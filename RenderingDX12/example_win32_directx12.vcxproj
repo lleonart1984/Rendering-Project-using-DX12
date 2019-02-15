@@ -373,6 +373,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Readme.md" />
     <None Include="CA4G\DirectXTex\DirectXTex.inl" />
     <None Include="CA4G\DirectXTex\Shaders\Compiled\BC6HEncode_EncodeBlockCS.inc" />
     <None Include="CA4G\DirectXTex\Shaders\Compiled\BC6HEncode_EncodeBlockCS.pdb" />
@@ -389,7 +390,6 @@
     <None Include="CA4G\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS.inc" />
     <None Include="CA4G\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS.pdb" />
     <None Include="CA4G\DirectXTex\Shaders\CompileShaders.cmd" />
-    <None Include="Readme.md" />
     <None Include="Techniques\Tutorials\Tutorials.rm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

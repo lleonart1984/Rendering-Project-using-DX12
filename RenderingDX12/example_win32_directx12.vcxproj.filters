@@ -126,6 +126,6 @@
     <None Include="CA4G\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS.inc" />
     <None Include="CA4G\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS.pdb" />
     <None Include="Techniques\Tutorials\Tutorials.rm" />
-    <None Include="Readme.md" />
+    <None Include="..\Readme.md" />
   </ItemGroup>
 </Project>
