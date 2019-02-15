@@ -474,7 +474,7 @@ void GraphicProcess(GraphicsManager *manager) {
 
 Notice `Backcolor` field was added by the `IHasBackcolor` trait.
 
-![Tutorial1](Images\Tutorial1.jpg)
+![Tutorial1](Images/Tutorial1.jpg)
 
 ## Tutorial 2. Populating commands asynchronously.
 
@@ -673,5 +673,5 @@ Finally we can draw the triangle primitive using 3 vertices from the bound verte
 manager gDraw Triangles(3);
 ```
 
-![Tutorial3](Images\Tutorial3.jpg)
+![Tutorial3](Images/Tutorial3.jpg)
 
