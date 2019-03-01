@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <d3d12.h>
 #include <dxgi1_4.h>
+#include "D3D12RaytracingFallback.h"
 #include <Windows.h>
 #include "gmath.h"
 #include "ca4GMemory.h"
@@ -524,8 +525,8 @@ class DeviceManager {
 	gObj<Texture2D> BackBuffer;
 	CountEvent *counting;
 	DescriptorsManager * const descriptors;
-	ID3D12Device2 * const device;
-	DeviceManager(ID3D12Device2 *device, int buffers);
+	ID3D12Device5 * const device;
+	DeviceManager(ID3D12Device5 *device, int buffers);
 
 public:
 	Creating * const creating;
@@ -3044,7 +3045,7 @@ public:
 	// Creates a presenter object that creates de DX device attached to a specific window (hWnd).
 	Presenter(HWND hWnd, bool fullScreen = false, int buffers = 3, bool useWarpDevice = false) {
 		UINT dxgiFactoryFlags = 0;
-		ID3D12Device2 *device;
+		ID3D12Device5 *device;
 
 #if defined(_DEBUG)
 		// Enable the debug layer (requires the Graphics Tools "optional feature").

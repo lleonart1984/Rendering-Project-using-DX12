@@ -203,7 +203,7 @@ gObj<ResourceView> ResourceView::getNullView(DeviceManager* manager, D3D12_RESOU
 
 #pragma region Device Manager
 
-DeviceManager::DeviceManager(ID3D12Device2 *device, int buffers)
+DeviceManager::DeviceManager(ID3D12Device5 *device, int buffers)
 	:
 	device(device),
 	counting(new CountEvent()),
