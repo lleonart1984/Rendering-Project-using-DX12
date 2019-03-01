@@ -211,6 +211,12 @@ DeviceManager::DeviceManager(ID3D12Device5 *device, int buffers, bool useFrameBu
 	creating(new Creating(this)),
 	loading(new Loading(this))
 {
+	auto hr = D3D12CreateRaytracingFallbackDevice(device, 0, 0, IID_PPV_ARGS(&fallbackDevice));
+
+	if (FAILED(hr)) {
+		throw AfterShow(CA4G_Errors_Unsupported_Fallback, nullptr, hr);
+	}
+
 	Scheduler = new GPUScheduler(this, useFrameBuffering, CA4G_MAX_NUMBER_OF_WORKERS, buffers);
 }
 
@@ -231,7 +237,7 @@ GPUScheduler::GPUScheduler(DeviceManager* manager, bool useFrameBuffering, int m
 	manager(manager),
 	useFrameBuffer(useFrameBuffering)
 {
-	ID3D12Device *device = manager->device;
+	ID3D12Device5 *device = manager->device;
 
 	// Creating the engines (engines are shared by all frames and threads...)
 	for (int e = 0; e < CA4G_SUPPORTED_ENGINES; e++) // 0 - direct, 1 - bunddle, 2 - compute, 3 - copy.
@@ -261,7 +267,7 @@ GPUScheduler::GPUScheduler(DeviceManager* manager, bool useFrameBuffering, int m
 
 			switch (type) {
 			case D3D12_COMMAND_LIST_TYPE_DIRECT:
-				thread.manager = new GraphicsManager(manager, thread.cmdList);
+				thread.manager = new DXRManager(manager, thread.cmdList);
 				break;
 			case D3D12_COMMAND_LIST_TYPE_BUNDLE:
 				thread.manager = new GraphicsManager(manager, thread.cmdList);

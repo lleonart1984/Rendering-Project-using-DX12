@@ -20,7 +20,9 @@ enum CA4G_Errors {
 	// Some initialization failed because memory was over
 	CA4G_Errors_RunOutOfMemory,
 	// Invalid Operation
-	CA4G_Errors_Invalid_Operation
+	CA4G_Errors_Invalid_Operation,
+	// Fallback raytracing device was not supported
+	CA4G_Errors_Unsupported_Fallback
 };
 
 // Shows a message box with a user-readable message for each error.
@@ -47,6 +49,9 @@ CA4G_Errors AfterShow(CA4G_Errors error, const wchar_t * arg = nullptr, HRESULT 
 		break;
 	case CA4G_Errors_Invalid_Operation:
 		errorMessage = TEXT("Invalid operation.");
+		break;
+	case CA4G_Errors_Unsupported_Fallback:
+		errorMessage = TEXT("Fallback raytracing device was not supported. Check OS is in Developer Mode.");
 		break;
 	default:
 		errorMessage = TEXT("Unknown error in CA4G");

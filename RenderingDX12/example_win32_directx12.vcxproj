@@ -105,7 +105,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;d3dcompiler.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;d3dcompiler.lib;dxgi.lib;dxguid.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SubSystem>Console</SubSystem>
       <EntryPointSymbol>
@@ -117,6 +117,13 @@
       <AssemblerOutput>AssemblyCode</AssemblerOutput>
       <AssemblerOutputFile>$(ProjectDir)$(Configuration)\%(RelativeDir)%(Filename).asm</AssemblerOutputFile>
     </FxCompile>
+    <PreBuildEvent>
+      <Command>cd "$(SolutionDir)tools\x64\"</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>cd "$(SolutionDir)tools\x64\"
+PostbuildCopy.bat "$(OutputPath)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -157,6 +164,13 @@
       <AssemblerOutput>AssemblyCode</AssemblerOutput>
       <AssemblerOutputFile>$(ProjectDir)$(Configuration)\%(RelativeDir)%(Filename).asm</AssemblerOutputFile>
     </FxCompile>
+    <PreBuildEvent>
+      <Command>cd "$(SolutionDir)tools\x64\"</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>cd "$(SolutionDir)tools\x64\"
+PostbuildCopy.bat "$(OutputPath)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CA4G\ca4g.h" />
@@ -473,6 +487,7 @@
     <None Include="CA4G\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS.inc" />
     <None Include="CA4G\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS.pdb" />
     <None Include="CA4G\DirectXTex\Shaders\CompileShaders.cmd" />
+    <None Include="packages.config" />
     <None Include="Techniques\Tutorials\Tutorials.rm" />
   </ItemGroup>
   <ItemGroup>
@@ -482,5 +497,12 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets'))" />
+  </Target>
 </Project>

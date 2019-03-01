@@ -45,6 +45,7 @@ class CommandListManager;
 class CopyingManager;
 class ComputeManager;
 class GraphicsManager;
+class DXRManager;
 class Presenter;
 class DeviceManager;
 template<typename ...A> class PipelineBindings;
@@ -72,6 +73,10 @@ struct EngineType {
 };
 template<>
 struct EngineType<GraphicsManager> {
+	static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+};
+template<>
+struct EngineType<DXRManager> {
 	static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 };
 template<>
@@ -395,7 +400,7 @@ class GPUScheduler {
 		// Info per thread
 		struct PerThreadInfo {
 			CommandListManager* manager;
-			ID3D12GraphicsCommandList* cmdList;
+			ID3D12GraphicsCommandList4* cmdList;
 			bool isActive;
 			// Prepares this command list for recording. This method resets the command list to use the desiredAllocator.
 			void Activate(ID3D12CommandAllocator* desiredAllocator) {
@@ -535,6 +540,7 @@ class DeviceManager {
 	friend GraphicsPipelineBindings;
 	friend ComputeManager;
 	friend GraphicsManager;
+	friend DXRManager;
 	friend GPUScheduler;
 
 	GPUScheduler * Scheduler;
@@ -545,6 +551,8 @@ class DeviceManager {
 	// Supported DXR interface here
 	ID3D12Device5 * const device;
 
+	// Fallback device object used to manage DXR functionalities when no GPU support.
+	ID3D12RaytracingFallbackDevice *fallbackDevice;
 
 	DeviceManager(ID3D12Device5 *device, int buffers, bool useFrameBuffer);
 	
@@ -2710,6 +2718,7 @@ class GraphicsManager : public ComputeManager {
 	friend Presenter;
 	friend DeviceManager;
 	friend GPUScheduler;
+	friend DXRManager;
 	template<typename> friend class Engine;
 
 	GraphicsManager(DeviceManager* manager, ID3D12GraphicsCommandList *cmdList) :ComputeManager(manager, cmdList),
@@ -2819,10 +2828,16 @@ public:
 	}*const drawer;
 };
 
-class DXRManager : public CommandListManager {
-public:
-	DXRManager(DeviceManager *manager, ID3D12GraphicsCommandList4 *cmdList) : CommandListManager(manager, cmdList) {
+class DXRManager : public GraphicsManager {
+	friend GPUScheduler;
+
+	ID3D12RaytracingFallbackCommandList *fallbackCmdList;
+
+	DXRManager(DeviceManager *manager, ID3D12GraphicsCommandList4 *cmdList) : GraphicsManager(manager, cmdList) {
+		manager->fallbackDevice->QueryRaytracingCommandList(cmdList, IID_PPV_ARGS(&fallbackCmdList));
 	}
+public:
+
 };
 
 #pragma endregion
