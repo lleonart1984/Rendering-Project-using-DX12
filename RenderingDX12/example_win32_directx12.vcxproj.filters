@@ -29,7 +29,6 @@
     <ClInclude Include="Imgui\imstb_rectpack.h" />
     <ClInclude Include="Imgui\imstb_textedit.h" />
     <ClInclude Include="Imgui\imstb_truetype.h" />
-    <ClInclude Include="CA4G\Implementations\ca4g_Resources_Partial.h" />
     <ClInclude Include="CA4G\ModelLoaders\Tokenizer.h" />
     <ClInclude Include="CA4G\ModelLoaders\ObjLoader.h" />
     <ClInclude Include="CA4G\ModelLoaders\Definitions.h" />
@@ -47,7 +46,6 @@
     <ClInclude Include="CA4G\DirectXTex\WICTextureLoader.h" />
     <ClInclude Include="CA4G\DirectXTex\WICTextureLoader12.h" />
     <ClInclude Include="CA4G\ca4gImaging.h" />
-    <ClInclude Include="CA4G\Implementations\ca4g_Pipelines_Partial.h" />
     <ClInclude Include="CA4G\ca4gApplication.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial1.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial2.h" />
@@ -58,6 +56,9 @@
     <ClInclude Include="Techniques\Tutorials\Tutorial6.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial7.h" />
     <ClInclude Include="CA4G\ca4GMemory.h" />
+    <ClInclude Include="main.h" />
+    <ClInclude Include="Techniques\Tutorials\Tutorial8.h" />
+    <ClInclude Include="Techniques\Tutorials\Tutorial9.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -107,6 +108,13 @@
     <FxCompile Include="Techniques\Tutorials\Shaders\SimpleTransform_VS.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\PassPositionAndCoordinates_VS.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\BasicSampling2D_PS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\TransformToViewSpace_VS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\SimplePhongShading_PS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\GrabDepthComplexity_PS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\ShowComplexity_PS.hlsl" />
+    <FxCompile Include="CA4G\Shaders\DrawScreen_VS.hlsl" />
+    <FxCompile Include="CA4G\Shaders\DrawScreen_PS.hlsl" />
+    <FxCompile Include="CA4G\Shaders\DrawComplexity_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CA4G\DirectXTex\DirectXTex.inl" />

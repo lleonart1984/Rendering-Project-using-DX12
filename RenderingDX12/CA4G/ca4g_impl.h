@@ -203,7 +203,7 @@ gObj<ResourceView> ResourceView::getNullView(DeviceManager* manager, D3D12_RESOU
 
 #pragma region Device Manager
 
-DeviceManager::DeviceManager(ID3D12Device2 *device, int buffers)
+DeviceManager::DeviceManager(ID3D12Device5 *device, int buffers, bool useFrameBuffering)
 	:
 	device(device),
 	counting(new CountEvent()),
@@ -211,7 +211,7 @@ DeviceManager::DeviceManager(ID3D12Device2 *device, int buffers)
 	creating(new Creating(this)),
 	loading(new Loading(this))
 {
-	Scheduler = new GPUScheduler(this, CA4G_MAX_NUMBER_OF_WORKERS, buffers);
+	Scheduler = new GPUScheduler(this, useFrameBuffering, CA4G_MAX_NUMBER_OF_WORKERS, buffers);
 }
 
 DeviceManager::~DeviceManager() {
@@ -226,7 +226,10 @@ DeviceManager::~DeviceManager() {
 
 #pragma region Engine implementation
 
-GPUScheduler::GPUScheduler(DeviceManager* manager, int max_threads, int buffers) : manager(manager)
+GPUScheduler::GPUScheduler(DeviceManager* manager, bool useFrameBuffering, int max_threads, int buffers) 
+	: 
+	manager(manager),
+	useFrameBuffer(useFrameBuffering)
 {
 	ID3D12Device *device = manager->device;
 

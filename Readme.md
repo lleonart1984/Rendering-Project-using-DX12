@@ -85,7 +85,7 @@ void LoadAssets (CopyingManager* manager) { ... }
 void ComputeSomePreprocessedData(ComputeManager* manager) { ... }
 
 void Startup() {
-	perform_async(LoadAssets);
+    perform_async(LoadAssets);
     perform_async(ComputeSomePreprocessedData);
 }
 ```
@@ -500,7 +500,7 @@ When this sample is run, two colors will be used randomly to clear the render ta
 
 ## Tutorial 3. A basic pipeline setup.
 
-This tutorial shows the definition of a pipeline bindings object in CA4G. This object plays several roles: Construct the root signature, define the pipeline state object and perform bindings of necessary resources to the visible descriptor heap when necessary.
+This tutorial shows the definition of a pipeline bindings object in CA4G. This object plays several roles: Constructs the root signature, defines the pipeline state object and performs bindings of necessary resources to the visible descriptor heap when necessary.
 
 First, define a new class to express your specific pipeline bindings extending `GraphicsPipelineBindings` class. Our bindings object needs at least the render target will be used to render at. A `Texture2D` field will be used to access to the necessary resource during binding.
 

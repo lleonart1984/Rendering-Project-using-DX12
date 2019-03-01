@@ -26,6 +26,10 @@
 #include "ca4gImaging.h"
 #include "ca4gDSL.h"
 
+#include "Shaders\DrawScreen_VS.hlsl.h"
+#include "Shaders\DrawScreen_PS.hlsl.h"
+#include "Shaders\DrawComplexity_PS.hlsl.h"
+
 #define CA4G_MAX_NUMBER_OF_WORKERS 8
 #define CA4G_SUPPORTED_ENGINES 4
 #define CA4G_SUPPORTED_BUFFERING 3
@@ -65,7 +69,6 @@ template<typename A>
 struct EngineType {
 	static const D3D12_COMMAND_LIST_TYPE Type;
 };
-
 template<>
 struct EngineType<GraphicsManager> {
 	static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -85,6 +88,8 @@ struct EngineType<CopyingManager> {
 #define ENGINE_MASK_BUNDLE 2
 #define ENGINE_MASK_COMPUTE 4
 #define ENGINE_MASK_COPY 8
+
+#define CompiledShader(s) (s),ARRAYSIZE(s) 
 
 #pragma endregion
 
@@ -329,6 +334,8 @@ CallableMember<T, CopyingManager>* ProcessPtr(T* instance, typename CallableMemb
 
 #pragma endregion
 
+#pragma region GPU Scheduler
+
 class GPUScheduler {
 	friend DeviceManager;
 	friend Presenter;
@@ -436,12 +443,14 @@ class GPUScheduler {
 	CountEvent *counting;
 	int threadsCount;
 	int currentFrameIndex;
+	// Gets whenever the user wants to synchronize frame rendering using frame buffering
+	bool useFrameBuffer;
 
 	Signal* perFrameFinishedSignal;
 
 	static DWORD WINAPI __WORKER_TODO(LPVOID param);
 
-	GPUScheduler(DeviceManager* manager, int max_threads = CA4G_MAX_NUMBER_OF_WORKERS, int buffers = CA4G_SUPPORTED_BUFFERING);
+	GPUScheduler(DeviceManager* manager, bool useFrameBuffer, int max_threads = CA4G_MAX_NUMBER_OF_WORKERS, int buffers = CA4G_SUPPORTED_BUFFERING);
 	
 	void PopulateCommandsBy(ICallableMember *process, int workerIndex);
 
@@ -483,7 +492,8 @@ class GPUScheduler {
 	}
 
 	void SetupFrame(int frame) {
-		WaitFor(perFrameFinishedSignal[frame]); // Grants the GPU finished working this frame in a previous stage
+		if (useFrameBuffer)
+			WaitFor(perFrameFinishedSignal[frame]); // Grants the GPU finished working this frame in a previous stage
 
 		currentFrameIndex = frame;
 
@@ -493,6 +503,10 @@ class GPUScheduler {
 
 	void FinishFrame() {
 		perFrameFinishedSignal[currentFrameIndex] = SendSignal(ENGINE_MASK_ALL);
+
+		if (!useFrameBuffer)
+			// Grants the GPU finished working this frame before finishing this frame
+			WaitFor(perFrameFinishedSignal[currentFrameIndex]);
 	}
 
 	void Enqueue(ICallableMember* process) {
@@ -504,6 +518,8 @@ class GPUScheduler {
 		workToDo->TryProduce(process);
 	}
 };
+
+#pragma endregion
 
 #pragma region Device Manager
 
@@ -524,9 +540,13 @@ class DeviceManager {
 	gObj<Texture2D> BackBuffer;
 	CountEvent *counting;
 	DescriptorsManager * const descriptors;
-	ID3D12Device2 * const device;
-	DeviceManager(ID3D12Device2 *device, int buffers);
+	// Device object used to manage DX functionalities
+	// Supported DXR interface here
+	ID3D12Device5 * const device;
 
+
+	DeviceManager(ID3D12Device5 *device, int buffers, bool useFrameBuffer);
+	
 public:
 	Creating * const creating;
 	Loading * const loading;
@@ -2062,7 +2082,7 @@ protected:
 		StreamBits = StreamTypeBits<PSS...>();
 	}
 
-	// Use this method to load a bytecode and set to a pipeline state description field.
+	// Use this method to load a bytecode
 	D3D12_SHADER_BYTECODE LoadByteCode(const char* bytecodeFilePath) {
 		D3D12_SHADER_BYTECODE code;
 		FILE* file;
@@ -2084,6 +2104,14 @@ protected:
 
 		code.BytecodeLength = count;
 		code.pShaderBytecode = (void*)bytecode;
+		return code;
+	}
+
+	// Use this method to load a bytecode from a memory buffer
+	D3D12_SHADER_BYTECODE LoadByteCodeFromMemory(const byte* bytecodeData, int count) {
+		D3D12_SHADER_BYTECODE code;
+		code.BytecodeLength = count;
+		code.pShaderBytecode = (void*)bytecodeData;
 		return code;
 	}
 
@@ -2220,6 +2248,52 @@ struct GraphicsPipelineBindings : public PipelineBindings <
 > {
 };
 
+class ShowComplexityPipeline : public GraphicsPipelineBindings {
+public:
+	// UAV to output the complexity
+	gObj<Texture2D> complexity;
+
+	// Render Target
+	gObj<Texture2D> RenderTarget;
+
+protected:
+	void Setup() {
+		_ gSet VertexShader(LoadByteCodeFromMemory(CompiledShader(cso_DrawScreen_VS)));
+		_ gSet PixelShader(LoadByteCodeFromMemory(CompiledShader(cso_DrawComplexity_PS)));
+		_ gSet InputLayout({
+				VertexElement(VertexElementType_Float, 2, "POSITION")
+			});
+	}
+
+	void Globals()
+	{
+		RTV(0, RenderTarget);
+		SRV(0, complexity, ShaderType_Pixel);
+	}
+};
+
+class ShowTexturePipeline : public GraphicsPipelineBindings {
+public:
+	// UAV to output the complexity
+	gObj<Texture2D> texture;
+	// Render Target
+	gObj<Texture2D> RenderTarget;
+
+protected:
+	void Setup() {
+		_ gSet VertexShader(LoadByteCodeFromMemory(CompiledShader(cso_DrawScreen_VS)));
+		_ gSet PixelShader(LoadByteCodeFromMemory(CompiledShader(cso_DrawScreen_PS)));
+		_ gSet InputLayout({
+				VertexElement(VertexElementType_Float, 2, "POSITION")
+			});
+	}
+
+	void Globals()
+	{
+		RTV(0, RenderTarget);
+		SRV(0, texture, ShaderType_Pixel);
+	}
+};
 
 // Allows to create a graphics pipeline state object
 //class GraphicsPipelineBindings : public PipelineBindings {
@@ -2425,7 +2499,7 @@ protected:
 	CommandListManager(DeviceManager* manager, ID3D12GraphicsCommandList *cmdList) :
 		manager(manager),
 		cmdList(cmdList),
-		clearing(new Clearing(cmdList)),
+		clearing(new Clearing(this, cmdList)),
 		copying(new Copying(this, cmdList)),
 		loading(new Loading(this))
 	{
@@ -2444,8 +2518,9 @@ public:
 	// Allows access to all clearing functions for Resources
 	class Clearing {
 		ID3D12GraphicsCommandList *cmdList;
+		CommandListManager *manager;
 	public:
-		Clearing(ID3D12GraphicsCommandList *cmdList) :cmdList(cmdList) {}
+		Clearing(CommandListManager *manager, ID3D12GraphicsCommandList *cmdList) :manager(manager),cmdList(cmdList) {}
 
 		inline Clearing* UAV(gObj<ResourceView> uav, const FLOAT values[4]) {
 			cmdList->ClearUnorderedAccessViewFloat(D3D12_GPU_DESCRIPTOR_HANDLE{}, uav->getUAVHandle(), uav->resource->internalResource, values, 0, nullptr);
@@ -2453,7 +2528,24 @@ public:
 		}
 		inline Clearing* UAV(gObj<ResourceView> uav, const float4 &value) {
 			float v[4]{ value.x, value.y, value.z, value.w };
-			cmdList->ClearUnorderedAccessViewFloat(D3D12_GPU_DESCRIPTOR_HANDLE{}, uav->getUAVHandle(), uav->resource->internalResource, v, 0, nullptr);
+			cmdList->ClearUnorderedAccessViewFloat(
+				this->manager->manager->descriptors->gpu_csu->getGPUVersion(uav->getUAV()), 
+				uav->getUAVHandle(), uav->resource->internalResource, v, 0, nullptr);
+			return this;
+		}
+		inline Clearing* UAV(gObj<ResourceView> uav, const unsigned int &value) {
+			unsigned int v[4]{ value, value, value, value };
+			uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			cmdList->ClearUnorderedAccessViewUint(
+				this->manager->manager->descriptors->gpu_csu->getGPUVersion(uav->getUAV()),
+				uav->getUAVHandle(), uav->resource->internalResource, v, 0, nullptr);
+			return this;
+		}
+		inline Clearing* UAV(gObj<ResourceView> uav, const uint4 &value) {
+			unsigned int v[4]{ value.x, value.y, value.z, value.w };
+			cmdList->ClearUnorderedAccessViewUint(
+				this->manager->manager->descriptors->gpu_csu->getGPUVersion(uav->getUAV()),
+				uav->getUAVHandle(), uav->resource->internalResource, v, 0, nullptr);
 			return this;
 		}
 		inline Clearing* UAV(gObj<ResourceView> uav, const unsigned int values[4]) {
@@ -2563,7 +2655,6 @@ public:
 	}* const loading;
 };
 
-
 // Allows to access to the DX12's Copy engine interface.
 class CopyingManager : public CommandListManager {
 	friend Presenter;
@@ -2630,7 +2721,6 @@ class GraphicsManager : public ComputeManager {
 		delete drawer;
 	}
 
-	
 public:
 	class Setter {
 		GraphicsManager *manager;
@@ -2726,6 +2816,12 @@ public:
 			return IndexedPrimitive(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, count, start);
 		}
 	}*const drawer;
+};
+
+class DXRManager : public CommandListManager {
+public:
+	DXRManager(DeviceManager *manager, ID3D12GraphicsCommandList4 *cmdList) : CommandListManager(manager, cmdList) {
+	}
 };
 
 #pragma endregion
@@ -2830,7 +2926,7 @@ public:
 	// Creates a 2D texture of specific element type.
 	// Use int, float, unsigned int, float[2,3,4], int[2,3,4]
 	template <class T>
-	gObj<Texture2D> DrawableTexture2D(int width, int height, int mips = 1, int slices = 1, D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COPY_DEST) {
+	gObj<Texture2D> DrawableTexture2D(int width, int height, int mips = 1, int slices = 1, D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON) {
 		D3D12_RESOURCE_DESC d;
 		ZeroMemory(&d, sizeof(D3D12_RESOURCE_DESC));
 		d.Width = width;
@@ -2845,7 +2941,6 @@ public:
 		d.Format = Formats<T>::Value;
 		return new Texture2D (CreateResourceAndWrap(d, state));
 	}
-
 	
 	// Creates a 2D texture for depth buffer purpose (32-bit float format).
 	gObj<Texture2D> DepthBuffer(int width, int height) {
@@ -3021,6 +3116,8 @@ class Presenter {
 	DeviceManager* manager;
 	IDXGISwapChain3* swapChain;
 
+	
+
 	unsigned int CurrentBuffer;
 
 	void __PrepareToPresent(GraphicsManager* cmds) {
@@ -3042,9 +3139,9 @@ public:
 	}
 
 	// Creates a presenter object that creates de DX device attached to a specific window (hWnd).
-	Presenter(HWND hWnd, bool fullScreen = false, int buffers = 3, bool useWarpDevice = false) {
+	Presenter(HWND hWnd, bool fullScreen = false, int buffers = 2, bool useFrameBuffering = false, bool useWarpDevice = false) {
 		UINT dxgiFactoryFlags = 0;
-		ID3D12Device2 *device;
+		ID3D12Device5 *device;
 
 #if defined(_DEBUG)
 		// Enable the debug layer (requires the Graphics Tools "optional feature").
@@ -3090,7 +3187,7 @@ public:
 		D3D12_FEATURE_DATA_D3D12_OPTIONS ops;
 		device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &ops, sizeof(ops));
 
-		manager = new DeviceManager(device, buffers);
+		manager = new DeviceManager(device, buffers, useFrameBuffering);
 		
 		RECT rect;
 		GetClientRect(hWnd, &rect);
@@ -3164,7 +3261,8 @@ public:
 
 		static int frameIndex = 0;
 
-		manager->descriptors->gpu_csu->Reset((frameIndex++) % 3);
+		//manager->descriptors->gpu_csu->Reset((frameIndex++) % 3);
+		manager->descriptors->gpu_csu->Reset(CurrentBuffer);
 
 		manager->BackBuffer = renderTargetViews[CurrentBuffer];
 
