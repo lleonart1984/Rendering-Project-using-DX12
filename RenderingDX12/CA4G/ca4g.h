@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <d3d12.h>
 #include <dxgi1_4.h>
+#include "D3D12RaytracingFallback.h"
 #include <Windows.h>
 #include "gmath.h"
 #include "ca4GMemory.h"
