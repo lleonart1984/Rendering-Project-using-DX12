@@ -7,7 +7,7 @@
 #include <tchar.h>
 #include <shlobj.h>
 
-#include "stdafx.h"
+#include "main.h"
 
 #define DX12_ENABLE_DEBUG_LAYER     0
 
@@ -70,7 +70,12 @@ int main(int, char**)
 	ShowWindow(hWnd, SW_SHOWDEFAULT);
 	UpdateWindow(hWnd);
 
+#ifdef WARP
+	static Presenter* presenter = new Presenter(hWnd, false, 2, false, true);
+#else
 	static Presenter* presenter = new Presenter(hWnd);
+#endif
+
 	presenter->Load(technique);
 	gObj<IHasBackcolor> asBackcolorRenderer = technique.Dynamic_Cast<IHasBackcolor>();
 	gObj<IHasScene> asSceneRenderer = technique.Dynamic_Cast<IHasScene>();
