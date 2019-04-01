@@ -410,7 +410,7 @@ void GraphicProcess(GraphicsManager *manager) {
     // Setting up per frame bindings
     pipeline->cameraCB = cameraCB;
    	// this is necessary every frame because 3 different render targets 
-    // can be used for triple-buffering support.
+    // might be used for triple-buffering support.
     pipeline->renderTarget = render_target; 
 
     manager gClear RT(render_target, Backcolor);
@@ -435,6 +435,266 @@ void GraphicProcess(GraphicsManager *manager) {
     }
 }
 ```
+
+
+
+# Raytracing support
+
+One of the main ideas behind CA4G is to fully support all capabilities of DirectX12 API. Every technique that might be implemented over DirectX12 should be possible to implement using this facade. DXR is not an exception.
+
+In CA4G is presented a new command list manager named `DXRManager`. This command list manager works internally over a DIRECT-type command list (can be cast to `GraphicsManager` if necessary). Similarly to a `GraphicsManager` setup (setting a pipeline object), DXR works setting a `RTPipelineManager` object into the pipeline. Then, developer can decide what ray-tracing program to activate and how to setup shaders (ray-generations, miss and hit groups) to obtain the desired ray-trace process.
+
+For devices that doesn't have DXR hardware support, internally in DXRManager will be used a fallback device object transparently. Developers do not need to handle this.
+
+To explain step-by-step proposed DXR support in CA4G will be used the first example from the DirectX Samples repository. In this example a basic library is defined with three shaders: a shader to generate parallel rays in a normalized viewport (`MyRaygenShader`), a miss shader to paint a solid color when ray misses the geometry (`MyMissShader`), and a closest hit shader (`MyClosestHitShader`) to color ray payload with the barycentric coordinates of the intersection.
+
+On the other hand, the applications needs to setup a single bottom level acceleration data structure with a simple triangle geometry, and a top level acceleration data structure with a single instance to this bottom level geometry. Then a global signature is used to refer to the Scene object (a shader resource view), and the output target (an UAV Texture2D). Only for illustration, a local signature is used to refer to a constant with some other application parameter (the viewports).
+
+The shader was lightly modified from DirectX Samples and is shown next.
+
+```c
+struct Viewport
+{
+	float left;
+	float top;
+	float right;
+	float bottom;
+};
+
+struct RayGenConstantBuffer {
+	Viewport viewport;
+	Viewport stencil;
+};
+
+typedef BuiltInTriangleIntersectionAttributes MyAttributes;
+struct RayPayload
+{
+	float4 color;
+};
+
+RaytracingAccelerationStructure Scene : register(t0, space0);
+RWTexture2D<float4> RenderTarget : register(u0);
+ConstantBuffer<RayGenConstantBuffer> g_rayGenCB : register(b0);
+
+bool IsInsideViewport(float2 p, Viewport viewport)
+{
+	return (p.x >= viewport.left && p.x <= viewport.right)
+		&& (p.y >= viewport.top && p.y <= viewport.bottom);
+}
+
+[shader("raygeneration")]
+void MyRaygenShader()
+{
+	float2 lerpValues = (float2)DispatchRaysIndex() / (float2)DispatchRaysDimensions();
+
+// Orthographic projection since we're raytracing in screen space.
+float3 rayDir = float3(0, 0, 1);
+float3 origin = float3(lerpValues * 2 - 1, -1);
+
+if (IsInsideViewport(origin.xy, g_rayGenCB.stencil))
+{
+	// Trace the ray.
+	// Set the ray's extents.
+	RayDesc ray;
+	ray.Origin = origin;
+	ray.Direction = rayDir;
+	// Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
+	// TMin should be kept small to prevent missing geometry at close contact areas.
+	ray.TMin = 0.001;
+	ray.TMax = 10000.0;
+	RayPayload payload = { float4(0, 0, 1, 1) };
+	TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
+
+	// Write the raytraced color to the output texture.
+	RenderTarget[DispatchRaysIndex().xy] = payload.color;
+}
+else
+{
+	// Render interpolated DispatchRaysIndex outside the stencil window
+	RenderTarget[DispatchRaysIndex().xy] = float4(lerpValues, 0, 1);
+}
+
+}
+
+[shader("closesthit")]
+void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
+{
+	float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
+	payload.color = float4(barycentrics, 1);
+}
+
+[shader("miss")]
+void MyMissShader(inout RayPayload payload)
+{
+	payload.color = float4(1, 0, 1, 1);
+}
+```
+
+Next, we will explain how this example can be implemented using CA4G concepts to support DXR caps.
+
+## Ray-tracing Pipeline Manager
+
+In CA4G the `RTPipelineManager` class is meant to be inherited specializing some methods to describe what DXIL libraries should loaded and which ray-tracing programs can be loaded from them. That means that it can be loaded 3 DXIL libraries and use all exported shaders to setup one single program.
+
+The program's role is to stablish several shaders will be used in a dispatch rays call, therefore, shares the same global signature and local signatures by shader type.
+
+Lets define for this example a new `RTPipelineManager` subclass object named `DXRBasic`.
+
+```c++
+struct DXRBasic : public RTPipelineManager {
+...
+}
+```
+
+This type must expose all shader objects (represented in CA4G with a specific handle object), libraries and programs loaded.
+
+### Wrapping a DXIL library
+
+First, lets use an object to refer a single DXIL library and all its exports.
+
+```c++
+class DX_RTX_Sample_RT : public DXIL_Library<DXRBasic> {
+	void Setup() {
+		_ gLoad DXIL (ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\DX_RTX_Basic_RT.cso"));
+		_ gLoad Shader(Context()->MyRaygenShader, L"MyRaygenShader");
+		_ gLoad Shader(Context()->MyClosestHitShader, L"MyClosestHitShader");
+		_ gLoad Shader(Context()->MyMissShader, L"MyMissShader");
+	}
+};
+gObj<DX_RTX_Sample_RT> _Library;
+
+
+```
+
+Notice shaders are loaded (declared as exported by this library) and fill the handle present in the Context() object. The `Context()` method references to the RT pipeline manager that loaded this library. This is convenient to have only one object with the shader handles. Imaging there are three different libraries with shaders definitions required by a program. Instead of having the same shaders handles replicated in the RT Pipeline Manager object, the library object and the program object, we propose to have them only as fields of the `RTPipelineManager` subclass and the refers to them from other objects using the `Context()` method. The template is used to specify the `RTPipelineManager` type used to load this library, this way, the Context method will be statically typed to the context where this library is being used.
+
+### Defining a Ray Tracing Program
+
+Once a library was loaded, a ray-tracing program can be conceived because required shaders will be available.
+
+The Setup method of a program will load all required shaders and will create hit groups using those shaders. Also, all settings such as `StackSize`, `PayloadSize` and `AttributeSize`, must be fulfilled here if necessary.
+
+```c++
+class MyProgram : public RTProgram<DXRBasic>
+{
+protected:
+	void Setup() {
+		_ gSet Payload(16);
+		_ gLoad Shader(Context()->MyRaygenShader);
+		_ gLoad Shader(Context()->MyMissShader);
+		_ gCreate HitGroup(ClosestHit, Context()->MyClosestHitShader, {}, {});
+	}
+
+	void Globals() override {
+		UAV(0, Output);
+		ADS(0, Scene); // Acceleration Data Structure
+	}
+
+	void RayGeneration_Locals() override {
+		CBV(0, RayGenConstantBuffer);
+	}
+public:
+	// Generated by this program
+	HitGroupHandle ClosestHit;
+	
+	// Input
+	gObj<SceneOnGPU> Scene;
+	gObj<Texture2D> Output;
+	struct Viewport { float l, t, r, b; };
+	struct RayGenConstantBuffer {
+		Viewport viewport;
+		Viewport stencil;
+	} RayGenConstantBuffer;
+
+};
+gObj<MyProgram> _Program;
+```
+
+The `Globals` method will define all bindings required when this program is activated on the pipeline. This method is used to declare the global signature and all loaded shaders (and hit groups created) in this program are automatically associated to this root signature.
+
+The method RayGeneration_Locals needs to be overridden in order to specify this ray generation shader will use a local data store in the shader table (this is not necessary because only one ray-generation shader can be used in a dispatch ray but was used to illustrate how local signatures are created and associated to shaders).
+
+This program creates a hit group with a closesthit shader and no intersection, neither anyhit shaders.
+
+In next sections will be explained in detail the role of the `SceneOnGPU` object. Now, consider this object as a reference (by any means necessary) to the top level acceleration data structure. 
+
+Once we defined the library wrappers and ray-tracing programs, the RTPipelineManager subobject can be completed.
+
+```c++
+struct DXRBasic : public RTPipelineManager {
+
+	RayGenerationHandle MyRaygenShader;
+	ClosestHitHandle MyClosestHitShader;
+	MissHandle MyMissShader;
+
+	class DX_RTX_Sample_RT : public DXIL_Library<DXRBasic> {...};
+	gObj<DX_RTX_Sample_RT> _Library;
+
+	class MyProgram : public RTProgram<DXRBasic> {...};
+	gObj<MyProgram> _Program;
+
+	void Setup() override {
+		_ gLoad Library(_Library);
+		_ gLoad Program(_Program);
+	}
+}
+```
+
+The CA4G façade hides internally in this object the construction of the DX12 state object. The other functionality of a program object is to handle internally shader tables and resource bindings (to the GPU or to the shader table entries).
+
+## Building the Acceleration Structures
+
+In CA4G, the process of building the bottom level acceleration DS is handled by a type named `GeometryCollection`. This object can be created by a `DXRManager` and stores geometries (using load commands) and then creates a buffer with all the bottom level structure using the method in creating module `BakedGeometries()`.
+
+```c++
+void BuildScene(DXRManager* manager) {
+	auto geometries = manager gCreate TriangleGeometries();
+	geometries gSet VertexBuffer(vertices, VERTEX::Layout());
+	geometries gLoad Geometry(0, 3);
+	auto geometriesOnGPU = geometries gCreate BakedGeometry();
+    
+	auto instances = manager gCreate Instances();
+	instances gLoad Instance(geometriesOnGPU);
+	this->Scene = instances gCreate BakedScene();
+}
+```
+
+After this, the top level data structure can be created (because will reference the instances to the bottom level objects).
+
+For this, the `InstanceCollection` object is used. This object can be created with the `Intances` method in the `DXRManager::Creating` module.
+
+Finally the `SceneOnGPU` object (mostly top level acceleration data-structure) can be created using the `BakeScene` method.
+
+## Dispatching rays
+
+```c++
+void Raytracing(DXRManager *manager) {
+	auto rtProgram = pipeline->_Program;
+	rtProgram->Output = rtRenderTarget;
+	rtProgram->Scene = this->Scene;
+	rtProgram->RayGenConstantBuffer = {
+		{ -0.9, -0.9, 0.9, 0.9},
+		{-0.9, -0.9, 0.9, 0.9}
+	};
+	manager gSet Pipeline(pipeline);
+	manager gSet Program(rtProgram);
+	manager gSet Miss(pipeline->MyMissShader, 0);
+	manager gSet HitGroup(rtProgram->ClosestHit, 0);
+	manager gSet RayGeneration(pipeline->MyRaygenShader);
+	manager gDispatch Rays(render_target->Width, render_target->Height);
+	manager gCopy All(render_target, rtRenderTarget);
+}
+```
+
+As shown in this code, the "rendering" process of the ray-tracing program can be as follows.
+
+First, set all necessary resources to the program before bindings. Then set the pipeline object and after this activate (with gSet) the program to bind. Notice a program is not forced to have a single ray-generation shader, but it must be defined (set) later.
+
+Set all necessary shaders into the pipeline (this will update necessary shader tables with the shader identifiers and bind local resources). Miss and HitGroup methods receives a way of indexing the current bindings. That means, if you have two different miss shaders you will need to assign for each all local bindings before calling to `Miss (..., index)`.
+
+The dispatch rays command will use all shader tables of the active program and perform the ray-tracing process. Then a copy command can be used to save from the generated UAV object to the render target.
+
+![DXRSample1](Images/DXRSample1.jpg)
 
 
 

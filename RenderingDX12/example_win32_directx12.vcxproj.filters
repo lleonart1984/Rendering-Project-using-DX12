@@ -59,6 +59,7 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial8.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial9.h" />
+    <ClInclude Include="Techniques\Tutorials\Tutorial10.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -115,6 +116,8 @@
     <FxCompile Include="CA4G\Shaders\DrawScreen_VS.hlsl" />
     <FxCompile Include="CA4G\Shaders\DrawScreen_PS.hlsl" />
     <FxCompile Include="CA4G\Shaders\DrawComplexity_PS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\DX_RTX_Sample_RT.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\DX_RTX_Basic_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CA4G\DirectXTex\DirectXTex.inl" />

@@ -46,7 +46,7 @@ public:
 	template <typename Subtype>
 	ManagedObject(const ManagedObject<Subtype>& other) {
 		this->counter = other.counter;
-		this->_this = other._this;
+		this->_this = (S*)other._this;
 		AddReference();
 	}
 
@@ -56,6 +56,14 @@ public:
 		this->_this = other._this;
 		AddReference();
 		return *this;
+	}
+
+	bool operator == (const ManagedObject<S> &other) {
+		return other._this == _this;
+	}
+
+	bool operator != (const ManagedObject<S> &other) {
+		return other._this != _this;
 	}
 
 	~ManagedObject() {

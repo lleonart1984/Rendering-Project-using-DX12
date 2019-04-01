@@ -19,8 +19,8 @@ public:
 
 protected:
 	void Setup() {
-		_ gSet VertexShader(LoadByteCode(".\\Techniques\\Sample\\Sample_VS.cso"));
-		_ gSet PixelShader(LoadByteCode(".\\Techniques\\Sample\\Sample_PS.cso"));
+		_ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\Sample\\Sample_VS.cso"));
+		_ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\Sample\\Sample_PS.cso"));
 		_ gSet InputLayout(SCENE_VERTEX::Layout());
 		_ gSet DepthTest();
 		_ gSet DepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
@@ -157,7 +157,7 @@ protected:
 			pipeline->locals = transforms[i];
 			pipeline->materials = materials[i];
 
-			manager gDraw Triangles(object.vertexesCount, object.startVertex);
+			manager gDispatch Triangles(object.vertexesCount, object.startVertex);
 		}
 	}
 

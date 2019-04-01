@@ -9,8 +9,7 @@
 
 #include "main.h"
 
-#define DX12_ENABLE_DEBUG_LAYER     0
-
+//#define WARP
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)

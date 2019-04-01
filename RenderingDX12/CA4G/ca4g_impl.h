@@ -5,7 +5,7 @@
 
 #pragma region Command List Manager
 
-void CommandListManager::__All(gObj<ResourceWrapper> dst, gObj<ResourceWrapper> src) {
+void CommandListManager::__All(gObj<ResourceWrapper> & const dst, gObj<ResourceWrapper> & const src) {
 
 	if (EquivalentDesc(dst->internalResource->GetDesc(), src->internalResource->GetDesc()))
 	{ // have the same dimensions
@@ -117,8 +117,398 @@ void PipelineBindings<A...>::BindOnGPU(ComputeManager *manager, const list<SlotB
 	}
 }
 
+void IRTProgram::BindOnGPU(DXRManager *manager, gObj<BindingsHandle> globals) {
+	ID3D12GraphicsCommandList* cmdList = manager->cmdList;
+	ID3D12RaytracingFallbackCommandList* fallbackCmdList = manager->fallbackCmdList;
+	// Foreach bound slot
+	for (int i = 0; i < globals->csuBindings.size(); i++)
+	{
+		auto binding = globals->csuBindings[i];
+
+		switch (binding.Root_Parameter.ParameterType)
+		{
+		case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+			cmdList->SetComputeRoot32BitConstants(i, binding.Root_Parameter.Constants.Num32BitValues,
+				binding.ConstantData.ptrToConstant, 0);
+			break;
+		case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
+		{
+#pragma region DESCRIPTOR TABLE
+			// Gets the range length (if bound an array) or 1 if single.
+			int count = binding.DescriptorData.ptrToCount == nullptr ? 1 : *binding.DescriptorData.ptrToCount;
+
+			// Gets the bound resource if single
+			gObj<ResourceView> resource = binding.DescriptorData.ptrToCount == nullptr ? *((gObj<ResourceView>*)binding.DescriptorData.ptrToResourceViewArray) : nullptr;
+
+			// Gets the bound resources if array or treat the resource as a single array case
+			gObj<ResourceView>* resourceArray = binding.DescriptorData.ptrToCount == nullptr ? &resource
+				: *((gObj<ResourceView>**)binding.DescriptorData.ptrToResourceViewArray);
+
+			// foreach resource in bound array (or single resource treated as array)
+			for (int j = 0; j < count; j++)
+			{
+				// reference to the j-th resource (or bind null if array is null)
+				gObj<ResourceView> resource = resourceArray == nullptr ? nullptr : *(resourceArray + j);
+
+				if (!resource)
+					// Grant a resource view to create null descriptor if missing resource.
+					resource = ResourceView::getNullView(this->manager, binding.DescriptorData.Dimension);
+
+				// Gets the cpu handle at not visible descriptor heap for the resource
+				D3D12_CPU_DESCRIPTOR_HANDLE handle;
+				resource->getCPUHandleFor(binding.Root_Parameter.DescriptorTable.pDescriptorRanges[0].RangeType, handle);
+
+				// Adds the handle of the created descriptor into the src list.
+				manager->srcDescriptors.add(handle);
+			}
+			// add the descriptors range length
+			manager->dstDescriptorRangeLengths.add(count);
+			int startIndex = this->manager->descriptors->gpu_csu->Malloc(count);
+			manager->dstDescriptors.add(this->manager->descriptors->gpu_csu->getCPUVersion(startIndex));
+			cmdList->SetComputeRootDescriptorTable(i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
+			break; // DESCRIPTOR TABLE
+#pragma endregion
+		}
+		case D3D12_ROOT_PARAMETER_TYPE_CBV:
+		{
+#pragma region DESCRIPTOR CBV
+			// Gets the range length (if bound an array) or 1 if single.
+			gObj<ResourceView> resource = *((gObj<ResourceView>*)binding.DescriptorData.ptrToResourceViewArray);
+			cmdList->SetComputeRootConstantBufferView(i, resource->resource->GetGPUVirtualAddress());
+			break; // DESCRIPTOR CBV
+#pragma endregion
+		}
+		case D3D12_ROOT_PARAMETER_TYPE_SRV: // this parameter is used only for top level data structures
+		{
+#pragma region DESCRIPTOR SRV
+			// Gets the range length (if bound an array) or 1 if single.
+			gObj<SceneOnGPU> scene = *((gObj<SceneOnGPU>*)binding.SceneData.ptrToScene);
+			
+			if (manager->manager->fallbackDevice != nullptr)
+			{ // Used Fallback device
+				 fallbackCmdList->SetTopLevelAccelerationStructure(i, scene->topLevelAccFallbackPtr);
+			}
+			else
+				cmdList->SetComputeRootShaderResourceView(i, scene->topLevelAccDS->resource->GetGPUVirtualAddress());
+			break; // DESCRIPTOR CBV
+#pragma endregion
+		}
+		}
+	}
+}
+
+void IRTProgram::BindLocalsOnShaderTable(gObj<BindingsHandle> locals, byte* shaderRecordData) {
+	for (int i = 0; i < locals->csuBindings.size(); i++)
+	{
+		auto binding = locals->csuBindings[i];
+
+		switch (binding.Root_Parameter.ParameterType)
+		{
+		case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+			memcpy(shaderRecordData, binding.ConstantData.ptrToConstant, binding.Root_Parameter.Constants.Num32BitValues * 4);
+			shaderRecordData += binding.Root_Parameter.Constants.Num32BitValues * 4;
+			break;
+		default:
+			shaderRecordData += 4 * 4;
+		}
+	}
+}
+
+// Create a wrapped pointer for the Fallback Layer path.
+WRAPPED_GPU_POINTER DeviceManager::CreateFallbackWrappedPointer(gObj<Buffer> resource, UINT bufferNumElements)
+{
+	D3D12_UNORDERED_ACCESS_VIEW_DESC rawBufferUavDesc = {};
+	rawBufferUavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+	rawBufferUavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+	rawBufferUavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+	rawBufferUavDesc.Buffer.NumElements = bufferNumElements;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE bottomLevelDescriptor;
+
+	// Only compute fallback requires a valid descriptor index when creating a wrapped pointer.
+	UINT descriptorHeapIndex = 0;
+	if (!fallbackDevice->UsingRaytracingDriver())
+	{
+		descriptorHeapIndex = descriptors->gpu_csu->MallocPersistent();
+		bottomLevelDescriptor = descriptors->gpu_csu->getCPUVersion(descriptorHeapIndex);
+		device->CreateUnorderedAccessView(resource->resource->internalResource, nullptr, &rawBufferUavDesc, bottomLevelDescriptor);
+	}
+	return fallbackDevice->GetWrappedPointerSimple(descriptorHeapIndex, resource->resource->internalResource->GetGPUVirtualAddress());
+}
+/*
+void SceneBuilder::Build(DXRManager* manager) {
+	// Get required sizes for an acceleration structure.
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
+	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	topLevelInputs.Flags = buildFlags;
+	topLevelInputs.NumDescs = instances.size();
+	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
+
+	if (manager->manager->fallbackDevice != nullptr)
+	{
+		manager->manager->fallbackDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+	}
+	else // DirectX Raytracing
+	{
+		manager->manager->device->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+	}
+
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = topLevelInputs;
+	bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	bottomLevelInputs.Flags = buildFlags;
+	bottomLevelInputs.NumDescs = geometries.size();
+	bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+	bottomLevelInputs.pGeometryDescs = &geometries.first();
+
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
+	if (manager->manager->fallbackDevice != nullptr)
+	{
+		manager->manager->fallbackDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+	}
+	else // DirectX Raytracing
+	{
+		manager->manager->device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+	}
+
+	D3D12_RESOURCE_STATES initialResourceState;
+	if (manager->manager->fallbackDevice != nullptr)
+	{
+		initialResourceState = manager->manager->fallbackDevice->GetAccelerationStructureResourceState();
+	}
+	else // DirectX Raytracing
+	{
+		initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+	}
+	lastBakedTopLevel = manager->manager->creating->GenericBuffer<byte>(initialResourceState, topLevelPrebuildInfo.ResultDataMaxSizeInBytes,
+		CPU_ACCESS_NONE, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	lastBakedBottomLevel = manager->manager->creating->GenericBuffer<byte>(initialResourceState, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes,
+		CPU_ACCESS_NONE, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+	// Create instance buffers for top level ds bound to bottom level positions
+
+	if (manager->manager->fallbackDevice != nullptr) {
+		// Create an instance desc for the bottom-level acceleration structure.
+	}
+	else {
+
+	}
+
+	gObj<Buffer> instancesBuffer = manager->manager->creating->GenericBuffer<byte>();
+
+	// build both acc ds
+
+}
+*/
+
+gObj<GeometriesOnGPU> GeometryCollection::Creating::BakedGeometry() {
+	// creates the bottom level acc ds and emulated gpu pointer if necessary
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	inputs.Flags = buildFlags;
+	inputs.NumDescs = manager->geometries.size();
+	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+	inputs.pGeometryDescs = &manager->geometries.first();
+
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
+	if (manager->manager->fallbackDevice != nullptr)
+	{
+		manager->manager->fallbackDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuildInfo);
+	}
+	else // DirectX Raytracing
+	{
+		manager->manager->device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuildInfo);
+	}
+
+	D3D12_RESOURCE_STATES initialResourceState;
+	if (manager->manager->fallbackDevice != nullptr)
+	{
+		initialResourceState = manager->manager->fallbackDevice->GetAccelerationStructureResourceState();
+	}
+	else // DirectX Raytracing
+	{
+		initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+	}
+
+	gObj<Buffer> scratchBuffer = manager->manager->creating->GenericBuffer<byte>(D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		prebuildInfo.ScratchDataSizeInBytes, CPU_ACCESS_NONE, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+	gObj<Buffer> buffer = manager->manager->creating->GenericBuffer<byte>(initialResourceState,
+		prebuildInfo.ResultDataMaxSizeInBytes, CPU_ACCESS_NONE, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+	// Bottom Level Acceleration Structure desc
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
+	{
+		bottomLevelBuildDesc.Inputs = inputs;
+		bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchBuffer->resource->GetGPUVirtualAddress();
+		bottomLevelBuildDesc.DestAccelerationStructureData = buffer->resource->GetGPUVirtualAddress();
+	}
+
+	if (manager->manager->fallbackDevice != nullptr)
+	{
+		ID3D12DescriptorHeap *pDescriptorHeaps[] = { 
+			manager->manager->descriptors->gpu_csu->getInnerHeap(), 
+			manager->manager->descriptors->gpu_smp->getInnerHeap() };
+		manager->cmdList->fallbackCmdList->SetDescriptorHeaps(ARRAYSIZE(pDescriptorHeaps), pDescriptorHeaps);
+		manager->cmdList->fallbackCmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+	}
+	else
+		manager->cmdList->cmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+
+	buffer->ChangeStateTo(manager->cmdList->cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+	gObj<GeometriesOnGPU> result = new GeometriesOnGPU();
+	result->bottomLevelAccDS = buffer;
+	result->scratchBottomLevelAccDS = scratchBuffer;
+
+	if (manager->manager->fallbackDevice != nullptr) {
+		// store an emulated gpu pointer via UAV
+		UINT numBufferElements = static_cast<UINT>(prebuildInfo.ResultDataMaxSizeInBytes) / sizeof(UINT32);
+		result->emulatedPtr = manager->manager->CreateFallbackWrappedPointer(buffer, numBufferElements);
+	}
+
+	return result;
+}
+
+gObj<SceneOnGPU> InstanceCollection::Creating::BakedScene() {
+	// Bake scene using instance buffer and generate the top level DS
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	inputs.Flags = buildFlags;
+	
+	if (manager->manager->fallbackDevice != nullptr)
+		inputs.NumDescs = manager->fallbackInstances.size();
+	else
+		inputs.NumDescs = manager->instances.size();
+	
+	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+	if (manager->manager->fallbackDevice != nullptr)
+		manager->manager->fallbackDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuildInfo);
+	else // DirectX Raytracing
+		manager->manager->device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuildInfo);
+
+	gObj<Buffer> scratchBuffer = manager->manager->creating->GenericBuffer<byte>(D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		prebuildInfo.ScratchDataSizeInBytes, CPU_ACCESS_NONE, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+	D3D12_RESOURCE_STATES initialResourceState;
+	if (manager->manager->fallbackDevice != nullptr)
+	{
+		initialResourceState = manager->manager->fallbackDevice->GetAccelerationStructureResourceState();
+	}
+	else // DirectX Raytracing
+	{
+		initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+	}
+
+	gObj<Buffer> buffer = manager->manager->creating->GenericBuffer<byte>(initialResourceState,
+		prebuildInfo.ResultDataMaxSizeInBytes, CPU_ACCESS_NONE, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+	gObj<Buffer> instanceBuffer;
+	
+	if (manager->manager->fallbackDevice != nullptr) {
+		instanceBuffer = manager->manager->creating->GenericBuffer<byte>(D3D12_RESOURCE_STATE_GENERIC_READ,
+			sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC)*manager->fallbackInstances.size(), CPU_WRITE_GPU_READ, D3D12_RESOURCE_FLAG_NONE);
+		instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->fallbackInstances.first(), sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC)*manager->fallbackInstances.size());
+	}
+	else {
+		instanceBuffer = manager->manager->creating->GenericBuffer<byte>(D3D12_RESOURCE_STATE_GENERIC_READ,
+			sizeof(D3D12_RAYTRACING_INSTANCE_DESC)*manager->instances.size(), CPU_WRITE_GPU_READ, D3D12_RESOURCE_FLAG_NONE);
+		instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->instances.first(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC)*manager->instances.size());
+	}
+
+	// Build acc structure
+	
+	// Top Level Acceleration Structure desc
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
+	{
+		inputs.InstanceDescs = instanceBuffer->resource->internalResource->GetGPUVirtualAddress();
+		topLevelBuildDesc.Inputs = inputs;
+		topLevelBuildDesc.ScratchAccelerationStructureData = scratchBuffer->resource->GetGPUVirtualAddress();
+		topLevelBuildDesc.DestAccelerationStructureData = buffer->resource->GetGPUVirtualAddress();
+	}
+
+	if (manager->manager->fallbackDevice != nullptr)
+	{
+		ID3D12DescriptorHeap *pDescriptorHeaps[] = {
+			manager->manager->descriptors->gpu_csu->getInnerHeap(),
+			manager->manager->descriptors->gpu_smp->getInnerHeap() };
+		manager->cmdList->fallbackCmdList->SetDescriptorHeaps(ARRAYSIZE(pDescriptorHeaps), pDescriptorHeaps);
+		manager->cmdList->fallbackCmdList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+	}
+	else
+		manager->cmdList->cmdList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+
+	// Valid for Top level ds as well?
+	buffer->ChangeStateTo(manager->cmdList->cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+	gObj<SceneOnGPU> result = new SceneOnGPU();
+
+	result->scratchBuffer = scratchBuffer;
+	result->topLevelAccDS = buffer;
+	result->instancesBuffer = instanceBuffer;
+	result->usedGeometries = manager->usedGeometries;
+	// Create a wrapped pointer to the acceleration structure.
+	if (manager->manager->fallbackDevice != nullptr)
+	{
+		UINT numBufferElements = static_cast<UINT>(prebuildInfo.ResultDataMaxSizeInBytes) / sizeof(UINT32);
+		result->topLevelAccFallbackPtr = manager->manager->CreateFallbackWrappedPointer(buffer, numBufferElements);
+	}
+
+	return result;
+}
+
+//void DXRStateBindings::BindOnGPU(DXRManager *manager, const list<SlotBinding> &list, int startRootParameter) {
+//	ID3D12GraphicsCommandList* cmdList = manager->cmdList;
+//
+//	// Foreach bound slot
+//	for (int i = 0; i < list.size(); i++)
+//	{
+//		auto binding = list[i];
+//
+//		// Gets the range length (if bound an array) or 1 if single.
+//		int count = binding.ptrToCount == nullptr ? 1 : *binding.ptrToCount;
+//
+//		// Gets the bound resource if single
+//		gObj<ResourceView> resource = binding.ptrToCount == nullptr ? *((gObj<ResourceView>*)binding.ptrToResource) : nullptr;
+//
+//		// Gets the bound resources if array or treat the resource as a single array case
+//		gObj<ResourceView>* resourceArray = binding.ptrToCount == nullptr ? &resource
+//			: *((gObj<ResourceView>**)binding.ptrToResource);
+//
+//		// foreach resource in bound array (or single resource treated as array)
+//		for (int j = 0; j < count; j++)
+//		{
+//			// reference to the j-th resource (or bind null if array is null)
+//			gObj<ResourceView> resource = resourceArray == nullptr ? nullptr : *(resourceArray + j);
+//
+//			if (!resource)
+//				// Grant a resource view to create null descriptor if missing resource.
+//				resource = ResourceView::getNullView(this->manager, binding.Dimension);
+//
+//			// Gets the cpu handle at not visible descriptor heap for the resource
+//			D3D12_CPU_DESCRIPTOR_HANDLE handle;
+//			resource->getCPUHandleFor(binding.type, handle);
+//
+//			// Adds the handle of the created descriptor into the src list.
+//			manager->srcDescriptors.add(handle);
+//		}
+//		// add the descriptors range length
+//		manager->dstDescriptorRangeLengths.add(count);
+//		int startIndex = this->manager->descriptors->gpu_csu->Malloc(count);
+//		manager->dstDescriptors.add(this->manager->descriptors->gpu_csu->getCPUVersion(startIndex));
+//		cmdList->SetComputeRootDescriptorTable(startRootParameter + i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
+//	}
+//}
+
 template<typename ...A>
 void PipelineBindings<A...>::__OnSet(ComputeManager *manager) {
+
 	ID3D12GraphicsCommandList* cmdList = manager->cmdList;
 	for (int i = 0; i < RenderTargetMax; i++)
 		if (!(*RenderTargets[i]))
@@ -135,6 +525,84 @@ void PipelineBindings<A...>::__OnSet(ComputeManager *manager) {
 	cmdList->SetDescriptorHeaps(2, heaps);
 
 	BindOnGPU(manager, __GlobalsCSU, 0);
+}
+
+void RTPipelineManager::__OnSet(DXRManager * manager)
+{
+	ID3D12DescriptorHeap* heaps[] = { this->manager->descriptors->gpu_csu->getInnerHeap(), this->manager->descriptors->gpu_smp->getInnerHeap() };
+
+	if (manager->fallbackCmdList)
+		manager->fallbackCmdList->SetDescriptorHeaps(2, heaps);
+	else
+		manager->cmdList->SetDescriptorHeaps(2, heaps);
+}
+
+void IRTProgram::UpdateRayGenLocals(DXRManager* cmdList, RayGenerationHandle shader) {
+	// Get shader identifier
+	byte* shaderID;
+	int shaderIDSize;
+	if (manager->fallbackDevice != nullptr)
+	{
+		shaderIDSize = manager->fallbackDevice->GetShaderIdentifierSize();
+		shaderID = (byte*)cmdList->currentPipeline1->fbso->GetShaderIdentifier(shader.shaderHandle);
+	}
+	else // DirectX Raytracing
+	{
+		shaderIDSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+		shaderID = (byte*)((ID3D12StateObjectPropertiesPrototype*)cmdList->currentPipeline1->so)->GetShaderIdentifier(shader.shaderHandle);
+	}
+
+	byte* shaderRecordStart = raygen_shaderTable->GetShaderRecordStartAddress(0);
+	memcpy(shaderRecordStart, shaderID, shaderIDSize);
+	if (!raygen_locals.isNull())
+		BindLocalsOnShaderTable(raygen_locals, shaderRecordStart + shaderIDSize);
+}
+
+void IRTProgram::UpdateMissLocals(DXRManager* cmdList, MissHandle shader, int index)
+{
+	// Get shader identifier
+	byte* shaderID;
+	int shaderIDSize;
+	int shaderRecordSize;
+	if (manager->fallbackDevice != nullptr)
+	{
+		shaderIDSize = manager->fallbackDevice->GetShaderIdentifierSize();
+		shaderID = (byte*)cmdList->currentPipeline1->fbso->GetShaderIdentifier(shader.shaderHandle);
+	}
+	else // DirectX Raytracing
+	{
+		shaderIDSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+		shaderID = (byte*)((ID3D12StateObjectPropertiesPrototype*)cmdList->currentPipeline1->so)->GetShaderIdentifier(shader.shaderHandle);
+	}
+	shaderRecordSize = shaderIDSize + ( miss_locals.isNull() ? 0 : miss_locals->rootSize );
+
+	byte* shaderRecordStart = miss_shaderTable->GetShaderRecordStartAddress(0);
+	memcpy(shaderRecordStart, shaderID, shaderIDSize);
+	if (!miss_locals.isNull())
+		BindLocalsOnShaderTable(miss_locals, shaderRecordStart + shaderIDSize);
+}
+
+void IRTProgram::UpdateHitGroupLocals(DXRManager* cmdList, HitGroupHandle shader, int index) {
+	// Get shader identifier
+	byte* shaderID;
+	int shaderIDSize;
+	int shaderRecordSize;
+	if (manager->fallbackDevice != nullptr)
+	{
+		shaderIDSize = manager->fallbackDevice->GetShaderIdentifierSize();
+		shaderID = (byte*)cmdList->currentPipeline1->fbso->GetShaderIdentifier(shader.shaderHandle);
+	}
+	else // DirectX Raytracing
+	{
+		shaderIDSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+		shaderID = (byte*)((ID3D12StateObjectPropertiesPrototype*)cmdList->currentPipeline1->so)->GetShaderIdentifier(shader.shaderHandle);
+	}
+	shaderRecordSize = shaderIDSize + (hitGroup_locals.isNull() ? 0 : hitGroup_locals->rootSize);
+
+	byte* shaderRecordStart = group_shaderTable->GetShaderRecordStartAddress(0);
+	memcpy(shaderRecordStart, shaderID, shaderIDSize);
+	if (!hitGroup_locals.isNull())
+		BindLocalsOnShaderTable(hitGroup_locals, shaderRecordStart + shaderIDSize);
 }
 
 #pragma endregion
@@ -187,23 +655,43 @@ GPUDescriptorHeapManager::GPUDescriptorHeapManager(ID3D12Device *device, D3D12_D
 
 gObj<ResourceView> ResourceView::getNullView(DeviceManager* manager, D3D12_RESOURCE_DIMENSION dimension)
 {
-	static gObj<Buffer> NullBuffer = nullptr;
-	static gObj<Texture2D> NullTexture2D = nullptr;
 	switch (dimension)
 	{
 	case D3D12_RESOURCE_DIMENSION_BUFFER:
-		return NullBuffer ? NullBuffer : NullBuffer = new Buffer(manager);
+		return manager->__NullBuffer ? manager->__NullBuffer : manager->__NullBuffer = new Buffer(manager);
 	case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
-		return NullTexture2D ? NullTexture2D : NullTexture2D = new Texture2D(manager);
+		return manager->__NullTexture2D ? manager->__NullTexture2D : manager->__NullTexture2D = new Texture2D(manager);
 	}
 	throw "not supported yet";
 }
 
 #pragma endregion
 
+#pragma region DXRStateBindings
+//void DXRStateBindings::__OnInitialization(DeviceManager * manager)
+//{
+//	this->manager = manager;
+//	Setup();
+//	__CurrentLoadingCSU = &__GlobalsCSU;
+//	__CurrentLoadingSamplers = &__GlobalsSamplers;
+//	Globals();
+//	__CurrentLoadingCSU = &__LocalsCSU;
+//	__CurrentLoadingSamplers = &__LocalsSamplers;
+//	Locals();
+//
+//	int sizeShaderIdentifier = manager->fallbackDevice != nullptr ? manager->fallbackDevice->GetShaderIdentifierSize() :
+//		D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+//
+//	raygenShaderTable = this->manager->creating->ShaderTable(D3D12_RESOURCE_STATE_GENERIC_READ, sizeShaderIdentifier);
+//	missShaderTable = this->manager->creating->ShaderTable(D3D12_RESOURCE_STATE_GENERIC_READ, sizeShaderIdentifier);
+//	hitgroupShaderTable = this->manager->creating->ShaderTable(D3D12_RESOURCE_STATE_GENERIC_READ, sizeShaderIdentifier);
+//}
+
+#pragma endregion
+
 #pragma region Device Manager
 
-DeviceManager::DeviceManager(ID3D12Device5 *device, int buffers, bool useFrameBuffering)
+DeviceManager::DeviceManager(ID3D12Device5 *device, int buffers, bool useFrameBuffering, bool isWarpDevice)
 	:
 	device(device),
 	counting(new CountEvent()),
@@ -211,21 +699,35 @@ DeviceManager::DeviceManager(ID3D12Device5 *device, int buffers, bool useFrameBu
 	creating(new Creating(this)),
 	loading(new Loading(this))
 {
-	auto hr = D3D12CreateRaytracingFallbackDevice(device, 0, 0, IID_PPV_ARGS(&fallbackDevice));
+	auto hr = D3D12CreateRaytracingFallbackDevice(device, CreateRaytracingFallbackDeviceFlags::ForceComputeFallback, 0, IID_PPV_ARGS(&fallbackDevice));
 
 	if (FAILED(hr)) {
 		throw AfterShow(CA4G_Errors_Unsupported_Fallback, nullptr, hr);
+	}
+
+	D3D12_FEATURE_DATA_D3D12_OPTIONS5 options;
+	if (SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options)))
+		&& options.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+	{
+		fallbackDevice = nullptr; // device supports DXR! no necessary fallback device
 	}
 
 	Scheduler = new GPUScheduler(this, useFrameBuffering, CA4G_MAX_NUMBER_OF_WORKERS, buffers);
 }
 
 DeviceManager::~DeviceManager() {
-	delete descriptors;
+	if (!__NullBuffer.isNull())
+		__NullBuffer = nullptr;
+	if (!__NullTexture2D.isNull())
+		__NullTexture2D = nullptr;
+
 	delete creating;
 	delete counting;
 	delete loading;
 	delete Scheduler;
+	if (fallbackDevice != nullptr)
+		delete fallbackDevice;
+	delete descriptors;
 }
 
 #pragma endregion

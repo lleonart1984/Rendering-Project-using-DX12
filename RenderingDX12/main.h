@@ -24,4 +24,5 @@
 //gObj<Tutorial6> technique;
 //gObj<Tutorial7> technique;
 //gObj<Tutorial8> technique;
-gObj<Tutorial9> technique;
+//gObj<Tutorial9> technique;
+gObj<Tutorial10> technique;

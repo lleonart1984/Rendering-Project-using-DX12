@@ -24,9 +24,9 @@ class Tutorial5 : public Technique, public IHasBackcolor, public IHasCamera, pub
 		// Setup method is overriden to load shader codes and set other default settings
 		void Setup() {
 			// Loads a compiled shader object and set as vertex shader
-			_ gSet VertexShader(LoadByteCode(".\\Techniques\\Tutorials\\Shaders\\SimpleTransform_VS.cso"));
+			_ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\SimpleTransform_VS.cso"));
 			// Loads a compiled shader object and set as pixel shader
-			_ gSet PixelShader(LoadByteCode(".\\Techniques\\Tutorials\\Shaders\\SimpleColor_PS.cso"));
+			_ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\SimpleColor_PS.cso"));
 			// Setup the input layout this shader needs to satify
 			_ gSet InputLayout({
 					VertexElement { VertexElementType_Float, 3, "POSITION"},	// float3 P : POSITION
@@ -166,7 +166,7 @@ protected:
 				// setup pipeline local binds
 				pipeline[workerID]->currentTransformCB = transformsCBs[i];
 				// Draw a triangle with 3 vertices
-				manager gDraw Triangles(3);
+				manager gDispatch Triangles(3);
 			}
 	}
 };

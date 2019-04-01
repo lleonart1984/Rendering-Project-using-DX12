@@ -21,8 +21,8 @@ class Tutorial9 : public Technique, public IHasBackcolor, public IHasCamera, pub
 
 	protected:
 		void Setup() {
-			_ gSet VertexShader(LoadByteCode(".\\Techniques\\Tutorials\\Shaders\\TransformToViewSpace_VS.cso"));
-			_ gSet PixelShader(LoadByteCode(".\\Techniques\\Tutorials\\Shaders\\GrabDepthComplexity_PS.cso"));
+			_ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\TransformToViewSpace_VS.cso"));
+			_ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\GrabDepthComplexity_PS.cso"));
 			_ gSet InputLayout(SCENE_VERTEX::Layout());
 		}
 
@@ -125,7 +125,7 @@ protected:
 		{
 			auto object = Scene->Objects()[i];
 			pipeline->locals = transforms[i];
-			manager gDraw Triangles(object.vertexesCount, object.startVertex);
+			manager gDispatch Triangles(object.vertexesCount, object.startVertex);
 		}
 
 		showComplexity->RenderTarget = render_target;
@@ -133,7 +133,7 @@ protected:
 		manager gClear RT(render_target, Backcolor);
 		manager gSet Pipeline(showComplexity);
 		manager gSet VertexBuffer(screenVertices);
-		manager gDraw Triangles(6);
+		manager gDispatch Triangles(6);
 	}
 
 	void Frame() {

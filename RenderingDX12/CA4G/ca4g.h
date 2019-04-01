@@ -27,6 +27,10 @@
 #include "ca4gImaging.h"
 #include "ca4gDSL.h"
 
+#ifdef _DEBUG
+#include <dxgidebug.h>
+#endif
+
 #include "Shaders\DrawScreen_VS.hlsl.h"
 #include "Shaders\DrawScreen_PS.hlsl.h"
 #include "Shaders\DrawComplexity_PS.hlsl.h"
@@ -60,6 +64,18 @@ class CubeTexture;
 class Texture2DMS;
 class Texture3D;
 class GPUScheduler;
+class SceneBuilder;
+class TriangleGeometryCollection;
+class GeometryCollection;
+class InstanceCollection;
+
+class HitGroupManager;
+template<typename S, D3D12_STATE_SUBOBJECT_TYPE Type> class DynamicStateBindingOf;
+class DXILManager;
+template<typename C> class DXIL_Library;
+class IRTProgram;
+template<typename L> class RTProgram;
+class RTPipelineManager;
 #pragma endregion
 
 #pragma region TOOLS for MACROS
@@ -139,6 +155,52 @@ enum VertexElementType {
 
 #pragma endregion
 
+#pragma region Vertex Description
+
+DXGI_FORMAT TYPE_VS_COMPONENTS_FORMATS[3][4]{
+	/*Int*/{ DXGI_FORMAT_R32_SINT, DXGI_FORMAT_R32G32_SINT, DXGI_FORMAT_R32G32B32_SINT,DXGI_FORMAT_R32G32B32A32_SINT },
+	/*Unt*/{ DXGI_FORMAT_R32_UINT, DXGI_FORMAT_R32G32_UINT, DXGI_FORMAT_R32G32B32_UINT,DXGI_FORMAT_R32G32B32A32_UINT },
+	/*Float*/{ DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT,DXGI_FORMAT_R32G32B32A32_FLOAT },
+};
+
+// Basic struct for constructing vertex element descriptions
+struct VertexElement {
+	// Type for each field component
+	const VertexElementType Type;
+	// Number of components
+	const int Components;
+	// String with the semantic
+	LPCSTR const Semantic;
+	// Index for indexed semantics
+	const int SemanticIndex;
+	// Buffer slot this field will be contained.
+	const int Slot;
+public:
+	constexpr VertexElement(
+		VertexElementType Type,
+		int Components,
+		LPCSTR const Semantic,
+		int SemanticIndex = 0,
+		int Slot = 0
+	) :Type(Type), Components(Components), Semantic(Semantic), SemanticIndex(SemanticIndex), Slot(Slot)
+	{
+	}
+	// Creates a Dx12 description using this information.
+	D3D12_INPUT_ELEMENT_DESC createDesc(int offset, int &size) const {
+		D3D12_INPUT_ELEMENT_DESC d = {};
+		d.AlignedByteOffset = offset;
+		d.Format = TYPE_VS_COMPONENTS_FORMATS[(int)Type][Components - 1];
+		d.InputSlot = Slot;
+		d.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+		d.SemanticIndex = SemanticIndex;
+		d.SemanticName = Semantic;
+		size += 4 * Components;
+		return d;
+	}
+};
+
+#pragma endregion
+
 #pragma region Managing Descriptors
 
 // Represents a CPU free descriptor heap manager
@@ -177,6 +239,12 @@ class GPUDescriptorHeapManager {
 	volatile long mallocOffset = 0;
 	int capacity;
 	int blockCapacity;
+
+	struct Node {
+		int index;
+		Node* next;
+	} *free = nullptr;
+
 public:
 	Mutex mutex;
 
@@ -199,6 +267,27 @@ public:
 		if (mallocOffset >= blockCapacity)
 			throw AfterShow(CA4G_Errors_RunOutOfMemory, TEXT("Descriptor heap"));
 		return result;
+	}
+
+	long MallocPersistent() {
+		int index;
+		mutex.Acquire();
+		if (free != nullptr) {
+			index = free->index;
+			Node *toDelete = free;
+			free = free->next;
+			delete toDelete;
+		}
+		else
+			index = --capacity;
+		mutex.Release();
+		return index;
+	}
+
+	void ReleasePersistent(long index) {
+		mutex.Acquire();
+		free = new Node{ index, free };
+		mutex.Release();
 	}
 
 	GPUDescriptorHeapManager(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type, int capacity);
@@ -295,6 +384,12 @@ struct CallableMember : public ICallableMember {
 	}
 };
 
+// Creates a callable member for a specific instance and RTX process method
+template<typename T>
+CallableMember<T, DXRManager> Process(T* instance, typename CallableMember<T, DXRManager>::Member f) {
+	return CallableMember<T, DXRManager>(instance, f);
+}
+
 // Creates a callable member for a specific instance and graphics process method
 template<typename T>
 CallableMember<T, GraphicsManager> Process(T* instance, typename CallableMember<T, GraphicsManager>::Member f) {
@@ -311,6 +406,12 @@ CallableMember<T, ComputeManager> Process(T* instance, typename CallableMember<T
 template<typename T>
 CallableMember<T, CopyingManager> Process(T* instance, typename CallableMember<T, CopyingManager>::Member f) {
 	return CallableMember<T, CopyingManager>(instance, f);
+}
+
+// Creates a pointer to a callable member for a specific instance and graphics process method
+template<typename T>
+CallableMember<T, DXRManager>* ProcessPtr(T* instance, typename CallableMember<T, DXRManager>::Member f) {
+	return new CallableMember<T, DXRManager>(instance, f);
 }
 
 // Creates a pointer to a callable member for a specific instance and graphics process method
@@ -400,7 +501,7 @@ class GPUScheduler {
 		// Info per thread
 		struct PerThreadInfo {
 			CommandListManager* manager;
-			ID3D12GraphicsCommandList4* cmdList;
+			ID3D12GraphicsCommandList5* cmdList;
 			bool isActive;
 			// Prepares this command list for recording. This method resets the command list to use the desiredAllocator.
 			void Activate(ID3D12CommandAllocator* desiredAllocator) {
@@ -542,6 +643,11 @@ class DeviceManager {
 	friend GraphicsManager;
 	friend DXRManager;
 	friend GPUScheduler;
+	friend RTPipelineManager;
+	friend class IRTProgram;
+	template<typename R> friend class RTProgram;
+	friend GeometryCollection;
+	friend InstanceCollection;
 
 	GPUScheduler * Scheduler;
 	gObj<Texture2D> BackBuffer;
@@ -554,7 +660,12 @@ class DeviceManager {
 	// Fallback device object used to manage DXR functionalities when no GPU support.
 	ID3D12RaytracingFallbackDevice *fallbackDevice;
 
-	DeviceManager(ID3D12Device5 *device, int buffers, bool useFrameBuffer);
+	gObj<Buffer> __NullBuffer = nullptr;
+	gObj<Texture2D> __NullTexture2D = nullptr;
+
+	DeviceManager(ID3D12Device5 *device, int buffers, bool useFrameBuffer, bool isWarpDevice);
+
+	WRAPPED_GPU_POINTER CreateFallbackWrappedPointer(gObj<Buffer> resource, UINT bufferNumElements);
 	
 public:
 	Creating * const creating;
@@ -585,6 +696,12 @@ public:
 		process.TagID = Tag;
 		Scheduler->Enqueue(&process);
 	}
+	// Performs a general rtx task synchronously.
+	template<typename T>
+	inline void Perform(CallableMember<T, DXRManager>& process) {
+		process.TagID = Tag;
+		Scheduler->Enqueue(&process);
+	}
 
 	// Performs a copying limited task asynchronously.
 	template<typename T>
@@ -601,6 +718,12 @@ public:
 	// Performs a general graphics task asynchronously.
 	template<typename T>
 	inline void PerformAsync(CallableMember<T, GraphicsManager>* process) {
+		process->TagID = Tag;
+		Scheduler->EnqueueAsync(process);
+	}
+	// Performs a general rtx task asynchronously.
+	template<typename T>
+	inline void PerformAsync(CallableMember<T, DXRManager>* process) {
 		process->TagID = Tag;
 		Scheduler->EnqueueAsync(process);
 	}
@@ -634,6 +757,7 @@ class ResourceWrapper {
 	friend Creating; //allow to access to resource wrapper private constructor for resource creation
 	friend Presenter; // allow to access to resource wrapper private constructor for presented render targets
 	friend ResourceView; // allow to reference counting
+
 private:
 
 	// Creates a wrapper to a resource with a description and an initial state
@@ -668,6 +792,7 @@ private:
 	// How many resource views are referencing this resource. This resource is automatically released when no view is referencing it.
 	int references = 0;
 
+
 public:
 	~ResourceWrapper() {
 		if (internalResource) {
@@ -676,6 +801,9 @@ public:
 		}
 	}
 
+	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() {
+		return internalResource->GetGPUVirtualAddress();
+	}
 	// Device Manager to manage this resource
 	DeviceManager *manager;
 	// Resource
@@ -695,6 +823,32 @@ public:
 
 	// If this resource is in upload heap, this is a ptr to the mapped data (to prevent map/unmap overhead)
 	void* mappedData = nullptr;
+
+	void UpdateMappedData(int position, void* data, int size) {
+		D3D12_RANGE range{ };
+
+		if (mappedData == nullptr)
+		{
+			mutex.Acquire();
+			if (mappedData == nullptr)
+				internalResource->Map(0, &range, &mappedData);
+			mutex.Release();
+		}
+
+		memcpy((UINT8*)mappedData + position, (UINT8*)data, size);
+	}
+
+	byte* GetMappedDataAddress() {
+		D3D12_RANGE range{ };
+		if (mappedData == nullptr)
+		{
+			mutex.Acquire();
+			if (mappedData == nullptr)
+				internalResource->Map(0, &range, &mappedData);
+			mutex.Release();
+		}
+		return (byte*)mappedData;
+	}
 
 	// Prepares this resource wrapper to have an uploading version
 	void CreateForUploading() {
@@ -786,7 +940,6 @@ public:
 		delete[] pNumRows;
 		delete[] pRowSizesInBytes;
 	}
-
 
 	// Uploads the data of a region of a single subresource.
 	template<typename T>
@@ -920,10 +1073,29 @@ class ResourceView {
 	template <typename ...A> friend class PipelineBindings;
 	friend GraphicsManager;
 	friend DeviceManager;
+	friend GeometryCollection;
+	friend TriangleGeometryCollection;
+	friend InstanceCollection;
+	friend IRTProgram;
 	
 	// Used for binding and other scenarios to synchronize the usage of the resource
 	// barriering the states changes.
 	void ChangeStateTo(ID3D12GraphicsCommandList *cmdList, D3D12_RESOURCE_STATES dst) {
+		if (resource->LastUsageState == dst)
+			return;
+
+		D3D12_RESOURCE_BARRIER barrier = { };
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Transition.pResource = resource->internalResource;
+		barrier.Transition.StateAfter = dst;
+		barrier.Transition.StateBefore = resource->LastUsageState;
+		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		cmdList->ResourceBarrier(1, &barrier);
+		resource->LastUsageState = dst;
+	}
+
+	void ChangeStateFromTo(ID3D12GraphicsCommandList *cmdList, D3D12_RESOURCE_STATES src, D3D12_RESOURCE_STATES dst) {
 		if (resource->LastUsageState == dst)
 			return;
 
@@ -1091,6 +1263,20 @@ protected:
 		}
 	}
 
+	void getCPUHandleFor(D3D12_ROOT_PARAMETER_TYPE type, D3D12_CPU_DESCRIPTOR_HANDLE &handle) {
+		switch (type) {
+		case D3D12_ROOT_PARAMETER_TYPE_CBV:
+			handle = getCBVHandle();
+			break;
+		case D3D12_ROOT_PARAMETER_TYPE_SRV:
+			handle = getSRVHandle();
+			break;
+		case D3D12_ROOT_PARAMETER_TYPE_UAV:
+			handle = getUAVHandle();
+			break;
+		}
+	}
+
 	D3D12_CPU_DESCRIPTOR_HANDLE getRTVHandle() {
 		return manager->descriptors->cpu_rt->getCPUVersion(getRTV());
 	}
@@ -1157,6 +1343,18 @@ class Buffer : public ResourceView {
 	friend Presenter;
 	friend GraphicsManager;
 	friend ResourceView;
+	friend DXRManager;
+	friend SceneBuilder;
+	friend RTPipelineManager;
+	friend IRTProgram;
+	friend TriangleGeometryCollection;
+	friend GeometryCollection;
+	friend InstanceCollection;
+
+	byte* GetShaderRecordStartAddress(int index) {
+		return ((byte*)resource->GetMappedDataAddress()) + index * Stride;
+	}
+
 protected:
 	// Inherited via Resource
 	void CreateUAVDesc(D3D12_UNORDERED_ACCESS_VIEW_DESC & d)
@@ -1315,49 +1513,209 @@ public:
 
 #pragma endregion
 
-#pragma region Pipeline bindings
+#pragma region Scene Manager
 
-DXGI_FORMAT TYPE_VS_COMPONENTS_FORMATS[3][4]{
-	/*Int*/{ DXGI_FORMAT_R32_SINT, DXGI_FORMAT_R32G32_SINT, DXGI_FORMAT_R32G32B32_SINT,DXGI_FORMAT_R32G32B32A32_SINT },
-	/*Unt*/{ DXGI_FORMAT_R32_UINT, DXGI_FORMAT_R32G32_UINT, DXGI_FORMAT_R32G32B32_UINT,DXGI_FORMAT_R32G32B32A32_UINT },
-	/*Float*/{ DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT,DXGI_FORMAT_R32G32B32A32_FLOAT },
+class GeometriesOnGPU
+{
+	friend GeometryCollection;
+	friend InstanceCollection;
+
+	gObj<Buffer> bottomLevelAccDS;
+	gObj<Buffer> scratchBottomLevelAccDS;
+	WRAPPED_GPU_POINTER emulatedPtr;
 };
 
-// Basic struct for constructing vertex element descriptions
-struct VertexElement {
-	// Type for each field component
-	const VertexElementType Type;
-	// Number of components
-	const int Components;
-	// String with the semantic
-	LPCSTR const Semantic;
-	// Index for indexed semantics
-	const int SemanticIndex;
-	// Buffer slot this field will be contained.
-	const int Slot;
+// Represents a geometry collection can be used to compose scenes
+// Internally manage a bottom level acceleration structure
+// This structure can be lock/unlock for further modifications
+class GeometryCollection {
+	friend TriangleGeometryCollection;
+
+	DeviceManager *manager;
+	DXRManager *cmdList;
+
+	GeometryCollection(DeviceManager* manager, DXRManager* cmdList) : 
+		manager(manager), cmdList(cmdList),
+		creating(new Creating(this)) {
+	}
+
+protected:
+	list<D3D12_RAYTRACING_GEOMETRY_DESC> geometries;
 public:
-	constexpr VertexElement(
-		VertexElementType Type,
-		int Components,
-		LPCSTR const Semantic,
-		int SemanticIndex = 0,
-		int Slot = 0
-	) :Type(Type), Components(Components), Semantic(Semantic), SemanticIndex(SemanticIndex), Slot(Slot)
-	{
-	}
-	// Creates a Dx12 description using this information.
-	D3D12_INPUT_ELEMENT_DESC createDesc(int offset, int &size) const {
-		D3D12_INPUT_ELEMENT_DESC d = {};
-		d.AlignedByteOffset = offset;
-		d.Format = TYPE_VS_COMPONENTS_FORMATS[(int)Type][Components - 1];
-		d.InputSlot = Slot;
-		d.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-		d.SemanticIndex = SemanticIndex;
-		d.SemanticName = Semantic;
-		size += 4 * Components;
-		return d;
-	}
+	class Creating {
+		friend GeometryCollection;
+		GeometryCollection* manager;
+		Creating(GeometryCollection* manager) :manager(manager) {}
+	public:
+		gObj<GeometriesOnGPU> BakedGeometry();
+	} * const creating;
 };
+
+// Represents a triangle-based geometry collection
+struct TriangleGeometryCollection : GeometryCollection {
+	friend DXRManager;
+private:
+	gObj<Buffer> boundVertices;
+	gObj<Buffer> boundIndices;
+	gObj<Buffer> boundTransforms;
+	int currentVertexOffset = 0;
+	DXGI_FORMAT currentVertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+
+	TriangleGeometryCollection(DeviceManager* manager, DXRManager* cmdList):
+		GeometryCollection(manager, cmdList),
+		loading(new Loader(this)), setting(new Setting(this)){}
+public:
+	class Loader {
+		friend TriangleGeometryCollection;
+		TriangleGeometryCollection *manager;
+		Loader(TriangleGeometryCollection* manager) :manager(manager) {}
+	public:
+		void Geometry(int startVertex, int count, int transformIndex  = -1) {
+			D3D12_RAYTRACING_GEOMETRY_DESC desc{ };
+			desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE::D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+			desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+			desc.Triangles.VertexBuffer = D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE
+			{
+				manager->boundVertices->resource->GetGPUVirtualAddress() + manager->currentVertexOffset,
+				manager->boundVertices->Stride
+			};
+			if (transformIndex >= 0)
+				desc.Triangles.Transform3x4 = manager->boundTransforms->resource->GetGPUVirtualAddress() + transformIndex * sizeof(float3x4);
+			desc.Triangles.VertexFormat = manager->currentVertexFormat;
+			desc.Triangles.VertexCount = count;
+
+			manager->geometries.add(desc);
+		}
+	} *const loading;
+
+	class Setting {
+		friend TriangleGeometryCollection;
+		TriangleGeometryCollection *manager;
+		Setting(TriangleGeometryCollection *manager) :manager(manager) {}
+
+		template<int N>
+		void UpdateLayout(VertexElement(&vertexLayout)[N], int positionIndex = 0) {
+			int offset = 0;
+			D3D12_INPUT_ELEMENT_DESC d;
+			int vertexElementIndex = 0;
+			while (positionIndex >= 0)
+			{
+				int size;
+				d = vertexLayout[vertexElementIndex].createDesc(offset, size);
+				if (positionIndex == 0)
+					break;
+				offset += size;
+				positionIndex--;
+				vertexElementIndex++;
+			}
+			manager->currentVertexFormat = d.Format;
+			manager->currentVertexOffset = offset;
+		}
+
+	public:
+		template<int N>
+		void VertexBuffer(gObj<Buffer> vertices, VertexElement(&vertexLayout)[N], int positionIndex = 0) {
+			UpdateLayout(vertexLayout, positionIndex);
+			//vertices->ChangeStateTo(manager->cmdList->cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			manager->boundVertices = vertices;
+		}
+		void IndexBuffer(gObj<Buffer> indices) {
+			manager->boundIndices = indices;
+		}
+	} * const setting;
+};
+
+class SceneOnGPU {
+	friend InstanceCollection;
+	friend IRTProgram;
+
+	gObj<Buffer> topLevelAccDS;
+	gObj<Buffer> scratchBuffer;
+	gObj<Buffer> instancesBuffer;
+	gObj<list<GeometriesOnGPU>> usedGeometries;
+	WRAPPED_GPU_POINTER topLevelAccFallbackPtr;
+};
+
+// Represents a scene as a collection of instances
+class InstanceCollection {
+	
+	friend DXRManager;
+
+	DeviceManager *manager;
+	DXRManager *cmdList;
+
+	gObj<list<gObj<GeometriesOnGPU>>> usedGeometries;
+	list<D3D12_RAYTRACING_INSTANCE_DESC> instances;
+	list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC> fallbackInstances;
+
+	InstanceCollection(DeviceManager* manager, DXRManager* cmdList):manager(manager), cmdList(cmdList),
+	creating(new Creating(this)), loading(new Loading(this))
+	{
+		usedGeometries = new list<gObj<GeometriesOnGPU>>();
+	}
+public:
+	class Loading {
+		friend InstanceCollection;
+		InstanceCollection *manager;
+		Loading(InstanceCollection *manager) :manager(manager) {}
+		void FillMat4x3(float(&dst)[3][4], float4x4 transform) {
+			dst[0][0] = transform.M00;
+			dst[0][1] = transform.M10;
+			dst[0][2] = transform.M20;
+			dst[0][3] = transform.M30;
+			dst[1][0] = transform.M01;
+			dst[1][1] = transform.M11;
+			dst[1][2] = transform.M21;
+			dst[1][3] = transform.M31;
+			dst[2][0] = transform.M02;
+			dst[2][1] = transform.M12;
+			dst[2][2] = transform.M22;
+			dst[2][3] = transform.M32;
+		}
+
+	public:
+		void Instance(gObj<GeometriesOnGPU> geometries, UINT mask = ~0, float4x4 transform = float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1), UINT instanceID = INTSAFE_UINT_MAX)
+		{
+			manager->usedGeometries->add(geometries);
+
+			if (manager->manager->fallbackDevice != nullptr) {
+				int index = manager->instances.size();
+				D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC d{ };
+				d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+				FillMat4x3(d.Transform, transform);
+				d.InstanceMask = mask;
+				d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
+				d.InstanceContributionToHitGroupIndex = 0;
+				d.AccelerationStructure = geometries->emulatedPtr;
+				manager->fallbackInstances.add(d);
+			}
+			else {
+				int index = manager->instances.size();
+				D3D12_RAYTRACING_INSTANCE_DESC d{ };
+				d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+				FillMat4x3(d.Transform, transform);
+				d.InstanceMask = mask;
+				d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
+				d.InstanceContributionToHitGroupIndex = 0;
+				d.AccelerationStructure = geometries->bottomLevelAccDS->resource->GetGPUVirtualAddress();
+				manager->instances.add(d);
+			}
+		}
+	} * const loading;
+
+	class Creating {
+		friend InstanceCollection;
+		InstanceCollection *manager;
+		Creating(InstanceCollection *manager) :manager(manager) {}
+	public:
+		gObj<SceneOnGPU> BakedScene();
+		
+	} * const creating;
+};
+
+#pragma endregion
+
+#pragma region Pipeline bindings
 
 // Used for default initialization similar to d3dx12 usage
 struct DefaultStateValue {
@@ -1511,6 +1869,22 @@ struct InputLayoutStateManager : public PipelineSubobjectState< D3D12_INPUT_LAYO
 		}
 		_Description.pInputElementDescs = layout;
 		_Description.NumElements = elements.size();
+	}
+
+	template<int N>
+	void InputLayout(VertexElement(&elements)[N]) {
+		if (_Description.pInputElementDescs != nullptr)
+			delete[] _Description.pInputElementDescs;
+		auto layout = new D3D12_INPUT_ELEMENT_DESC[N];
+		int offset = 0;
+		for (int i = 0; i < N; i++)
+		{
+			int size = 0;
+			layout[i] = current->createDesc(offset, size);
+			offset += size;
+		}
+		_Description.pInputElementDescs = layout;
+		_Description.NumElements = N;
 	}
 };
 
@@ -1799,8 +2173,7 @@ struct MultiViewInstancingStateManager : public PipelineSubobjectState< D3D12_VI
 class IPipelineBindings {
 	friend ComputeManager;
 	friend GraphicsManager;
-
-protected:
+	template<typename ...A> friend class PipelineBindings;
 	
 	// After initialization this variable is set with the root signature
 	ID3D12RootSignature *rootSignature;
@@ -1823,6 +2196,52 @@ template<typename PSS>
 unsigned long  StreamTypeBits() {
 	return (1 << (int)PSS::PipelineState_Type);// | StreamTypeBits<A...>();
 }
+
+class ShaderLoader {
+public:
+	// Use this method to load a bytecode
+	static D3D12_SHADER_BYTECODE FromFile(const char* bytecodeFilePath) {
+		D3D12_SHADER_BYTECODE code;
+		FILE* file;
+		if (fopen_s(&file, bytecodeFilePath, "rb") != 0)
+		{
+			throw AfterShow(CA4G_Errors_ShaderNotFound);
+		}
+		fseek(file, 0, SEEK_END);
+		long long count;
+		count = ftell(file);
+		fseek(file, 0, SEEK_SET);
+
+		byte* bytecode = new byte[count];
+		int offset = 0;
+		while (offset < count) {
+			offset += fread_s(&bytecode[offset], min(1024, count - offset), sizeof(byte), 1024, file);
+		}
+		fclose(file);
+
+		code.BytecodeLength = count;
+		code.pShaderBytecode = (void*)bytecode;
+		return code;
+	}
+
+	// Use this method to load a bytecode from a memory buffer
+	static D3D12_SHADER_BYTECODE FromMemory(const byte* bytecodeData, int count) {
+		D3D12_SHADER_BYTECODE code;
+		code.BytecodeLength = count;
+		code.pShaderBytecode = (void*)bytecodeData;
+		return code;
+	}
+
+	// Use this method to load a bytecode from a memory buffer
+	template<int count>
+	static D3D12_SHADER_BYTECODE FromMemory(const byte (&bytecodeData)[count]) {
+		D3D12_SHADER_BYTECODE code;
+		code.BytecodeLength = count;
+		code.pShaderBytecode = (void*)bytecodeData;
+		return code;
+	}
+
+};
 
 // -- Abstract pipeline object (can be Graphics or Compute)
 // Allows creation of root signatures and leaves abstract the pipeline state object creation
@@ -2070,14 +2489,14 @@ class PipelineBindings : public IPipelineBindings{
 
 		if (hr != S_OK)
 		{
-			throw AfterShow(CA4G_Errors_BasSignatureConstruction, TEXT("Error serializing root signature"));
+			throw AfterShow(CA4G_Errors_BadSignatureConstruction, TEXT("Error serializing root signature"));
 		}
 
 		hr = manager->device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 
 		if (hr != S_OK)
 		{
-			throw AfterShow(CA4G_Errors_BasSignatureConstruction, TEXT("Error creating root signature"));
+			throw AfterShow(CA4G_Errors_BadSignatureConstruction, TEXT("Error creating root signature"));
 		}
 
 		delete[] parameters;
@@ -2090,40 +2509,7 @@ protected:
 	{
 		StreamBits = StreamTypeBits<PSS...>();
 	}
-
-	// Use this method to load a bytecode
-	D3D12_SHADER_BYTECODE LoadByteCode(const char* bytecodeFilePath) {
-		D3D12_SHADER_BYTECODE code;
-		FILE* file;
-		if (fopen_s(&file, bytecodeFilePath, "rb") != 0)
-		{
-			throw AfterShow(CA4G_Errors_ShaderNotFound);
-		}
-		fseek(file, 0, SEEK_END);
-		long long count;
-		count = ftell(file);
-		fseek(file, 0, SEEK_SET);
-
-		byte* bytecode = new byte[count];
-		int offset = 0;
-		while (offset < count) {
-			offset += fread_s(&bytecode[offset], min(1024, count - offset), sizeof(byte), 1024, file);
-		}
-		fclose(file);
-
-		code.BytecodeLength = count;
-		code.pShaderBytecode = (void*)bytecode;
-		return code;
-	}
-
-	// Use this method to load a bytecode from a memory buffer
-	D3D12_SHADER_BYTECODE LoadByteCodeFromMemory(const byte* bytecodeData, int count) {
-		D3D12_SHADER_BYTECODE code;
-		code.BytecodeLength = count;
-		code.pShaderBytecode = (void*)bytecodeData;
-		return code;
-	}
-
+	
 	// Binds a constant buffer view
 	void CBV(int slot, gObj<Buffer>& const resource, ShaderType type, int space = 0) {
 		__CurrentLoadingCSU->add(SlotBinding{ (D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, slot, D3D12_RESOURCE_DIMENSION_BUFFER, (void*)&resource , nullptr, space });
@@ -2267,8 +2653,8 @@ public:
 
 protected:
 	void Setup() {
-		_ gSet VertexShader(LoadByteCodeFromMemory(CompiledShader(cso_DrawScreen_VS)));
-		_ gSet PixelShader(LoadByteCodeFromMemory(CompiledShader(cso_DrawComplexity_PS)));
+		_ gSet VertexShader(ShaderLoader::FromMemory(cso_DrawScreen_VS));
+		_ gSet PixelShader(ShaderLoader::FromMemory(cso_DrawComplexity_PS));
 		_ gSet InputLayout({
 				VertexElement(VertexElementType_Float, 2, "POSITION")
 			});
@@ -2284,14 +2670,14 @@ protected:
 class ShowTexturePipeline : public GraphicsPipelineBindings {
 public:
 	// UAV to output the complexity
-	gObj<Texture2D> texture;
+	gObj<Texture2D> Texture;
 	// Render Target
 	gObj<Texture2D> RenderTarget;
 
 protected:
 	void Setup() {
-		_ gSet VertexShader(LoadByteCodeFromMemory(CompiledShader(cso_DrawScreen_VS)));
-		_ gSet PixelShader(LoadByteCodeFromMemory(CompiledShader(cso_DrawScreen_PS)));
+		_ gSet VertexShader(ShaderLoader::FromMemory(cso_DrawScreen_VS));
+		_ gSet PixelShader(ShaderLoader::FromMemory(cso_DrawScreen_PS));
 		_ gSet InputLayout({
 				VertexElement(VertexElementType_Float, 2, "POSITION")
 			});
@@ -2300,7 +2686,7 @@ protected:
 	void Globals()
 	{
 		RTV(0, RenderTarget);
-		SRV(0, texture, ShaderType_Pixel);
+		SRV(0, Texture, ShaderType_Pixel);
 	}
 };
 
@@ -2471,6 +2857,1514 @@ protected:
 
 #pragma endregion
 
+#pragma region State Object Bindings
+
+class IStateBindings {
+	friend DXRManager;
+
+protected:
+
+	// When state setting is closed, the state object is created and stored.
+	ID3D12StateObject *so = nullptr;
+	// When state setting is closed, the fallback state object is created and stored.
+	ID3D12RaytracingFallbackStateObject *fbso = nullptr;
+
+	virtual void __OnSet(DXRManager* manager) = 0;
+
+	virtual void __OnDraw(DXRManager* manager) = 0;
+
+	virtual void __OnInitialization(DeviceManager* manager) = 0;
+};
+
+class DynamicStateBindings {
+
+	friend RTPipelineManager;
+
+	template<typename S, D3D12_STATE_SUBOBJECT_TYPE Type> friend class DynamicStateBindingOf;
+
+	D3D12_STATE_SUBOBJECT* dynamicStates;
+
+	void AllocateStates(int length) {
+		dynamicStates = new D3D12_STATE_SUBOBJECT[length];
+	}
+
+	template<typename D>
+	D* GetState(int index) {
+		return (D*)dynamicStates[index].pDesc;
+	}
+
+	template<typename D>
+	void SetState(int index, D3D12_STATE_SUBOBJECT_TYPE type, D* state) {
+		dynamicStates[index].Type = type;
+		dynamicStates[index].pDesc = state;
+	}
+
+	/*template<typename D>
+	D* GenericAddState(D3D12_STATE_SUBOBJECT_TYPE Type) {
+		dynamicStates.add(D3D12_STATE_SUBOBJECT{ Type, new D{ } });
+		return (D*)dynamicStates.last().pDesc;
+	}
+
+	template<typename D>
+	D* GenericTrackState(D3D12_STATE_SUBOBJECT_TYPE Type) {
+		for (int i = 0; i < dynamicStates.size(); i++)
+			if (dynamicStates[i].Type == Type)
+				return (D*)dynamicStates[i].pDesc;
+		return nullptr;
+	}
+
+	template<typename D>
+	D* GenericGetOrCreateState(D3D12_STATE_SUBOBJECT_TYPE Type) {
+		auto state = GenericTrackState<D>(Type);
+		if (state != nullptr)
+			return state;
+		return GenericAddState<D>(Type);
+	}
+
+	void ResetStates() {
+		dynamicStates.reset();
+	}*/
+public:
+	DynamicStateBindings() {}
+};
+
+template<typename S, D3D12_STATE_SUBOBJECT_TYPE Type>
+class DynamicStateBindingOf : public virtual DynamicStateBindings {
+protected:
+	S* GetState(int index) {
+		return GetState<S>(index);
+	}
+
+	S* GetAfterCreate(int index) {
+		S* state = new S{ };
+		SetState(index, Type, state);
+		return state;
+	}
+public:
+};
+
+
+#pragma region State Managers
+
+// Represents a binding of a resource (or resource array) to a shader slot.
+struct SlotBinding {
+	// Gets or sets the root parameter bound
+	D3D12_ROOT_PARAMETER Root_Parameter;
+
+	union {
+		struct ConstantData {
+			// Gets the pointer to a constant buffer in memory.
+			void* ptrToConstant;
+		} ConstantData;
+		struct DescriptorData
+		{
+			// Determines the dimension of the bound resource
+			D3D12_RESOURCE_DIMENSION Dimension;
+			// Gets the pointer to a resource field (pointer to ResourceView)
+			// or to the array of resources
+			void* ptrToResourceViewArray;
+			// Gets the pointer to the number of resources in array
+			int* ptrToCount;
+		} DescriptorData;
+		struct SceneData {
+			void* ptrToScene;
+		} SceneData;
+	};
+};
+
+
+class BindingsHandle {
+	friend RTPipelineManager;
+	friend DXRManager;
+	friend IRTProgram;
+	template<typename R> friend class RTProgram;
+
+	ID3D12RootSignature *rootSignature;
+	bool isLocal;
+	int rootSize;
+
+	list<SlotBinding> csuBindings;
+	list<SlotBinding> samplerBindings;
+
+	D3D12_STATIC_SAMPLER_DESC Samplers[32];
+	int Max_Sampler;
+
+	void AddSampler(SlotBinding binding) {
+		samplerBindings.add(binding);
+	}
+	void AddCSU(SlotBinding binding) {
+		csuBindings.add(binding);
+	}
+
+public:
+	inline bool HasSomeBindings() {
+		return csuBindings.size() + samplerBindings.size() > 0;
+	}
+};
+
+class ProgramHandle {
+	friend RTPipelineManager;
+	friend DXRManager;
+	template<typename C> friend class DXIL_Library;
+	template<typename L> friend class RTProgram;
+	friend IRTProgram;
+
+	LPCWSTR shaderHandle;
+protected:
+	ProgramHandle(LPCWSTR handle) :shaderHandle(handle) {}
+public:
+	ProgramHandle() :shaderHandle(nullptr) {}
+	ProgramHandle(const ProgramHandle &other) {
+		this->shaderHandle = other.shaderHandle;
+	}
+	inline bool IsNull() { return shaderHandle == nullptr; }
+};
+
+class MissHandle : public ProgramHandle {
+	friend RTPipelineManager;
+	friend DXRManager;
+	template<typename C> friend class DXIL_Library;
+
+	MissHandle(LPCWSTR shaderHandle) : ProgramHandle(shaderHandle) { }
+public:
+	MissHandle() : ProgramHandle() {}
+	MissHandle(const MissHandle &other) : ProgramHandle(other) { }
+};
+
+class RayGenerationHandle : public ProgramHandle {
+	friend RTPipelineManager;
+	friend DXRManager;
+	template<typename C> friend class DXIL_Library;
+
+	RayGenerationHandle(LPCWSTR shaderHandle) : ProgramHandle(shaderHandle) {}
+
+public:
+	RayGenerationHandle() : ProgramHandle() { }
+	RayGenerationHandle(const RayGenerationHandle &other) : ProgramHandle(other) { }
+};
+
+class AnyHitHandle : public ProgramHandle {
+	friend RTPipelineManager;
+	template<typename C> friend class DXIL_Library;
+
+	AnyHitHandle(LPCWSTR shaderHandle) : ProgramHandle(shaderHandle) {}
+
+public:
+	AnyHitHandle() : ProgramHandle() { }
+	AnyHitHandle(const AnyHitHandle &other) : ProgramHandle(other) { }
+};
+
+class ClosestHitHandle : public ProgramHandle {
+	friend RTPipelineManager;
+	template<typename C> friend class DXIL_Library;
+
+	ClosestHitHandle(LPCWSTR shaderHandle) : ProgramHandle(shaderHandle) {}
+
+public:
+	ClosestHitHandle() : ProgramHandle() { }
+	ClosestHitHandle(const ClosestHitHandle &other) : ProgramHandle(other) { }
+};
+
+class IntersectionHandle : public ProgramHandle {
+	friend RTPipelineManager;
+	template<typename C> friend class DXIL_Library;
+
+	IntersectionHandle(LPCWSTR shaderHandle) : ProgramHandle(shaderHandle) {}
+
+public:
+	IntersectionHandle() : ProgramHandle() { }
+	IntersectionHandle(const IntersectionHandle &other) : ProgramHandle(other) { }
+};
+
+class HitGroupHandle : public ProgramHandle {
+	friend RTPipelineManager;
+	friend DXRManager;
+	template<typename C> friend class RTProgram;
+
+	static LPCWSTR CreateAutogeneratedName() {
+		static int ID = 0;
+
+		wchar_t* label = new wchar_t[100];
+		label[0] = 0;
+		wcscat(label, TEXT("HITGROUP_"));
+		wsprintf(&label[7], L"%d",
+			ID);
+
+		ID++;
+
+		return label;
+	}
+
+	AnyHitHandle anyHit;
+	ClosestHitHandle closestHit;
+	IntersectionHandle intersection;
+
+	HitGroupHandle(ClosestHitHandle closestHit, AnyHitHandle anyHit, IntersectionHandle intersection) 
+		: ProgramHandle(CreateAutogeneratedName()), anyHit(anyHit), closestHit(closestHit), intersection(intersection) {}
+public:
+	HitGroupHandle() :ProgramHandle() {}
+	HitGroupHandle(const HitGroupHandle &other) :ProgramHandle(other) {
+		this->anyHit = other.anyHit;
+		this->closestHit = other.closestHit;
+		this->intersection = other.intersection;
+	}
+};
+
+struct GlobalRootSignatureManager : public DynamicStateBindingOf<D3D12_GLOBAL_ROOT_SIGNATURE, D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE> {
+	void SetGlobalRootSignature(int index, ID3D12RootSignature *rootSignature) {
+		auto state = GetAfterCreate(index);
+		state->pGlobalRootSignature = rootSignature;
+	}
+};
+
+struct LocalRootSignatureManager : public DynamicStateBindingOf<D3D12_LOCAL_ROOT_SIGNATURE, D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE> {
+	void SetLocalRootSignature(int index, ID3D12RootSignature *rootSignature) {
+		auto state = GetAfterCreate(index);
+		state->pLocalRootSignature = rootSignature;
+	}
+};
+
+struct HitGroupManager : public virtual DynamicStateBindingOf<D3D12_HIT_GROUP_DESC, D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP> {
+	void SetTriangleHitGroup(int index, LPCWSTR exportName, LPCWSTR anyHit, LPCWSTR closestHit) {
+		auto hg = GetAfterCreate(index);
+		hg->AnyHitShaderImport = anyHit;
+		hg->ClosestHitShaderImport = closestHit;
+		hg->IntersectionShaderImport = nullptr;
+		hg->Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+		hg->HitGroupExport = exportName;
+	}
+	void SetProceduralGeometryHitGroup(int index, LPCWSTR exportName, LPCWSTR anyHit, LPCWSTR closestHit, LPCWSTR intersection) {
+		auto hg = GetAfterCreate(index);
+		hg->AnyHitShaderImport = anyHit;
+		hg->ClosestHitShaderImport = closestHit;
+		hg->IntersectionShaderImport = intersection;
+		hg->Type = D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
+		hg->HitGroupExport = exportName;
+	}
+};
+
+#pragma endregion
+
+struct DXILManager : public virtual DynamicStateBindingOf<D3D12_DXIL_LIBRARY_DESC, D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY> {
+	void SetDXIL(int index, D3D12_SHADER_BYTECODE bytecode, list<D3D12_EXPORT_DESC> &exports) {
+		auto dxil = GetAfterCreate(index);
+		dxil->DXILLibrary = bytecode;
+		dxil->NumExports = exports.size();
+		dxil->pExports = &exports.first();
+	}
+};
+
+struct RTShaderConfig : public virtual DynamicStateBindingOf<D3D12_RAYTRACING_SHADER_CONFIG, D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG>
+{
+	void SetRTSizes(int index, int maxAttributeSize, int maxPayloadSize) {
+		auto state = GetAfterCreate(index);
+		state->MaxAttributeSizeInBytes = maxAttributeSize;
+		state->MaxPayloadSizeInBytes = maxPayloadSize;
+	}
+};
+
+struct RTPipelineConfig : public virtual DynamicStateBindingOf<D3D12_RAYTRACING_PIPELINE_CONFIG, D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG>
+{
+	void SetMaxRTRecursion(int index, int maxRecursion) {
+		auto state = GetAfterCreate(index);
+		state->MaxTraceRecursionDepth = maxRecursion;
+	}
+};
+
+struct ExportsManager : public virtual DynamicStateBindingOf<D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION, D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION>
+{
+	void SetExportsAssociations(int index, D3D12_STATE_SUBOBJECT* ptrToSubobject, const list<LPCWSTR> &exports) {
+		auto state = GetAfterCreate(index);
+		state->pSubobjectToAssociate = ptrToSubobject;
+		state->NumExports = exports.size();
+		state->pExports = &exports.first();
+	}
+};
+
+// Gets the basic data of a dxil library
+struct IDXIL_Library {
+	template<typename C> friend class DXIL_Library;
+	friend RTPipelineManager;
+private:
+	D3D12_SHADER_BYTECODE bytecode;
+	list<D3D12_EXPORT_DESC> exports;
+};
+
+// Gets a base definition a library
+template<typename C>
+struct DXIL_Library : public IDXIL_Library {
+	friend DXIL_Library;
+	friend RTPipelineManager;
+private:
+	
+	C* context;
+	void __OnInitialization(RTPipelineManager* context) {
+		this->context = (C*)context;
+		Setup();
+	}
+
+protected:
+	DXIL_Library() : loading(new Loading(this)) {
+	}
+
+	virtual void Setup() = 0;
+	
+	class Loading {
+		DXIL_Library *manager;
+	public:
+		Loading(DXIL_Library* manager) :manager(manager) {}
+
+		void DXIL(D3D12_SHADER_BYTECODE bytecode) {
+			manager->bytecode = bytecode;
+		}
+		void Shader(RayGenerationHandle &handle, LPCWSTR shader) {
+			manager->exports.add({ shader });
+			handle = RayGenerationHandle(shader);
+		}
+		void Shader(MissHandle &handle, LPCWSTR shader) {
+			manager->exports.add({ shader });
+			handle = MissHandle(shader);
+		}
+		void Shader(AnyHitHandle &handle, LPCWSTR shader) {
+			manager->exports.add({ shader });
+			handle = AnyHitHandle(shader);
+		}
+		void Shader(ClosestHitHandle &handle, LPCWSTR shader) {
+			manager->exports.add({ shader });
+			handle = ClosestHitHandle(shader);
+		}
+		void Shader(IntersectionHandle &handle, LPCWSTR shader) {
+			manager->exports.add({ shader });
+			handle = IntersectionHandle(shader);
+		}
+	} * const loading;
+public:
+	inline C* Context() { return context; }
+};
+
+// Interface of every raytracing program
+class IRTProgram {
+	template<typename L> friend class RTProgram;
+	friend RTPipelineManager;
+	friend DXRManager;
+
+	//! Gets the global bindings for this rt program
+	gObj<BindingsHandle> globals;
+	//! Gets the locals raygen bindings
+	gObj<BindingsHandle> raygen_locals;
+	//! Gets the locals miss bindings
+	gObj<BindingsHandle> miss_locals;
+	//! Gets the locals hitgroup bindings
+	gObj<BindingsHandle> hitGroup_locals;
+	// Gets the list of all hit groups created in this rt program
+	list<HitGroupHandle> hitGroups;
+	// Gets the list of all associations between shaders and global bindings
+	list<LPCWSTR> associationsToGlobal;
+	// Gets the list of all associations between shaders and raygen local bindings
+	list<LPCWSTR> associationsToRayGenLocals;
+	// Gets the list of all associations between shaders and miss local bindings
+	list<LPCWSTR> associationsToMissLocals;
+	// Gets the list of all associations between shaders and hitgroup local bindings
+	list<LPCWSTR> associationsToHitGroupLocals;
+	// Shader table for ray generation shader
+	gObj<Buffer> raygen_shaderTable;
+	// Shader table for all miss shaders
+	gObj<Buffer> miss_shaderTable;
+	// Shader table for all hitgroup entries
+	gObj<Buffer> group_shaderTable;
+	// Gets the attribute size in bytes for this program (normally 2 floats)
+	int AttributesSize = 2 * 4;
+	// Gets the ray payload size in bytes for this program (normally 3 floats)
+	int PayloadSize = 3 * 4;
+	// Gets the stack size required for this program
+	int StackSize = 1;
+
+	// Gets the maximum number of hit groups that will be setup before any 
+	// single dispatch rays
+	int MaxGroups = 1;
+	// Gets the maximum number of miss programs that will be setup before any
+	// single dispatch rays
+	int MaxMiss = 1;
+	DeviceManager *manager;
+
+	void UpdateRayGenLocals(DXRManager* cmdList, RayGenerationHandle shader);
+	void UpdateMissLocals(DXRManager* cmdList, MissHandle shader, int index);
+	void UpdateHitGroupLocals(DXRManager* cmdList, HitGroupHandle shader, int index);
+
+	void BindOnGPU(DXRManager *manager, gObj<BindingsHandle> globals);
+
+	void BindLocalsOnShaderTable(gObj<BindingsHandle> locals, byte* shaderRecordData);
+};
+
+// Represents a raytracing program with shader tables and local bindings management
+template<typename R>
+class RTProgram : IRTProgram {
+	friend RTPipelineManager;
+	friend DXRManager;
+	
+	R* _rt_manager;
+
+	void __OnInitialization(DeviceManager *manager, RTPipelineManager* rtManager) {
+		this->manager = manager;
+		this->_rt_manager = (R*)rtManager;
+		Setup();
+		// Build and append root signatures
+		globals = new BindingsHandle();
+		__CurrentBindings = globals;
+		Globals();
+		BuildRootSignatureForCurrentBindings();
+
+		raygen_locals = new BindingsHandle();
+		raygen_locals->isLocal = true;
+		__CurrentBindings = raygen_locals;
+		RayGeneration_Locals();
+		if (raygen_locals->HasSomeBindings())
+			BuildRootSignatureForCurrentBindings();
+		else
+			raygen_locals = nullptr;
+
+		miss_locals = new BindingsHandle();
+		miss_locals->isLocal = true;
+		__CurrentBindings = miss_locals;
+		Miss_Locals();
+		if (miss_locals->HasSomeBindings())
+			BuildRootSignatureForCurrentBindings();
+		else
+			miss_locals = nullptr;
+
+		hitGroup_locals = new BindingsHandle();
+		hitGroup_locals->isLocal = true;
+		__CurrentBindings = hitGroup_locals;
+		HitGroup_Locals();
+		if (hitGroup_locals->HasSomeBindings())
+			BuildRootSignatureForCurrentBindings();
+		else
+			hitGroup_locals = nullptr;
+
+		// Get shader identifiers.
+		UINT shaderIdentifierSize;
+		if (manager->fallbackDevice != nullptr)
+			shaderIdentifierSize = manager->fallbackDevice->GetShaderIdentifierSize();
+		else // DirectX Raytracing
+			shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+
+		raygen_shaderTable = manager->creating->ShaderTable(
+			D3D12_RESOURCE_STATE_GENERIC_READ, shaderIdentifierSize + 
+			(raygen_locals.isNull() ? 0 : raygen_locals->rootSize), 1);
+		miss_shaderTable = manager->creating->ShaderTable(
+			D3D12_RESOURCE_STATE_GENERIC_READ, shaderIdentifierSize + 
+			(miss_locals.isNull() ? 0 : miss_locals->rootSize), MaxMiss);
+		group_shaderTable = manager->creating->ShaderTable(
+			D3D12_RESOURCE_STATE_GENERIC_READ, shaderIdentifierSize + 
+			(hitGroup_locals.isNull() ? 0 : hitGroup_locals->rootSize), MaxGroups);
+	}
+
+	// Creates the root signature after closing
+	ID3D12RootSignature* CreateRootSignature(gObj<BindingsHandle> bindings, int &size) {
+		size = 0;
+
+		list<SlotBinding> &csu = bindings->csuBindings;
+		list<SlotBinding> &samplers = bindings->samplerBindings;
+
+		D3D12_ROOT_PARAMETER * parameters = new D3D12_ROOT_PARAMETER[csu.size() + samplers.size()];
+		D3D12_DESCRIPTOR_RANGE * ranges = new D3D12_DESCRIPTOR_RANGE[csu.size() + samplers.size()];
+		int index = 0;
+		for (int i = 0; i < csu.size(); i++)
+		{
+			parameters[index] = csu[i].Root_Parameter;
+
+			switch (csu[i].Root_Parameter.ParameterType) {
+			case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+				size += csu[i].Root_Parameter.Constants.Num32BitValues * 4;
+				break;
+			default:
+				size += 4 * 4;
+				break;
+			}
+
+			index++;
+		}
+		for (int i = 0; i < samplers.size(); i++)
+		{
+			parameters[index] = samplers[i].Root_Parameter;
+			size += 16;
+			index++;
+		}
+
+		D3D12_ROOT_SIGNATURE_DESC desc;
+		desc.pParameters = parameters;
+		desc.NumParameters = index;
+		desc.pStaticSamplers = bindings->Samplers;
+		desc.NumStaticSamplers = bindings->Max_Sampler;
+		desc.Flags = bindings->isLocal ? D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE : D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+		ID3DBlob *signatureBlob;
+		ID3DBlob *signatureErrorBlob;
+
+		ID3D12RootSignature *rootSignature;
+
+		if (manager->fallbackDevice != nullptr) // will use fallback for DX RT support
+		{
+			auto hr = manager->fallbackDevice->D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &signatureErrorBlob);
+			if (hr != S_OK)
+				throw AfterShow(CA4G_Errors_BadSignatureConstruction, TEXT("Error serializing root signature"));
+			hr = manager->fallbackDevice->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+			if (hr != S_OK)
+				throw AfterShow(CA4G_Errors_BadSignatureConstruction, TEXT("Error creating root signature"));
+		}
+		else
+		{
+			auto hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &signatureErrorBlob);
+			if (hr != S_OK)
+				throw AfterShow(CA4G_Errors_BadSignatureConstruction, TEXT("Error serializing root signature"));
+
+			hr = manager->device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+			if (hr != S_OK)
+				throw AfterShow(CA4G_Errors_BadSignatureConstruction, TEXT("Error creating root signature"));
+		}
+
+		delete[] parameters;
+
+		return rootSignature;
+	}
+
+	gObj<BindingsHandle> __CurrentBindings;
+	
+	// Creates a bindings handle object for a specific method
+	// With bindings lists and root signature.
+	void BuildRootSignatureForCurrentBindings() {
+		auto handle = __CurrentBindings;
+		int size = 0;
+		handle->rootSignature = CreateRootSignature(handle, size);
+		handle->rootSize = size;
+	}
+
+protected:
+
+	RTProgram() : loading(new Loader(this)), creating(new Creating(this)), setting(new Setter(this)) {
+	}
+	~RTProgram() {}
+
+#pragma region Binding Methods
+	// Binds a constant buffer view
+	void CBV(int slot, gObj<Buffer>& const resource, int space = 0) {
+
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		p.Descriptor.RegisterSpace = space;
+		p.Descriptor.ShaderRegister = slot;
+
+		SlotBinding b{ };
+		b.Root_Parameter = p;
+		b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+		__CurrentBindings->csuBindings.add(b);
+	}
+
+	// Binds a constant buffer view
+	template<typename D>
+	void CBV(int slot, D &data, int space = 0) {
+		int size = ((sizeof(D) - 1) / 4) + 1;
+
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		p.Constants.Num32BitValues = size;
+		p.Constants.RegisterSpace = space;
+		p.Constants.ShaderRegister = slot;
+
+		SlotBinding b{ };
+		b.Root_Parameter = p;
+		b.ConstantData.ptrToConstant = (void*)&data;
+		__CurrentBindings->csuBindings.add(b);
+	}
+
+	list<D3D12_DESCRIPTOR_RANGE> ranges;
+
+	// Binds a top level acceleration data structure
+	void ADS(int slot, gObj<SceneOnGPU>& const resource, int space = 0) {
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+		p.Descriptor.ShaderRegister = slot;
+		p.Descriptor.RegisterSpace = space;
+
+		SlotBinding b{ };
+		b.Root_Parameter = p;
+		b.SceneData.ptrToScene = (void*)&resource;
+		__CurrentBindings->csuBindings.add(b);
+	}
+
+
+	// Binds a shader resource view
+	void SRV(int slot, gObj<Buffer>& const resource, int space = 0) {
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		p.DescriptorTable.NumDescriptorRanges = 1;
+		D3D12_DESCRIPTOR_RANGE range = { };
+		range.BaseShaderRegister = slot;
+		range.NumDescriptors = 1;
+		range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		range.RegisterSpace = space;
+
+		ranges.add(range);
+		p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+		SlotBinding b{ };
+		b.Root_Parameter = p;
+		b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+		__CurrentBindings->csuBindings.add(b);
+	}
+
+	// Binds a shader resource view
+	void SRV(int slot, gObj<Texture2D>& const resource, int space = 0) {
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		p.DescriptorTable.NumDescriptorRanges = 1;
+		D3D12_DESCRIPTOR_RANGE range = { };
+		range.BaseShaderRegister = slot;
+		range.NumDescriptors = 1;
+		range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		range.RegisterSpace = space;
+
+		ranges.add(range);
+		p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+		SlotBinding b{ };
+		b.Root_Parameter = p;
+		b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+		__CurrentBindings->csuBindings.add(b);
+	}
+
+	// Binds a shader resource view
+	void SRV_Array(int startSlot, gObj<Texture2D>*& const resources, int &count, int space = 0) {
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		p.DescriptorTable.NumDescriptorRanges = 1;
+		D3D12_DESCRIPTOR_RANGE range = { };
+		range.BaseShaderRegister = startSlot;
+		range.NumDescriptors = -1;// undefined this moment
+		range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		range.RegisterSpace = space;
+
+		ranges.add(range);
+		p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+		SlotBinding b{ };
+		b.Root_Parameter = p;
+		b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+		b.DescriptorData.ptrToCount = (void*)&count;
+		__CurrentBindings->csuBindings.add(b);
+	}
+	
+	// Binds an unordered access view
+	void UAV(int slot, gObj<Buffer> const &resource, int space = 0) {
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		p.DescriptorTable.NumDescriptorRanges = 1;
+		D3D12_DESCRIPTOR_RANGE range = { };
+		range.BaseShaderRegister = slot;
+		range.NumDescriptors = 1;
+		range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		range.RegisterSpace = space;
+
+		ranges.add(range);
+		p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+		SlotBinding b{ };
+		b.Root_Parameter = p;
+		b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+		__CurrentBindings->csuBindings.add(b);
+	}
+
+	// Binds an unordered access view
+	void UAV(int slot, gObj<Texture2D> const &resource, int space = 0) {
+		D3D12_ROOT_PARAMETER p = { };
+		p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		p.DescriptorTable.NumDescriptorRanges = 1;
+		D3D12_DESCRIPTOR_RANGE range = { };
+		range.BaseShaderRegister = slot;
+		range.NumDescriptors = 1;
+		range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		range.RegisterSpace = space;
+
+		ranges.add(range);
+		p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+		SlotBinding b{ };
+		b.Root_Parameter = p;
+		b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+		__CurrentBindings->csuBindings.add(b);
+	}
+
+	// Adds a static sampler to the root signature.
+	void Static_SMP(int slot, const Sampler &sampler, int space = 0) {
+		D3D12_STATIC_SAMPLER_DESC desc = { };
+		desc.AddressU = sampler.AddressU;
+		desc.AddressV = sampler.AddressV;
+		desc.AddressW = sampler.AddressW;
+		desc.BorderColor =
+			!any(sampler.BorderColor - float4(0, 0, 0, 0)) ?
+			D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK :
+			!any(sampler.BorderColor - float4(0, 0, 0, 1)) ?
+			D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK :
+			D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+		desc.ComparisonFunc = sampler.ComparisonFunc;
+		desc.Filter = sampler.Filter;
+		desc.MaxAnisotropy = sampler.MaxAnisotropy;
+		desc.MaxLOD = sampler.MaxLOD;
+		desc.MinLOD = sampler.MinLOD;
+		desc.MipLODBias = sampler.MipLODBias;
+		desc.RegisterSpace = space;
+		desc.ShaderRegister = slot;
+		desc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		Static_Samplers[StaticSamplerMax] = desc;
+		StaticSamplerMax++;
+	}
+
+#pragma endregion
+
+	class Loader {
+		RTProgram *manager;
+	public:
+		Loader(RTProgram *manager) :manager(manager) { }
+
+		void Shader(const RayGenerationHandle &handle) {
+			manager->associationsToGlobal.add(handle.shaderHandle);
+			manager->associationsToRayGenLocals.add(handle.shaderHandle);
+		}
+
+		void Shader(const MissHandle &handle) {
+			manager->associationsToGlobal.add(handle.shaderHandle);
+			manager->associationsToMissLocals.add(handle.shaderHandle);
+		}
+
+	} * const loading;
+
+	class Creating {
+		RTProgram *manager;
+	public:
+		Creating(RTProgram *manager) : manager(manager){
+		}
+
+		void HitGroup(HitGroupHandle &handle, ClosestHitHandle &closest, const AnyHitHandle &anyHit, const IntersectionHandle &intersection) {
+			handle = HitGroupHandle(closest, anyHit, intersection);
+			manager->hitGroups.add(handle);
+			manager->associationsToGlobal.add(handle.shaderHandle);
+			manager->associationsToHitGroupLocals.add(handle.shaderHandle);
+		}
+	} * const creating;
+
+	class Setter {
+		RTProgram *manager;
+	public:
+		Setter(RTProgram *manager) :manager(manager) {}
+		void Payload(int sizeInBytes) {
+			manager->PayloadSize = sizeInBytes;
+		}
+		void StackSize(int maxDeep) {
+			manager->StackSize = maxDeep;
+		}
+		void Attribute(int sizeInBytes) {
+			manager->AttributesSize = sizeInBytes;
+		}
+	} * const setting;
+
+	inline R* Context() { return _rt_manager; }
+
+	virtual void Setup() = 0;
+
+	virtual void Globals() { }
+
+	virtual void RayGeneration_Locals() { }
+
+	virtual void Miss_Locals() { }
+
+	virtual void HitGroup_Locals() { }
+};
+
+struct RTPipelineManager : public virtual DynamicStateBindings,
+	DXILManager,
+	GlobalRootSignatureManager,
+	LocalRootSignatureManager,
+	HitGroupManager,
+	RTShaderConfig,
+	RTPipelineConfig,
+	ExportsManager
+{
+	friend DXRManager;
+	friend Loading;
+	friend IRTProgram;
+private:
+	list<gObj<IDXIL_Library>> loadedLibraries;
+	list<gObj<IRTProgram>> loadedPrograms;
+	DeviceManager *manager;
+
+	ID3D12RaytracingFallbackStateObject* fbso;
+	ID3D12StateObject *so;
+
+	// Will be executed when this pipeline manager were loaded
+	void __OnInitialization(DeviceManager *manager) {
+		this->manager = manager;
+		Setup();
+	}
+
+	void Close() {
+		// TODO: Create the so
+
+#pragma region counting states
+		int count = 0;
+
+		// 1 x each library (D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY)
+		count += loadedLibraries.size();
+
+		int maxAttributes = 2 * 4;
+		int maxPayload = 3 * 4;
+		int maxStackSize = 1;
+
+		for (int i = 0; i < loadedPrograms.size(); i++)
+		{
+			gObj<IRTProgram> program = loadedPrograms[i];
+
+			maxAttributes = max(maxAttributes, program->AttributesSize);
+			maxPayload = max(maxPayload, program->PayloadSize);
+			maxStackSize = max(maxStackSize, program->StackSize);
+
+			// Global root signature
+			if (!program->globals.isNull())
+				count++;
+			// Local raygen root signature
+			if (!program->raygen_locals.isNull())
+				count++;
+			// Local miss root signature
+			if (!program->miss_locals.isNull())
+				count++;
+			// Local hitgroup root signature
+			if (!program->hitGroup_locals.isNull())
+				count++;
+
+			// Associations to global root signature
+			if (program->associationsToGlobal.size() > 0)
+				count++;
+			// Associations to raygen local root signature
+			if (program->associationsToRayGenLocals.size() > 0)
+				count++;
+			// Associations to miss local root signature
+			if (program->associationsToMissLocals.size() > 0)
+				count++;
+			// Associations to hitgroup local root signature
+			if (program->associationsToHitGroupLocals.size() > 0)
+				count++;
+			// 1 x each hit group
+			count += program->hitGroups.size();
+		}
+
+		// 1 x shader config
+		count++;
+		// 1 x pipeline config
+		count++;
+
+#pragma endregion
+
+		AllocateStates(count);
+
+#pragma region Fill States
+
+		int index = 0;
+		// 1 x each library (D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY)
+		for (int i = 0; i < loadedLibraries.size(); i++)
+			SetDXIL(index++, loadedLibraries[i]->bytecode, loadedLibraries[i]->exports);
+
+		D3D12_STATE_SUBOBJECT* globalRS;
+		D3D12_STATE_SUBOBJECT* localRayGenRS;
+		D3D12_STATE_SUBOBJECT* localMissRS;
+		D3D12_STATE_SUBOBJECT* localHitGroupRS;
+
+		for (int i = 0; i < loadedPrograms.size(); i++)
+		{
+			gObj<IRTProgram> program = loadedPrograms[i];
+
+			// Global root signature
+			if (!program->globals.isNull())
+			{
+				globalRS = &dynamicStates[index];
+				SetGlobalRootSignature(index++, program->globals->rootSignature);
+			}
+			// Local raygen root signature
+			if (!program->raygen_locals.isNull())
+			{
+				localRayGenRS = &dynamicStates[index];
+				SetLocalRootSignature(index++, program->raygen_locals->rootSignature);
+			}
+			// Local miss root signature
+			if (!program->miss_locals.isNull())
+			{
+				localMissRS = &dynamicStates[index];
+				SetLocalRootSignature(index++, program->miss_locals->rootSignature);
+			}
+			// Local hitgroup root signature
+			if (!program->hitGroup_locals.isNull())
+			{
+				localHitGroupRS = &dynamicStates[index];
+				SetLocalRootSignature(index++, program->hitGroup_locals->rootSignature);
+			}
+
+			for (int j = 0; j < program->hitGroups.size(); j++)
+			{
+				auto hg = program->hitGroups[j];
+				if (hg.intersection.IsNull())
+					SetTriangleHitGroup(index++, hg.shaderHandle, hg.anyHit.shaderHandle, hg.closestHit.shaderHandle);
+				else
+					SetProceduralGeometryHitGroup(index++, hg.shaderHandle, hg.anyHit.shaderHandle, hg.closestHit.shaderHandle, hg.intersection.shaderHandle);
+			}
+
+			// Associations to global root signature
+			if (program->associationsToGlobal.size() > 0)
+				SetExportsAssociations(index++, globalRS, program->associationsToGlobal);
+			// Associations to raygen local root signature
+			if (!program->raygen_locals.isNull() && program->associationsToRayGenLocals.size() > 0)
+				SetExportsAssociations(index++, localRayGenRS, program->associationsToRayGenLocals);
+			// Associations to miss local root signature
+			if (!program->miss_locals.isNull() && program->associationsToMissLocals.size() > 0)
+				SetExportsAssociations(index++, localMissRS, program->associationsToMissLocals);
+			// Associations to hitgroup local root signature
+			if (!program->hitGroup_locals.isNull() && program->associationsToHitGroupLocals.size() > 0)
+				SetExportsAssociations(index++, localHitGroupRS, program->associationsToHitGroupLocals);
+		}
+
+		// 1 x shader config
+		SetRTSizes(index++, maxAttributes, maxPayload);
+		SetMaxRTRecursion(index++, maxStackSize);
+
+#pragma endregion
+
+		// Create so
+		D3D12_STATE_OBJECT_DESC soDesc = { };
+		soDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+		soDesc.NumSubobjects = index;
+		soDesc.pSubobjects = this->dynamicStates;
+
+		if (manager->fallbackDevice != nullptr) // emulating with fallback device
+		{
+			auto hr = manager->fallbackDevice->CreateStateObject(&soDesc, IID_PPV_ARGS(&fbso));
+			if (FAILED(hr))
+				throw AfterShow(CA4G_Errors_BadPSOConstruction, nullptr, hr);
+		}
+		else {
+			auto hr = manager->device->CreateStateObject(&soDesc, IID_PPV_ARGS(&so));
+			if (FAILED(hr))
+				throw AfterShow(CA4G_Errors_BadPSOConstruction, nullptr, hr);
+		}
+	}
+
+	public:
+	D3D12_STATE_SUBOBJECT_TYPE GetStateType(int index) {
+		return dynamicStates[index].Type;
+	}
+
+	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION* GetAsExports(int index) {
+		return (D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION*)dynamicStates[index].pDesc;
+	}
+
+	D3D12_DXIL_LIBRARY_DESC* GetAsDXIL(int index) {
+		return (D3D12_DXIL_LIBRARY_DESC*)dynamicStates[index].pDesc;
+	}
+
+	D3D12_GLOBAL_ROOT_SIGNATURE* GetAsGlobalRootSignature(int index) {
+		return (D3D12_GLOBAL_ROOT_SIGNATURE*)dynamicStates[index].pDesc;
+	}
+
+	D3D12_LOCAL_ROOT_SIGNATURE* GetAsLocalRootSignature(int index) {
+		return (D3D12_LOCAL_ROOT_SIGNATURE*)dynamicStates[index].pDesc;
+	}
+	private:
+	// Called when a pipeline is active into the pipeline
+	void __OnSet(DXRManager *cmdManager);
+
+protected:
+
+
+	class Loader {
+		RTPipelineManager *manager;
+	public:
+		Loader(RTPipelineManager *manager):manager(manager) {
+		}
+
+		template<typename P>
+		void Program(gObj<P> &program) {
+			program = new P();
+			program->__OnInitialization(this->manager->manager, this->manager);
+			manager->loadedPrograms.add(program);
+		}
+
+		template<typename L>
+		void Library(gObj<L> &library) {
+			library = new L();
+			library->__OnInitialization(this->manager);
+			manager->loadedLibraries.add(library);
+		}
+	} * const loading;
+
+	virtual void Setup() = 0;
+
+	RTPipelineManager() : loading(new Loader(this))
+	{
+	}
+};
+
+
+// Represents a pipeline bindings object for rt engines
+//class RTPipelineBindings : public IStateBindings, virtual DynamicStateBindings,
+//	DXILManager,
+//	GlobalRootSignatureManager,
+//	LocalRootSignatureManager,
+//	HitGroupManager,
+//	RTShaderConfig,
+//	RTPipelineConfig {
+//
+//	friend DXRManager;
+//
+//	// Deferred association struct. Used to "remember" 
+//	// needed associations for the state object construction on close
+//	struct DeferredAssociation {
+//		int SubojectOffset;
+//		list<LPCWSTR> exports;
+//	};
+//
+//	// Bytecode of the last DXIL library loaded
+//	D3D12_SHADER_BYTECODE currentBytecode = { };
+//	// List with the exports for the last DXIL library loaded
+//	list<D3D12_EXPORT_DESC> currentExports;
+//	// List of every loaded library descriptions
+//	list<D3D12_DXIL_LIBRARY_DESC> loadedLibraries;
+//	// Global list of every exported list to have everything saved 
+//	// in memory when state object is created
+//	list<list<D3D12_EXPORT_DESC>> allExports;
+//
+//	// Current global bindings object loaded to associate with every
+//	// shader export next
+//	gObj<BindingsHandle> currentGlobals;
+//	// Current local bindings object loaded to associate with every
+//	// shader export next
+//	gObj<BindingsHandle> currentLocals;
+//
+//	// List of exports will be associated to locals bindings
+//	list<LPCWSTR> localsExports;
+//	// List of exports will be associated to global bindings
+//	list<LPCWSTR> globalsExports;
+//
+//	// List of deferred associations
+//	list<DeferredAssociation> associations;
+//
+//	// Internal device manager for DX12 functionalities
+//	DeviceManager* manager;
+//
+//	// Used to collect static samplers
+//	D3D12_STATIC_SAMPLER_DESC Static_Samplers[32];
+//	// Gets or sets the maxim sampler slot used
+//	int StaticSamplerMax = 0;
+//	// Use to change between global and local list during collecting
+//	list<SlotBinding> *__CurrentLoadingCSU;
+//	// Use to change between global and local list during collecting
+//	list<SlotBinding> *__CurrentLoadingSamplers;
+//
+//	void AppendLibraryIfAny() {
+//		AppendGlobalSignatureIfNotEmpty();
+//		if (currentBytecode.pShaderBytecode != nullptr) {
+//			// save for future memory accessing
+//			allExports.add(currentExports.clone());
+//			
+//			this->AddDXIL(currentBytecode, allExports.last());
+//
+//			currentExports.reset();
+//			currentBytecode = { };
+//		}
+//	}
+//
+//	void Close() {
+//		AppendLibraryIfAny();
+//
+//		SetMaxRTRecursion(setting->maxTraceRecursion);
+//		SetRTTypes(setting->attributeSize, setting->maxPayloadSize);
+//
+//		// Create so
+//		D3D12_STATE_OBJECT_DESC soDesc = { };
+//		soDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+//		soDesc.NumSubobjects = this->dynamicStates.size();
+//		soDesc.pSubobjects = &this->dynamicStates.first();
+//
+//		if (manager->fallbackDevice != nullptr) // emulating with fallback device
+//		{
+//			auto hr = manager->fallbackDevice->CreateStateObject(&soDesc, IID_PPV_ARGS(&fbso));
+//			if (FAILED(hr))
+//				throw AfterShow(CA4G_Errors_BadPSOConstruction, nullptr, hr);
+//		}
+//		else {
+//			auto hr = manager->device->CreateStateObject(&soDesc, IID_PPV_ARGS(&so));
+//			if (FAILED(hr))
+//				throw AfterShow(CA4G_Errors_BadPSOConstruction, nullptr, hr);
+//		}
+//	}
+//
+//	byte* GetShaderIdentifier(ProgramHandle shader) {
+//		if (manager->fallbackDevice != nullptr)
+//			return (byte*)fbso->GetShaderIdentifier(shader.shaderHandle);
+//		else
+//			return (byte*)((ID3D12StateObjectPropertiesPrototype*)so)->GetShaderIdentifier(shader.shaderHandle);
+//	}
+//
+//	gObj<Buffer> raygenShaderTable;
+//	gObj<Buffer> missShaderTable;
+//	gObj<Buffer> hitgroupShaderTable;
+//
+//	void CommitLocalsFor(ProgramHandle handle, gObj<Buffer> &shaderTable, int index) {
+//		byte shaderRecord[4096]; // 4K limit of sh records
+//		int shaderIdentifierSize = manager->fallbackDevice != nullptr ? manager->fallbackDevice->GetShaderIdentifierSize() : D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+//		memcpy(shaderRecord, GetShaderIdentifier(handle), shaderIdentifierSize);
+//
+//		shaderTable->UpdateShaderRecord(index, shaderRecord);
+//	}
+//
+//	void CommitLocalsFor(RayGenerationHandle handle, int index) {
+//		CommitLocalsFor(handle, raygenShaderTable, index);
+//	}
+//	void CommitLocalsFor(HitGroupHandle handle, int index) {
+//		CommitLocalsFor(handle, hitgroupShaderTable, index);
+//	}
+//	void CommitLocalsFor(MissHandle handle, int index) {
+//		CommitLocalsFor(handle, missShaderTable, index);
+//	}
+//
+//	void AppendLocalSignatureIfNotEmpty() {
+//		if (localsExports.size() > 0) {
+//			AddLocalRootSignature(currentLocals->rootSignature);
+//			auto suboject = &dynamicStates.last();
+//			associations.add({ (byte*)suboject - (byte*)&dynamicStates.first(), localsExports.clone() });
+//			localsExports.reset();
+//		}
+//	}
+//
+//	void AppendGlobalSignatureIfNotEmpty() {
+//		AppendLocalSignatureIfNotEmpty();
+//
+//		if (globalsExports.size() > 0) {
+//			AddGlobalRootSignature(currentGlobals->rootSignature);
+//			auto suboject = &dynamicStates.last();
+//			associations.add({ (byte*)suboject - (byte*)&dynamicStates.first(), globalsExports.clone() });
+//			globalsExports.reset();
+//		}
+//	}
+//
+//	void AppendDeferredAssociations() {
+//		int currentSize = dynamicStates.size();
+//		for (int i = 0; i < associations.size(); i++)
+//			dynamicStates.add({ }); // enlarge dynamic state all necessary remain subobjects
+//		for (int i = 0; i < associations.size(); i++) {
+//			DeferredAssociation& a = associations[i];
+//			dynamicStates[i + currentSize].Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+//
+//			D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION* desc = new D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION();
+//			desc->NumExports = a.exports.size();
+//			desc->pExports = &a.exports.first();
+//			desc->pSubobjectToAssociate = &dynamicStates.first() + a.SubojectOffset;
+//			dynamicStates[i + currentSize].pDesc = desc;
+//		}
+//	}
+//
+//	// Creates the root signature after closing
+//	ID3D12RootSignature* CreateRootSignature(list<SlotBinding> &csu, list<SlotBinding> &samplers, bool isLocal) {
+//		D3D12_ROOT_PARAMETER * parameters = new D3D12_ROOT_PARAMETER[csu.size() + samplers.size()];
+//		D3D12_DESCRIPTOR_RANGE * ranges = new D3D12_DESCRIPTOR_RANGE[csu.size() + samplers.size()];
+//		int index = 0;
+//		for (int i = 0; i < csu.size(); i++)
+//
+//			//if (!csu[i].direct)
+//		{
+//			D3D12_DESCRIPTOR_RANGE range = { };
+//			range.RangeType = csu[i].type;
+//			range.BaseShaderRegister = csu[i].slot;
+//			range.NumDescriptors = csu[i].ptrToCount == nullptr ? 1 : -1;
+//			range.RegisterSpace = 0;
+//			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+//			//range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
+//			ranges[index] = range;
+//
+//			D3D12_ROOT_PARAMETER p = { };
+//			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+//			p.DescriptorTable.NumDescriptorRanges = 1;
+//			p.DescriptorTable.pDescriptorRanges = &ranges[index];
+//			p.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+//			parameters[index] = p;
+//
+//			index++;
+//		}
+//		//else
+//		//{
+//		//	D3D12_ROOT_PARAMETER p = { };
+//		//	p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+//		//	//p.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
+//		//	p.Descriptor.RegisterSpace = csu[i].space;
+//		//	p.Descriptor.ShaderRegister = csu[i].slot;
+//		//	p.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+//		//	parameters[index] = p;
+//
+//		//	index++;
+//		//}
+//
+//		for (int i = 0; i < samplers.size(); i++)
+//		{
+//			D3D12_DESCRIPTOR_RANGE range = { };
+//			range.RangeType = samplers[i].type;
+//			range.BaseShaderRegister = samplers[i].slot;
+//			range.NumDescriptors = samplers[i].ptrToCount == nullptr ? 1 : -1;
+//			range.RegisterSpace = 0;
+//			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+//			//range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
+//			ranges[index] = range;
+//
+//			D3D12_ROOT_PARAMETER p = { };
+//			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+//			p.DescriptorTable.NumDescriptorRanges = 1;
+//			p.DescriptorTable.pDescriptorRanges = &ranges[index];
+//			p.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+//			parameters[index] = p;
+//
+//			index++;
+//		}
+//
+//		D3D12_ROOT_SIGNATURE_DESC desc;
+//		desc.pParameters = parameters;
+//		desc.NumParameters = index;
+//		desc.pStaticSamplers = Static_Samplers;
+//		desc.NumStaticSamplers = StaticSamplerMax;
+//		desc.Flags = isLocal ? D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE : D3D12_ROOT_SIGNATURE_FLAG_NONE;
+//
+//		ID3DBlob *signatureBlob;
+//		ID3DBlob *signatureErrorBlob;
+//
+//		ID3D12RootSignature *rootSignature;
+//
+//		if (manager->fallbackDevice != nullptr) // will use fallback for DX RT support
+//		{
+//			auto hr = manager->fallbackDevice->D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &signatureErrorBlob);
+//			if (hr != S_OK)
+//				throw AfterShow(CA4G_Errors_BadSignatureConstruction, TEXT("Error serializing root signature"));
+//			hr = manager->fallbackDevice->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+//			if (hr != S_OK)
+//				throw AfterShow(CA4G_Errors_BadSignatureConstruction, TEXT("Error creating root signature"));
+//		}
+//		else
+//		{
+//			auto hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &signatureErrorBlob);
+//			if (hr != S_OK)
+//				throw AfterShow(CA4G_Errors_BadSignatureConstruction, TEXT("Error serializing root signature"));
+//
+//			hr = manager->device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+//			if (hr != S_OK)
+//				throw AfterShow(CA4G_Errors_BadSignatureConstruction, TEXT("Error creating root signature"));
+//		}
+//
+//		delete[] parameters;
+//		delete[] ranges;
+//
+//		return rootSignature;
+//	}
+//
+//	void __OnSet(DXRManager * manager);
+//
+//protected:
+//
+//	virtual void Setup() = 0;
+//
+//	typedef void (RTPipelineBindings::*BindingsMethod)();
+//
+//	RTPipelineBindings() : setting(new Setter()), loading(new Loading(this)), creating(new Creating(this)) {
+//	}
+//
+//	class Loading {
+//		friend RTPipelineBindings;
+//		RTPipelineBindings* manager;
+//		Loading(RTPipelineBindings *manager) :manager(manager) {}
+//
+//		void DeclareExport(LPCWSTR name) {
+//			manager->currentExports.add({ name });
+//			manager->globalsExports.add(name);
+//			manager->localsExports.add(name);
+//		}
+//
+//		void GetBindingsFor(BindingsMethod bindings, list<SlotBinding> &csu, list<SlotBinding> &samplers) {
+//			csu.reset();
+//			samplers.reset();
+//
+//			manager->__CurrentLoadingCSU = &csu;
+//			manager->__CurrentLoadingSamplers = &samplers;
+//
+//			auto instance = this->manager;
+//
+//			(instance->*bindings)();
+//		}
+//
+//	public:
+//
+//		void Library(D3D12_SHADER_BYTECODE bytecode) {
+//			manager->AppendLibraryIfAny();
+//			manager->currentBytecode = bytecode;
+//		}
+//
+//		void Globals(BindingsMethod globals) {
+//			manager->AppendGlobalSignatureIfNotEmpty();
+//			gObj<BindingsHandle> handle = new BindingsHandle();
+//			handle->isLocal = false;
+//			GetBindingsFor(globals, handle->csuBindings, handle->samplerBindings);
+//			handle->rootSignature = manager->CreateRootSignature(handle->csuBindings, handle->samplerBindings, handle->isLocal);
+//			manager->currentGlobals = handle;
+//		}
+//
+//		void Locals(BindingsMethod locals) {
+//			manager->AppendLocalSignatureIfNotEmpty();
+//			gObj<BindingsHandle> handle = new BindingsHandle();
+//			handle->isLocal = true;
+//			GetBindingsFor(locals, handle->csuBindings, handle->samplerBindings);
+//			manager->currentLocals = handle;
+//		}
+//
+//		void Shader(RayGenerationHandle &raygen, LPCWSTR name) {
+//			raygen = RayGenerationHandle(name);
+//			DeclareExport(name);
+//		}
+//		void Shader(MissHandle &miss, LPCWSTR name) {
+//			miss = MissHandle(name);
+//			DeclareExport(name);
+//		}
+//		void Shader(AnyHitHandle &anyHit, LPCWSTR name) {
+//			anyHit = AnyHitHandle(name);
+//			DeclareExport(name);
+//		}
+//		void Shader(ClosestHitHandle &closestHit, LPCWSTR name) {
+//			closestHit = ClosestHitHandle(name);
+//			DeclareExport(name);
+//		}
+//		void Shader(IntersectionHandle &intersection, LPCWSTR name) {
+//			intersection = IntersectionHandle(name);
+//			DeclareExport(name);
+//		}
+//		void HitGroup(HitGroupHandle &hitGroup,
+//			const ClosestHitHandle &closestHit,
+//			const AnyHitHandle &anyHit) {
+//			hitGroup = HitGroupHandle(closestHit, anyHit, IntersectionHandle::NULL_INTERSECTION);
+//			manager->AddTriangleHitGroup(hitGroup.shaderHandle,
+//				anyHit.shaderHandle, closestHit.shaderHandle);
+//			DeclareExport(hitGroup.shaderHandle);
+//		}
+//	} *const loading;
+//
+//	class Creating {
+//		friend RTPipelineBindings;
+//		RTPipelineBindings* manager;
+//		Creating(RTPipelineBindings *manager) :manager(manager) {}
+//	public:
+//	} *const creating;
+//
+//	#pragma region Binding Methods
+//	// Binds a constant buffer view
+//	void CBV(int slot, gObj<Buffer>& const resource, int space = 0) {
+//		__CurrentLoadingCSU->add(SlotBinding{ D3D12_DESCRIPTOR_RANGE_TYPE_CBV, slot, D3D12_RESOURCE_DIMENSION_BUFFER, (void*)&resource , nullptr, space });
+//	}
+//
+//	// Binds a shader resource view
+//	void SRV(int slot, gObj<Buffer>& const resource, int space = 0) {
+//		__CurrentLoadingCSU->add(SlotBinding{ D3D12_DESCRIPTOR_RANGE_TYPE_SRV, slot, D3D12_RESOURCE_DIMENSION_BUFFER, (void*)&resource, nullptr, space });
+//	}
+//
+//	// Binds a acceleration structure to the pipeline
+//	void ASV(int slot, gObj<Buffer>& const resource, int space = 0) {
+//		__CurrentLoadingCSU->add(SlotBinding{ D3D12_DESCRIPTOR_RANGE_TYPE_SRV, slot, D3D12_RESOURCE_DIMENSION_BUFFER, (void*)&resource, nullptr, space, true });
+//	}
+//
+//	// Binds a shader resource view
+//	void SRV(int slot, gObj<Texture2D>& const resource, int space = 0) {
+//		__CurrentLoadingCSU->add(SlotBinding{ D3D12_DESCRIPTOR_RANGE_TYPE_SRV, slot, D3D12_RESOURCE_DIMENSION_TEXTURE2D, (void*)&resource , nullptr, space });
+//	}
+//
+//	// Binds a shader resource view
+//	void SRV_Array(int startSlot, gObj<Texture2D>*& const resources, int &count, int space = 0) {
+//		__CurrentLoadingCSU->add(SlotBinding{ D3D12_DESCRIPTOR_RANGE_TYPE_SRV, startSlot, D3D12_RESOURCE_DIMENSION_TEXTURE2D, (void*)&resources, &count, space });
+//	}
+//
+//	// Binds a sampler object view
+//	void SMP(int slot, gObj<Sampler> const &sampler) {
+//		__CurrentLoadingSamplers->add(SlotBinding{ D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, slot, D3D12_RESOURCE_DIMENSION_UNKNOWN, (void*)&sampler });
+//	}
+//
+//	// Binds an unordered access view
+//	void UAV(int slot, gObj<Buffer> const &resource, int space = 0) {
+//		__CurrentLoadingCSU->add(SlotBinding{ D3D12_DESCRIPTOR_RANGE_TYPE_UAV, slot, D3D12_RESOURCE_DIMENSION_BUFFER, (void*)&resource, nullptr, space });
+//	}
+//
+//	// Binds an unordered access view
+//	void UAV(int slot, gObj<Texture2D> const &resource, int space = 0) {
+//		__CurrentLoadingCSU->add(SlotBinding{ D3D12_DESCRIPTOR_RANGE_TYPE_UAV, slot, D3D12_RESOURCE_DIMENSION_TEXTURE2D, (void*)&resource, nullptr, space });
+//	}
+//
+//	// Adds a static sampler to the root signature.
+//	void Static_SMP(int slot, const Sampler &sampler, int space = 0) {
+//		D3D12_STATIC_SAMPLER_DESC desc = { };
+//		desc.AddressU = sampler.AddressU;
+//		desc.AddressV = sampler.AddressV;
+//		desc.AddressW = sampler.AddressW;
+//		desc.BorderColor =
+//			!any(sampler.BorderColor - float4(0, 0, 0, 0)) ?
+//			D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK :
+//			!any(sampler.BorderColor - float4(0, 0, 0, 1)) ?
+//			D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK :
+//			D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+//		desc.ComparisonFunc = sampler.ComparisonFunc;
+//		desc.Filter = sampler.Filter;
+//		desc.MaxAnisotropy = sampler.MaxAnisotropy;
+//		desc.MaxLOD = sampler.MaxLOD;
+//		desc.MinLOD = sampler.MinLOD;
+//		desc.MipLODBias = sampler.MipLODBias;
+//		desc.RegisterSpace = space;
+//		desc.ShaderRegister = slot;
+//		desc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+//
+//		Static_Samplers[StaticSamplerMax] = desc;
+//		StaticSamplerMax++;
+//	}
+//
+//	#pragma endregion
+//
+//	class Setter {
+//		friend RTPipelineBindings;
+//
+//		int maxTraceRecursion = 8;
+//		int maxPayloadSize = 32;
+//		int attributeSize = 16;
+//	public:
+//		void MaxTraceRecursion(int stacking) {
+//			maxTraceRecursion = stacking;
+//		}
+//		void MaxPayloadSize(int size) {
+//			maxPayloadSize = size;
+//		}
+//		void AttributeSize(int size) {
+//			attributeSize = size;
+//		}
+//	} *const setting;
+//
+//};
+
+#pragma endregion
+
 #pragma region Managing Command Lists
 
 // Wrapper to a CommandList object of DX. This class is inteded for be inherited.
@@ -2479,6 +4373,7 @@ class CommandListManager {
 	friend Creating;
 	friend Copying;
 	friend GPUScheduler;
+	friend TriangleGeometryCollection;
 
 	// Indicates the command list was closed and can be sent to the allocator
 	bool closed;
@@ -2494,7 +4389,7 @@ class CommandListManager {
 
 
 	// Use this command list to copy from one resource to another
-	void __All(gObj<ResourceWrapper> dst, gObj<ResourceWrapper> src);
+	void __All(gObj<ResourceWrapper> &dst, gObj<ResourceWrapper> &src);
 
 protected:
 
@@ -2502,10 +4397,10 @@ protected:
 	list<D3D12_CPU_DESCRIPTOR_HANDLE> dstDescriptors;
 	list<unsigned int> dstDescriptorRangeLengths;
 
-	ID3D12GraphicsCommandList *cmdList;
+	ID3D12GraphicsCommandList5 *cmdList;
 	DeviceManager* manager;
 
-	CommandListManager(DeviceManager* manager, ID3D12GraphicsCommandList *cmdList) :
+	CommandListManager(DeviceManager* manager, ID3D12GraphicsCommandList5 *cmdList) :
 		manager(manager),
 		cmdList(cmdList),
 		clearing(new Clearing(this, cmdList)),
@@ -2612,6 +4507,7 @@ public:
 				dst->resource->uploadingResourceCache->Upload(data, subresource, box);
 				dst->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_COPY_DEST);
 				manager->__All(dst->resource, dst->resource->uploadingResourceCache);
+				//dst->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_GENERIC_READ);
 			}
 			return this;
 		}
@@ -2643,6 +4539,13 @@ public:
 		Copying* ValueData(gObj<Buffer> dst, const T &data) {
 			return GenericCopy(dst, &data);
 		}
+
+		template<typename V>
+		void All(gObj<V> & dst, gObj<V> & src) {
+			dst->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_COPY_DEST);
+			src->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_COPY_SOURCE);
+			manager->__All(dst->resource, src->resource);
+		}
 	}
 	*const copying;
 
@@ -2669,10 +4572,9 @@ class CopyingManager : public CommandListManager {
 	friend Presenter;
 	friend DeviceManager;
 	friend ComputeManager;
-	template<typename> friend class Engine;
 	friend GPUScheduler;
 
-	CopyingManager(DeviceManager* manager, ID3D12GraphicsCommandList *cmdList) :CommandListManager(manager, cmdList)
+	CopyingManager(DeviceManager* manager, ID3D12GraphicsCommandList5 *cmdList) :CommandListManager(manager, cmdList)
 	{
 	}
 };
@@ -2682,15 +4584,19 @@ class ComputeManager : public CopyingManager {
 	friend Presenter;
 	friend DeviceManager;
 	friend GraphicsManager;
+	friend DXRManager;
 	friend GraphicsPipelineBindings;
-	template<typename> friend class Engine;
 	template<typename ...PPS> friend class PipelineBindings;
 	friend GPUScheduler;
+	friend IRTProgram;
+	friend RTPipelineManager;
 
 	// Gets the current pipeline object set
 	gObj<IPipelineBindings> currentPipeline = nullptr;
+	gObj<RTPipelineManager> currentPipeline1 = nullptr;
+	gObj<IRTProgram> activeRTProgram = nullptr;
 
-ComputeManager(DeviceManager* manager, ID3D12GraphicsCommandList *cmdList) : CopyingManager(manager, cmdList), setting(new Setter(this))
+ComputeManager(DeviceManager* manager, ID3D12GraphicsCommandList5 *cmdList) : CopyingManager(manager, cmdList), setting(new Setter(this))
 	{
 	}
 public:
@@ -2703,11 +4609,10 @@ public:
 	Setter* Pipeline(IPipelineBindings * pipeline) {
 		manager->currentPipeline = pipeline;
 		manager->cmdList->SetPipelineState(pipeline->pso);
-		manager->cmdList->SetGraphicsRootSignature(pipeline->rootSignature);
+		manager->cmdList->SetComputeRootSignature(pipeline->rootSignature);
 		pipeline->__OnSet(manager);
 		return this;
 	}
-
 
 } *const setting;
 
@@ -2719,16 +4624,15 @@ class GraphicsManager : public ComputeManager {
 	friend DeviceManager;
 	friend GPUScheduler;
 	friend DXRManager;
-	template<typename> friend class Engine;
 
-	GraphicsManager(DeviceManager* manager, ID3D12GraphicsCommandList *cmdList) :ComputeManager(manager, cmdList),
+	GraphicsManager(DeviceManager* manager, ID3D12GraphicsCommandList5 *cmdList) :ComputeManager(manager, cmdList),
 		setting(new Setter(this)),
-		drawer(new Drawer(this)) {
+		dispatcher(new Dispatcher(this)) {
 	}
 	~GraphicsManager() {
 		delete copying;
 		delete setting;
-		delete drawer;
+		delete dispatcher;
 	}
 
 public:
@@ -2787,57 +4691,168 @@ public:
 
 	} *const setting;
 
-	class Drawer {
+	class Dispatcher {
 		GraphicsManager *manager;
 	public:
-		Drawer(GraphicsManager* manager) :manager(manager) {
+		Dispatcher(GraphicsManager* manager) :manager(manager) {
 		}
 
 		// Draws a primitive using a specific number of vertices
-		Drawer* Primitive(D3D_PRIMITIVE_TOPOLOGY topology, int count, int start = 0) {
+		void Primitive(D3D_PRIMITIVE_TOPOLOGY topology, int count, int start = 0) {
 			// Grant this cmdlist is active before use it
-			if (!manager->currentPipeline)
-				return this;
+			if (manager->currentPipeline.isNull())
+				return;
 
 			manager->currentPipeline->__OnDraw(manager);
 			manager->cmdList->IASetPrimitiveTopology(topology);
 			manager->cmdList->DrawInstanced(count, 1, start, 0);
-			return this;
 		}
 
 		// Draws a primitive using a specific number of vertices
-		Drawer* IndexedPrimitive(D3D_PRIMITIVE_TOPOLOGY topology, int count, int start = 0) {
+		void IndexedPrimitive(D3D_PRIMITIVE_TOPOLOGY topology, int count, int start = 0) {
 			// Grant this cmdlist is active before use it
-			if (!manager->currentPipeline)
-				return this;
+			if (manager->currentPipeline.isNull())
+				return;
 
 			manager->currentPipeline->__OnDraw(manager);
 			manager->cmdList->IASetPrimitiveTopology(topology);
 			manager->cmdList->DrawIndexedInstanced(count, 1, start, 0, 0);
-			return this;
 		}
 
 		// Draws triangles using a specific number of vertices
-		Drawer* Triangles(int count, int start = 0) {
-			return Primitive(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, count, start);
+		void Triangles(int count, int start = 0) {
+			Primitive(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, count, start);
 		}
 
-		Drawer* IndexedTriangles(int count, int start = 0) {
-			return IndexedPrimitive(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, count, start);
+		void IndexedTriangles(int count, int start = 0) {
+			IndexedPrimitive(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, count, start);
 		}
-	}*const drawer;
+	}*const dispatcher;
 };
 
 class DXRManager : public GraphicsManager {
 	friend GPUScheduler;
+	friend RTPipelineManager;
+	//friend Dispatcher;
+	friend GeometryCollection;
+	friend InstanceCollection;
+	friend IRTProgram;
 
 	ID3D12RaytracingFallbackCommandList *fallbackCmdList;
 
-	DXRManager(DeviceManager *manager, ID3D12GraphicsCommandList4 *cmdList) : GraphicsManager(manager, cmdList) {
-		manager->fallbackDevice->QueryRaytracingCommandList(cmdList, IID_PPV_ARGS(&fallbackCmdList));
+	DXRManager(DeviceManager *manager, ID3D12GraphicsCommandList5 *cmdList) : GraphicsManager(manager, cmdList),
+	setting(new Setter(this)),
+	dispatcher(new Dispatcher(this)),
+	creating(new Creating(this))
+	{
+		if (manager->fallbackDevice != nullptr)
+			manager->fallbackDevice->QueryRaytracingCommandList(cmdList, IID_PPV_ARGS(&fallbackCmdList));
+		else
+			fallbackCmdList = nullptr;
 	}
 public:
+	class Setter {
+		DXRManager *manager;
+	public:
+		Setter(DXRManager *manager):manager(manager) {
+		}
+		void Pipeline(gObj<RTPipelineManager> bindings) {
+			manager->currentPipeline1 = bindings;
+			if (manager->fallbackCmdList != nullptr)
+				manager->fallbackCmdList->SetPipelineState1(bindings->fbso);
+			else 
+				manager->cmdList->SetPipelineState1(bindings->so);
+			manager->currentPipeline1->__OnSet(this->manager);
+		}
+		
+		void Program(gObj<IRTProgram> program) {
+			manager->activeRTProgram = program;
+			manager->cmdList->SetComputeRootSignature(program->globals->rootSignature);
+			program->BindOnGPU(manager, program->globals);
+		}
 
+		void UpdateShaderTable(gObj<Buffer> st, int index, ProgramHandle program) {
+			byte shaderRecord[4096]; // max shader record size
+			 //program.shaderHandle
+		}
+
+		// Commit all local bindings for this ray generation shader
+		void RayGeneration(RayGenerationHandle program) {
+			manager->activeRTProgram->UpdateRayGenLocals(manager, program);
+		}
+
+		void Miss(MissHandle program, int index) {
+			manager->activeRTProgram->UpdateMissLocals(manager, program, index);
+		}
+
+		void HitGroup(HitGroupHandle group, int geometryIndex, 
+			int rayContribution = 0, int multiplier = 1, int instanceContribution = 0)
+		{
+			int index = rayContribution + (geometryIndex * multiplier) + instanceContribution;
+			manager->activeRTProgram->UpdateHitGroupLocals(manager, group, index);
+
+		}
+
+	} * const setting;
+
+	class Dispatcher {
+		DXRManager *manager;
+	public:
+		Dispatcher(DXRManager *manager) :manager(manager) {}
+		void Rays(int width, int height, int depth = 1) {
+			auto currentBindings = manager->currentPipeline1;
+			auto currentProgram = manager->activeRTProgram;
+
+			if (!currentBindings)
+				return; // Exception?
+			D3D12_DISPATCH_RAYS_DESC d;
+			auto rtRayGenShaderTable = currentProgram->raygen_shaderTable;
+			auto rtMissShaderTable = currentProgram->miss_shaderTable;
+			auto rtHGShaderTable = currentProgram->group_shaderTable;
+
+			auto DispatchRays = [&](auto* commandList, auto* stateObject, auto* dispatchDesc)
+			{
+				dispatchDesc->HitGroupTable.StartAddress = rtHGShaderTable->resource->GetGPUVirtualAddress();
+				dispatchDesc->HitGroupTable.SizeInBytes = rtHGShaderTable->resource->desc.Width;
+				dispatchDesc->HitGroupTable.StrideInBytes = rtHGShaderTable->Stride;
+
+				dispatchDesc->MissShaderTable.StartAddress = rtMissShaderTable->resource->GetGPUVirtualAddress();
+				dispatchDesc->MissShaderTable.SizeInBytes = rtMissShaderTable->resource->desc.Width;
+				dispatchDesc->MissShaderTable.StrideInBytes = dispatchDesc->MissShaderTable.SizeInBytes;
+				
+				dispatchDesc->RayGenerationShaderRecord.StartAddress = rtRayGenShaderTable->resource->GetGPUVirtualAddress();
+				dispatchDesc->RayGenerationShaderRecord.SizeInBytes = rtRayGenShaderTable->resource->desc.Width;
+				
+				dispatchDesc->Width = width;
+				dispatchDesc->Height = height;
+				dispatchDesc->Depth = depth;
+				commandList->DispatchRays(dispatchDesc);
+			};
+
+			D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
+			if (manager->fallbackCmdList)
+			{
+				DispatchRays(manager->fallbackCmdList, currentBindings->fbso, &dispatchDesc);
+			}
+			else // DirectX Raytracing
+			{
+				DispatchRays(manager->cmdList, currentBindings->so, &dispatchDesc);
+			}
+		}
+	} *const dispatcher;
+
+	class Creating {
+		friend DXRManager;
+		DXRManager * manager;
+		Creating(DXRManager *manager) :manager(manager) {}
+	public:
+		gObj<TriangleGeometryCollection> TriangleGeometries() {
+			return new TriangleGeometryCollection(manager->manager, manager);
+		}
+		gObj<InstanceCollection> Instances() {
+			return new InstanceCollection(manager->manager, manager);
+		}
+	} * const creating;
 };
 
 #pragma endregion
@@ -2920,6 +4935,26 @@ class Creating {
 	}
 
 public:
+
+	// Creates a shader table buffer
+	gObj<Buffer> ShaderTable(D3D12_RESOURCE_STATES state, int stride, int count = 1, CPU_ACCESS cpuAccess = CPU_ACCESS::CPU_WRITE_GPU_READ, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE) {
+		
+		stride = (stride + (D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT - 1)) & ~(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT - 1);
+		
+		D3D12_RESOURCE_DESC desc = { };
+		desc.Width = count * stride;
+		desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		desc.Flags = flags;
+		desc.Format = DXGI_FORMAT_UNKNOWN;
+		desc.Height = 1;
+		desc.Alignment = 0;
+		desc.DepthOrArraySize = 1;
+		desc.MipLevels = 1;
+		desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		desc.SampleDesc = { 1, 0 };
+
+		return new Buffer(CreateResourceAndWrap(desc, state, cpuAccess), stride);
+	}
 	
 	// Creates a generic buffer
 	template <typename T>
@@ -3097,6 +5132,30 @@ public:
 // DeviceManager object, render targets for triplebuffering, Swapchain for presenting.
 // Allows loading a technique and presenting it.
 class Presenter {
+
+	// Enable experimental features required for compute-based raytracing fallback.
+	// This will set active D3D12 devices to DEVICE_REMOVED state.
+	// Returns bool whether the call succeeded and the device supports the feature.
+	inline bool EnableComputeRaytracingFallback(IDXGIAdapter1* adapter)
+	{
+		ID3D12Device* testDevice;
+		UUID experimentalFeatures[] = { D3D12ExperimentalShaderModels };
+
+		return SUCCEEDED(D3D12EnableExperimentalFeatures(1, experimentalFeatures, nullptr, nullptr))
+			&& SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice)));
+	}
+
+	// Returns bool whether the device supports DirectX Raytracing tier.
+	inline bool IsDirectXRaytracingSupported(IDXGIAdapter1* adapter)
+	{
+		ID3D12Device* testDevice;
+		D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
+
+		return SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice)))
+			&& SUCCEEDED(testDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData)))
+			&& featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+	}
+
 	// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
 	// If no such adapter can be found, *ppAdapter will be set to nullptr.
 	_Use_decl_annotations_
@@ -3132,8 +5191,6 @@ class Presenter {
 	DeviceManager* manager;
 	IDXGISwapChain3* swapChain;
 
-	
-
 	unsigned int CurrentBuffer;
 
 	void __PrepareToPresent(GraphicsManager* cmds) {
@@ -3145,6 +5202,8 @@ class Presenter {
 	}
 
 public:
+
+	ID3D12Debug *debugController;
 
 	ID3D12Device* getInnerD3D12Device() {
 		return manager->device;
@@ -3163,24 +5222,39 @@ public:
 		// Enable the debug layer (requires the Graphics Tools "optional feature").
 		// NOTE: Enabling the debug layer after device creation will invalidate the active device.
 		{
-			ID3D12Debug *debugController;
 			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 			{
 				debugController->EnableDebugLayer();
 
 				// Enable additional debug layers.
 				dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+
+				//((ID3D12Debug1*)debugController)->SetEnableGPUBasedValidation(true);
 			}
+
+			
 		}
 #endif
 
 		IDXGIFactory4* factory;
-		CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory));
+		IDXGIInfoQueue* dxgiInfoQueue;
+		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
+		{
+			CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory));
+
+			dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
+			dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
+		}
+		else
+			CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory));
+
 
 		if (useWarpDevice)
 		{
 			IDXGIAdapter *warpAdapter;
 			factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter));
+
+			//EnableDirectXRaytracing(warpAdapter);
 
 			D3D12CreateDevice(
 				warpAdapter,
@@ -3193,6 +5267,8 @@ public:
 			IDXGIAdapter1 *hardwareAdapter;
 			GetHardwareAdapter(factory, &hardwareAdapter);
 
+			EnableComputeRaytracingFallback(hardwareAdapter);
+
 			D3D12CreateDevice(
 				hardwareAdapter,
 				D3D_FEATURE_LEVEL_11_0,
@@ -3203,7 +5279,7 @@ public:
 		D3D12_FEATURE_DATA_D3D12_OPTIONS ops;
 		device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &ops, sizeof(ops));
 
-		manager = new DeviceManager(device, buffers, useFrameBuffering);
+		manager = new DeviceManager(device, buffers, useFrameBuffering, useWarpDevice);
 		
 		RECT rect;
 		GetClientRect(hWnd, &rect);
@@ -3302,6 +5378,8 @@ public:
 
 		auto gui_cmd = manager->Scheduler->engines[0].threadInfos[0].cmdList;
 
+		manager->Perform(process(__PrepareToRenderTarget));
+
 		D3D12_CPU_DESCRIPTOR_HANDLE rthandle = manager->BackBuffer->getRTVHandle();
 		gui_cmd->OMSetRenderTargets(1, &rthandle, false, nullptr);
 		gui_cmd->SetDescriptorHeaps(1, &this->manager->descriptors->gui_csu->heap);
@@ -3329,6 +5407,8 @@ public:
 	// Flush all pending work, and release objects.
 	void Close() {
 		manager->WaitFor(manager->SendSignal(manager->Flush(ENGINE_MASK_ALL)));
+
+		delete manager;
 	}
 };
 

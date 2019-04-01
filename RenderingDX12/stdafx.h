@@ -11,4 +11,5 @@
 #include "Techniques/Tutorials/Tutorial7.h"
 #include "Techniques/Tutorials/Tutorial8.h"
 #include "Techniques/Tutorials/Tutorial9.h"
+#include "Techniques/Tutorials/Tutorial10.h"
 

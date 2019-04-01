@@ -26,8 +26,8 @@ public:
 
 protected:
 	void Setup() {
-		_ gSet VertexShader(LoadByteCode(".\\Techniques\\RetainedBasic\\RetainedRendering_VS.cso"));
-		_ gSet PixelShader(LoadByteCode(".\\Techniques\\RetainedBasic\\RetainedRendering_PS.cso"));
+		_ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\RetainedBasic\\RetainedRendering_VS.cso"));
+		_ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\RetainedBasic\\RetainedRendering_PS.cso"));
 		_ gSet InputLayout({});
 		_ gSet DepthTest();
 	}
@@ -104,7 +104,7 @@ protected:
 		manager gSet Viewport(render_target->Width, render_target->Height);
 		manager gSet Pipeline(pipeline);
 
-		manager gDraw Triangles(VertexBuffer->ElementCount);
+		manager gDispatch Triangles(VertexBuffer->ElementCount);
 	}
 
 	void Frame() {

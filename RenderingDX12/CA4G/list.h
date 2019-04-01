@@ -12,6 +12,20 @@ public:
 		count = 0;
 		elements = new T[capacity];
 	}
+private:
+	list(const list<T> &other) {
+	}
+public:
+
+	list<T> clone() {
+		list<T> result();
+		result.elements = new T[count];
+		result.capacity = result.count = count;
+		for (int i = 0; i < count; i++)
+			result.elements[i] = elements[i];
+		return result;
+	}
+
 	void reset() {
 		count = 0;
 	}

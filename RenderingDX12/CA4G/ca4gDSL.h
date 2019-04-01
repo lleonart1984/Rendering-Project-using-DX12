@@ -28,7 +28,7 @@
 
 #define gSet ->setting->
 
-#define gDraw ->drawer->
+#define gDispatch ->dispatcher->
 
 #define gOpen(pipeline) (pipeline)->Open();
 

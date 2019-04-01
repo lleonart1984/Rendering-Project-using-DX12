@@ -2,6 +2,11 @@
 
 #include "..\ca4g.h"
 
+
+#define vertex_layout(layout) static std::initializer_list<VertexElement> Layout() \
+							{ static std::initializer_list<VertexElement> result layout; return result; }
+
+
 // Default vertex definition for Scene vertex
 struct SCENE_VERTEX {
 	float3 Position;

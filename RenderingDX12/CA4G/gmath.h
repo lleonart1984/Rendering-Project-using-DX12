@@ -341,6 +341,56 @@ typedef struct float3x3
 	bool IsSingular() const { return getDeterminant() == 0; }
 } float3x3;
 
+typedef struct float3x4
+{
+	float M00;
+	float M01;
+	float M02;
+	float M03;
+	float M10;
+	float M11;
+	float M12;
+	float M13;
+	float M20;
+	float M21;
+	float M22;
+	float M23;
+	float3x4(float value)
+	{
+		M00 = value;
+		M01 = value;
+		M02 = value;
+		M03 = value;
+		M10 = value;
+		M11 = value;
+		M12 = value;
+		M13 = value;
+		M20 = value;
+		M21 = value;
+		M22 = value;
+		M23 = value;
+	}
+	float3x4() :float3x4(0) {}
+	float3x4(float M00, float M01, float M02, float M03, float M10, float M11, float M12, float M13, float M20, float M21, float M22, float M23)
+	{
+		this->M00 = M00;
+		this->M01 = M01;
+		this->M02 = M02;
+		this->M03 = M03;
+		this->M10 = M10;
+		this->M11 = M11;
+		this->M12 = M12;
+		this->M13 = M13;
+		this->M20 = M20;
+		this->M21 = M21;
+		this->M22 = M22;
+		this->M23 = M23;
+	}
+
+	float3x4(const float4x4 &m) :float3x4(m.M00, m.M01, m.M02, m.M03, m.M10, m.M11, m.M12, m.M13, m.M20, m.M21, m.M22, m.M23) {
+	}
+} float3x4;
+
 float4 operator + (const float4 &v1, const float4 & v2)
 {
 	return float4{ v1.x + v2.x, v1.y + v2.y, v1.z + v2.z, v1.w + v2.w };

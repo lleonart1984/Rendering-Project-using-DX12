@@ -31,8 +31,8 @@ class Tutorial8 : public Technique, public IHasBackcolor, public IHasCamera, pub
 
 	protected:
 		void Setup() {
-			_ gSet VertexShader(LoadByteCode(".\\Techniques\\Tutorials\\Shaders\\TransformToViewSpace_VS.cso"));
-			_ gSet PixelShader(LoadByteCode(".\\Techniques\\Tutorials\\Shaders\\SimplePhongShading_PS.cso"));
+			_ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\TransformToViewSpace_VS.cso"));
+			_ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\SimplePhongShading_PS.cso"));
 			_ gSet InputLayout(SCENE_VERTEX::Layout());
 			_ gSet DepthTest();
 			_ gSet DepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
@@ -162,7 +162,7 @@ protected:
 			pipeline->locals = transforms[i];
 			pipeline->materials = materials[i];
 
-			manager gDraw Triangles(object.vertexesCount, object.startVertex);
+			manager gDispatch Triangles(object.vertexesCount, object.startVertex);
 		}
 	}
 

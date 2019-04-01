@@ -19,9 +19,9 @@ class Tutorial7 : public Technique, public IHasBackcolor, public IHasCamera {
 		// Setup method is overriden to load shader codes and set other default settings
 		void Setup() {
 			// Loads a compiled shader object and set as vertex shader
-			_ gSet VertexShader(LoadByteCode(".\\Techniques\\Tutorials\\Shaders\\PassPositionAndCoordinates_VS.cso"));
+			_ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\PassPositionAndCoordinates_VS.cso"));
 			// Loads a compiled shader object and set as pixel shader
-			_ gSet PixelShader(LoadByteCode(".\\Techniques\\Tutorials\\Shaders\\BasicSampling2D_PS.cso"));
+			_ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\BasicSampling2D_PS.cso"));
 			_ gSet InputLayout({
 					VertexElement { VertexElementType_Float, 3, "POSITION"},	// float3 P : POSITION
 					VertexElement { VertexElementType_Float, 2, "TEXCOORD"}		// float2 C : TEXCOORD
@@ -117,7 +117,7 @@ protected:
 		manager gSet IndexBuffer(indices);
 
 		// Draw a quad with 4 vertices and 6 indices
-		manager gDraw IndexedTriangles(6);
+		manager gDispatch IndexedTriangles(6);
 	}
 
 	// Graphic Process to clear the render target with a backcolor

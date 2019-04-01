@@ -12,7 +12,7 @@ enum CA4G_Errors {
 	// The Pipeline State Object has a bad construction.
 	CA4G_Errors_BadPSOConstruction,
 	// The Signature has a bad construction
-	CA4G_Errors_BasSignatureConstruction,
+	CA4G_Errors_BadSignatureConstruction,
 	// The image is in an unsupported format.
 	CA4G_Errors_UnsupportedFormat,
 	// Some shader were not found
@@ -58,8 +58,10 @@ CA4G_Errors AfterShow(CA4G_Errors error, const wchar_t * arg = nullptr, HRESULT 
 		break;
 	}
 	
-	lstrcatW(fullMessage, errorMessage);
-	lstrcatW(fullMessage, arg);
+	if (errorMessage != nullptr)
+		lstrcatW(fullMessage, errorMessage);
+	if (arg != nullptr)
+		lstrcatW(fullMessage, arg);
 
 	if (FAILED(hr)) // Some HRESULT to show
 	{
