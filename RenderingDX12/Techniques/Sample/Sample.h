@@ -80,7 +80,7 @@ protected:
 		perform(CreatingAssets);
 	}
 
-	void CreatingAssets(CopyingManager* manager) {
+	void CreatingAssets(gObj<CopyingManager> manager) {
 
 		// loading scene textures
 		textures = new gObj<Texture2D>[Scene->Textures().size()];
@@ -118,7 +118,7 @@ protected:
 		}
 	}
 
-	void Graphics(GraphicsManager* manager) {
+	void Graphics(gObj<GraphicsManager> manager) {
 		float4x4 view, proj;
 		Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
 

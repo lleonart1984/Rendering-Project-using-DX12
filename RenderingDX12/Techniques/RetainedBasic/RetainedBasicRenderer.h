@@ -86,7 +86,7 @@ protected:
 		pipeline->transforms = TransformBuffer;
 	}
 
-	void Graphics(GraphicsManager* manager) {
+	void Graphics(gObj<GraphicsManager> manager) {
 		
 		pipeline->renderTarget = render_target;
 

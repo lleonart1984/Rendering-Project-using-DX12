@@ -4,8 +4,6 @@
 // In two different threads. Depending on the race condition will be shown
 // one color or another
 
-#include "..\..\CA4G\ca4GScene.h"
-
 class Tutorial2 : public Technique, public IHasBackcolor {
 	
 	void Frame() {
@@ -25,10 +23,10 @@ class Tutorial2 : public Technique, public IHasBackcolor {
 	}
 
 	// Graphic Process to clear the render target with a backcolor
-	void GraphicProcess1(GraphicsManager *manager) {
+	void GraphicProcess1(gObj<GraphicsManager> manager) {
 		manager gClear RT(render_target, Backcolor); // Backcolor field was inherited from IHasBackcolor class
 	}
-	void GraphicProcess2(GraphicsManager *manager) {
+	void GraphicProcess2(gObj<GraphicsManager> manager) {
 		manager gClear RT(render_target, float3(1,1,1) - Backcolor);
 	}
 };

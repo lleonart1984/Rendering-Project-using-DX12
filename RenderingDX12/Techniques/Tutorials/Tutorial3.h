@@ -2,8 +2,6 @@
 
 // Drawing a single triangle
 
-#include "..\..\CA4G\ca4GScene.h"
-
 class Tutorial3 : public Technique, public IHasBackcolor {
 
 	// Speciallizes a graphics pipeline bindings object to define
@@ -54,7 +52,7 @@ protected:
 	}
 
 	// A copy engine can be used to populate buffers using GPU commands.
-	void UploadData(CopyingManager *manager) {
+	void UploadData(gObj<CopyingManager> manager) {
 		// Copies a buffer written using an initializer_list
 		manager	gCopy ListData(vertices, {
 				VERTEX { float3(0.5, 0, 0), float3(1, 0, 0)},
@@ -69,7 +67,7 @@ protected:
 	}
 
 	// Graphic Process to clear the render target with a backcolor
-	void GraphicProcess(GraphicsManager *manager) {
+	void GraphicProcess(gObj<GraphicsManager> manager) {
 
 		// Setting up per frame bindings
 		gBind(pipeline->renderTarget) render_target; // this is necessary every frame because 3 different render targets can be used for triple-buffering support.

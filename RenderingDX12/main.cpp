@@ -1,4 +1,3 @@
-#include "CA4G\ca4GScene.h"
 #include "ImGui\imgui.h"
 #include "ImGui\imgui_impl_win32.h"
 #include "ImGui\imgui_impl_dx12.h"
@@ -7,7 +6,7 @@
 #include <tchar.h>
 #include <shlobj.h>
 
-#include "main.h"
+#include "stdafx.h"
 
 //#define WARP
 
@@ -58,12 +57,29 @@ LPSTR desktop_directory()
 		return "ERROR";
 }
 
+class ImGUIPresenter : public Presenter {
+public:
+	ImGUIPresenter(HWND hWnd, bool fullScreen = false, int buffers = 2, bool useFrameBuffering = false, bool warpDevice = false):Presenter(hWnd, fullScreen, buffers, useFrameBuffering, warpDevice)
+	{
+	}
+
+	void OnPresentGUI(D3D12_CPU_DESCRIPTOR_HANDLE renderTargetHandle,
+		DX_CommandList commandList) {
+		commandList->OMSetRenderTargets(1, &renderTargetHandle, false, nullptr);
+		ID3D12DescriptorHeap* dh[1] = { this->getDescriptorsHeapForGUI() };
+		commandList->SetDescriptorHeaps(1, dh);
+
+		ImGui::Render();
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
+	}
+};
+
 int main(int, char**)
 {
     // Create application window
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("CA4G_Samples_Window"), NULL };
     RegisterClassEx(&wc);
-    hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, NULL, NULL, wc.hInstance, NULL);
+    HWND hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, NULL, NULL, wc.hInstance, NULL);
 
 	// Show the window
 	ShowWindow(hWnd, SW_SHOWDEFAULT);
@@ -72,7 +88,7 @@ int main(int, char**)
 #ifdef WARP
 	static Presenter* presenter = new Presenter(hWnd, false, 2, false, true);
 #else
-	static Presenter* presenter = new Presenter(hWnd);
+	static Presenter* presenter = new ImGUIPresenter(hWnd);
 #endif
 
 	presenter->Load(technique);
@@ -101,8 +117,9 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			camera->Position = float3(6, 2, 0);
-			camera->Target = float3(0, 2, 0);
+			scene->Materials()[9].Roulette = float4(0, 0, 1, 1);
+			camera->Position = float3(1, 1, 0);
+			camera->Target = float3(0, 0.5, 0);
 			lightSource->Position = float3(0, 2, 0);
 			lightSource->Intensity = float3(10, 10, 10);
 			break;
@@ -147,8 +164,8 @@ int main(int, char**)
     ImGui_ImplWin32_Init(hWnd);
     ImGui_ImplDX12_Init(presenter->getInnerD3D12Device(), 3, 
         DXGI_FORMAT_R8G8B8A8_UNORM,
-        presenter->getInnerDescriptorsHeap()->GetCPUDescriptorHandleForHeapStart(), 
-		presenter->getInnerDescriptorsHeap()->GetGPUDescriptorHandleForHeapStart());
+        presenter->getDescriptorsHeapForGUI()->GetCPUDescriptorHandleForHeapStart(), 
+		presenter->getDescriptorsHeapForGUI()->GetGPUDescriptorHandleForHeapStart());
 
     ImGui::StyleColorsClassic();
 

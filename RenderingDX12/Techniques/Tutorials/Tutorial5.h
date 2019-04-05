@@ -5,8 +5,6 @@
 // Creating a constant buffer to control camera and per-primitive info
 // This sample draws several triangles changing local transforms randomly
 
-#include "..\..\CA4G\ca4GScene.h"
-
 #define MAX_NUMBER_OF_ASYNC_PROCESSES 24
 
 class Tutorial5 : public Technique, public IHasBackcolor, public IHasCamera, public IHasTriangleNumberParameter, public IHasParalellism {
@@ -94,7 +92,7 @@ protected:
 	}
 
 	// A copy engine can be used to populate buffers using GPU commands.
-	void UploadData(CopyingManager *manager) {
+	void UploadData(gObj<CopyingManager> manager) {
 		// Copies a buffer written using an initializer_list
 		manager gCopy ListData(vertices, {
 				VERTEX { float3(-0.5, 0, 0), float3(1, 0, 0)},
@@ -119,7 +117,7 @@ protected:
 		//wait_for(signal(flush_all_to_gpu));
 	}
 
-	void CommonStart(GraphicsManager* manager) {
+	void CommonStart(gObj<GraphicsManager> manager) {
 		// each module clear, set or draw can be used with a fluent interface to perform several related commands fluently.
 		// clear expands to clearing->
 		// set expands to setter->
@@ -139,7 +137,7 @@ protected:
 	double time;
 
 	// Graphic Process render the triangles
-	void DrawTriangles(GraphicsManager *manager) {
+	void DrawTriangles(gObj<GraphicsManager> manager) {
 
 		int workerID = manager->getTag();
 

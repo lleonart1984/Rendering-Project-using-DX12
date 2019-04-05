@@ -9,10 +9,11 @@ struct PSInput
 };
 
 //RasterizerOrderedTexture2D<int> depthComplexity : register(u0);
-RWTexture2D<int> depthComplexity : register(u0);
+RWTexture2D<int> depthComplexity : register(u1);
 
-void main(PSInput input) 
+float4 main(PSInput input) : SV_TARGET
 {
-	//depthComplexity[input.Proj.xy] ++;
+	//depthComplexity[input.Proj.xy] = 5 + (int)input.Proj.x;
 	InterlockedAdd(depthComplexity[input.Proj.xy], 1);
+	return float4(input.Proj.xy/1000,1,1);
 }

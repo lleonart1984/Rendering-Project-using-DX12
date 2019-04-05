@@ -2,7 +2,6 @@
 
 // Rendering to a texture and drawing a single Quad with it.
 
-#include "..\..\CA4G\ca4gScene.h"
 #include "..\Common\ConstantBuffers.h"
 
 class Tutorial7 : public Technique, public IHasBackcolor, public IHasCamera {
@@ -82,7 +81,7 @@ protected:
 	}
 
 	// A copy engine can be used to populate buffers using GPU commands.
-	void UploadData(CopyingManager *manager) {
+	void UploadData(gObj<CopyingManager> manager) {
 			// Copies a buffer written using an initializer_list
 		manager gCopy ListData(vertices, {
 				VERTEX { float3(-0.5, -0.5, 0), float2(0, 1)},
@@ -101,7 +100,7 @@ protected:
 		perform(GraphicProcess);
 	}
 
-	void DrawSceneOn(gObj<Texture2D> renderTarget, gObj<Texture2D> texture, float3 backColor, GraphicsManager *manager) {
+	void DrawSceneOn(gObj<Texture2D> renderTarget, gObj<Texture2D> texture, float3 backColor, gObj<GraphicsManager> manager) {
 		pipeline->renderTarget = renderTarget;
 		pipeline->Texture = texture;
 
@@ -121,7 +120,7 @@ protected:
 	}
 
 	// Graphic Process to clear the render target with a backcolor
-	void GraphicProcess(GraphicsManager *manager) {
+	void GraphicProcess(gObj<GraphicsManager> manager) {
 
 		static int frameIndex = 0;
 		

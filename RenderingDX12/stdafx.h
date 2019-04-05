@@ -1,5 +1,12 @@
 #pragma once
 
+#include "ca4G.h"
+using namespace CA4G;
+
+#include "Techniques/GUI_Traits.h"
+
+#include "Techniques/Common/ConstantBuffers.h"
+#include "Techniques/Common/RetainedSceneLoader.h"
 #include "Techniques/Sample/Sample.h"
 #include "Techniques/RetainedBasic/RetainedBasicRenderer.h"
 #include "Techniques/Tutorials/Tutorial1.h"
@@ -12,4 +19,6 @@
 #include "Techniques/Tutorials/Tutorial8.h"
 #include "Techniques/Tutorials/Tutorial9.h"
 #include "Techniques/Tutorials/Tutorial10.h"
+#include "Techniques/DXR_Raytracer/DXRRaytracer.h"
 
+#include "main.h"

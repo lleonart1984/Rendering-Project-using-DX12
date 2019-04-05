@@ -2,13 +2,11 @@
 
 // Drawing a single triangle with ray-tracing
 
-#include "..\..\CA4G\ca4GScene.h"
-
 struct DXRBasic : public RTPipelineManager {
 
-	RayGenerationHandle MyRaygenShader;
-	ClosestHitHandle MyClosestHitShader;
-	MissHandle MyMissShader;
+	gObj<RayGenerationHandle> MyRaygenShader;
+	gObj<ClosestHitHandle> MyClosestHitShader;
+	gObj<MissHandle> MyMissShader;
 
 	class DX_RTX_Sample_RT : public DXIL_Library<DXRBasic> {
 		void Setup() {
@@ -50,7 +48,7 @@ struct DXRBasic : public RTPipelineManager {
 
 		gObj<Texture2D> Output;
 
-		HitGroupHandle ClosestHit;
+		gObj<HitGroupHandle> ClosestHit;
 	};
 	gObj<MyProgram> _Program;
 
@@ -106,7 +104,7 @@ class Tutorial10 : public Technique {
 		perform(BuildScene);
 	}
 
-	void BuildScene(DXRManager* manager) {
+	void BuildScene(gObj<DXRManager> manager) {
 		auto geometries = manager gCreate TriangleGeometries();
 		geometries gSet VertexBuffer(vertices, VERTEX::Layout());
 		geometries gLoad Geometry(0, 3);
@@ -118,7 +116,7 @@ class Tutorial10 : public Technique {
 	}
 
 	// A copy engine can be used to populate buffers using GPU commands.
-	void UploadData(CopyingManager *manager) {
+	void UploadData(gObj<CopyingManager> manager) {
 		// Copies a buffer written using an initializer_list
 		manager	gCopy ListData(vertices, {
 				VERTEX { float3(0.8, -0.4, 0), float3(1, 0, 0)},
@@ -131,7 +129,7 @@ class Tutorial10 : public Technique {
 		perform(Raytracing);
 	}
 
-	void Raytracing(DXRManager *manager) {
+	void Raytracing(gObj<DXRManager> manager) {
 		auto rtProgram = pipeline->_Program;
 		rtProgram->Output = rtRenderTarget;
 		rtProgram->Scene = this->Scene;

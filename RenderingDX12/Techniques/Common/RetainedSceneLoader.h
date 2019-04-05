@@ -1,8 +1,5 @@
 #pragma once
 
-#include "..\..\CA4G\ca4g.h"
-#include "..\..\CA4G\ca4GScene.h"
-
 class RetainedSceneLoader : public Technique, public IHasScene {
 protected:
 	gObj<Texture2D>* Textures;
@@ -17,7 +14,7 @@ protected:
 		perform(CreatingAssets);
 	}
 
-	void CreatingAssets(CopyingManager* manager) {
+	void CreatingAssets(gObj<CopyingManager> manager) {
 		// loading scene textures
 		TextureCount = Scene->Textures().size();
 		Textures = new gObj<Texture2D>[TextureCount];
@@ -45,11 +42,11 @@ protected:
 		UpdateMaterials(manager);
 	}
 
-	void UpdateTransforms(CopyingManager* manager) {
+	void UpdateTransforms(gObj<CopyingManager> manager) {
 		manager gCopy PtrData(TransformBuffer, Scene->Transforms());
 	}
 
-	void UpdateMaterials(CopyingManager* manager) {
+	void UpdateMaterials(gObj<CopyingManager> manager) {
 		manager gCopy PtrData(MaterialBuffer, &Scene->Materials().first());
 	}
 

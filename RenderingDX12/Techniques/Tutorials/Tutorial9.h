@@ -2,7 +2,6 @@
 
 // Drawing the depth complexity of a scene using UAV 
 
-#include "..\..\CA4G\ca4gScene.h"
 #include "..\Common\ConstantBuffers.h"
 
 // Notice this tutorial has two new traits, IHasScene and IHasLight.
@@ -12,6 +11,7 @@ class Tutorial9 : public Technique, public IHasBackcolor, public IHasCamera, pub
 	class DepthComplexityPipeline : public GraphicsPipelineBindings {
 	public:
 		// UAV to output the depth complexity
+		gObj<Texture2D> renderTarget;
 		gObj<Texture2D> depthComplexity;
 
 		// Globals constant buffer with projection and view information for all scene
@@ -28,7 +28,8 @@ class Tutorial9 : public Technique, public IHasBackcolor, public IHasCamera, pub
 
 		void Globals()
 		{
-			UAV(0, depthComplexity, ShaderType_Pixel);
+			RTV(0, renderTarget);
+			UAV(1, depthComplexity, ShaderType_Pixel);
 			CBV(0, globals, ShaderType_Vertex);
 		}
 
@@ -38,7 +39,12 @@ class Tutorial9 : public Technique, public IHasBackcolor, public IHasCamera, pub
 		}
 	};
 
-	
+	// Defined struct to map on CPU the Constant Buffer for camera
+	struct Globals {
+		float4x4 projection;
+		float4x4 view;
+	};
+
 public:
 	gObj<Texture2D> depthComplexity;
 	gObj<Buffer>* transforms;
@@ -58,7 +64,7 @@ protected:
 		_ gLoad Pipeline(showComplexity);
 
 		// Create depth buffer resource
-		depthComplexity = _ gCreate DrawableTexture2D<int>(render_target->Width, render_target->Height);
+		depthComplexity = _ gCreate DrawableTexture2D<int>(render_target->Width, render_target->Height, 1);
 
 		// Create globals vs constant buffer
 		globalsCB = _ gCreate ConstantBuffer<Globals>();
@@ -70,7 +76,7 @@ protected:
 		perform(CreatingAssets);
 	}
 
-	void CreatingAssets(CopyingManager* manager) {
+	void CreatingAssets(gObj<CopyingManager> manager) {
 
 		// load full vertex buffer of all scene geometries
 		vertexBuffer = _ gCreate VertexBuffer<SCENE_VERTEX>(Scene->VerticesCount());
@@ -101,7 +107,7 @@ protected:
 		}
 	}
 
-	void Graphics(GraphicsManager* manager) {
+	void Graphics(gObj<GraphicsManager> manager) {
 		float4x4 view, proj;
 		Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
 
@@ -115,8 +121,8 @@ protected:
 				copy DataTo(transforms[i], object.Transform);
 		}*/
 #pragma endregion
-
-		manager gClear UAV(depthComplexity, 0U);
+		pipeline->renderTarget = render_target;
+		manager gClear UAV(depthComplexity, 1U);
 		manager gSet Viewport(render_target->Width, render_target->Height);
 		manager gSet Pipeline(pipeline);
 		manager gSet VertexBuffer(vertexBuffer);
@@ -133,6 +139,7 @@ protected:
 		manager gClear RT(render_target, Backcolor);
 		manager gSet Pipeline(showComplexity);
 		manager gSet VertexBuffer(screenVertices);
+		manager gDispatch Triangles(6);
 		manager gDispatch Triangles(6);
 	}
 

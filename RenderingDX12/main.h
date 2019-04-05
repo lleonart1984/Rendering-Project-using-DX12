@@ -1,6 +1,5 @@
 #pragma once
 
-#include "stdafx.h"
 
 #define BASIC_OBJ 0
 #define SPONZA_OBJ 1
@@ -25,4 +24,5 @@
 //gObj<Tutorial7> technique;
 //gObj<Tutorial8> technique;
 //gObj<Tutorial9> technique;
-gObj<Tutorial10> technique;
+//gObj<Tutorial10> technique;
+gObj<DXRBasicSceneRaytracer> technique;

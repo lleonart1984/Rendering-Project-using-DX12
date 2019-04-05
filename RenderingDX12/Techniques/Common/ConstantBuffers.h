@@ -1,7 +1,5 @@
 #pragma once
 
-#include "..\..\CA4G\ca4g.h"
-
 struct Globals {
 	float4x4 projection;
 	float4x4 view;
