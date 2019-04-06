@@ -20,5 +20,6 @@ using namespace CA4G;
 #include "Techniques/Tutorials/Tutorial9.h"
 #include "Techniques/Tutorials/Tutorial10.h"
 #include "Techniques/DXR_Raytracer/DXRRaytracer.h"
+#include "Techniques/DXR_Photontracer/DXRPhotonMapping.h"
 
 #include "main.h"

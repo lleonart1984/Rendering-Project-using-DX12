@@ -998,6 +998,14 @@ namespace CA4G {
 	{
 		return float3{ v1.x * v2.x, v1.y * v2.y, v1.z * v2.z };
 	}
+	static float3 operator / (const float3 & v1, const int3 & v2)
+	{
+		return float3{ v1.x / v2.x, v1.y / v2.y, v1.z / v2.z };
+	}
+	static float3 operator / (const float3 & v1, const float & alpha)
+	{
+		return float3{ v1.x / alpha, v1.y / alpha, v1.z / alpha };
+	}
 	static float3 operator / (const float3 & v1, const float3 & v2)
 	{
 		return float3{ v1.x / v2.x, v1.y / v2.y, v1.z / v2.z };
@@ -1143,6 +1151,28 @@ namespace CA4G {
 			v1.y * v2.z - v1.z * v2.y,
 			v1.z * v2.x - v1.x * v2.z,
 			v1.x * v2.y - v1.y * v2.x);
+	}
+
+	static float2 lerp(const float2 &v1, const float2 &v2, const float alpha)
+	{
+		return float2(
+			v1.x*(1 - alpha) + v2.x*alpha,
+			v1.y*(1 - alpha) + v2.y*alpha);
+	}
+	static float3 lerp(const float3 &v1, const float3 &v2, const float alpha)
+	{
+		return float3(
+			v1.x*(1 - alpha) + v2.x*alpha,
+			v1.y*(1 - alpha) + v2.y*alpha,
+			v1.z*(1 - alpha) + v2.z*alpha);
+	}
+	static float4 lerp(const float4 &v1, const float4 &v2, const float alpha)
+	{
+		return float4(
+			v1.x*(1 - alpha) + v2.x*alpha,
+			v1.y*(1 - alpha) + v2.y*alpha,
+			v1.z*(1 - alpha) + v2.z*alpha,
+			v1.w*(1 - alpha) + v2.w*alpha);
 	}
 
 	static float2x2 mul(const float2x2 &m1, const float2x2 &m2) {
@@ -2531,7 +2561,7 @@ namespace CA4G {
 			d.Buffer.NumElements = ElementCount;
 			d.Buffer.StructureByteStride = Stride;
 			d.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+			d.Format = DXGI_FORMAT_UNKNOWN;// !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
 		}
 
 		void CreateSRVDesc(D3D12_SHADER_RESOURCE_VIEW_DESC & d)
@@ -13185,6 +13215,15 @@ namespace CA4G {
 		gObj<Buffer> StructuredBuffer(int count) {
 			return GenericBuffer<T>(D3D12_RESOURCE_STATE_COPY_DEST, count);
 		}
+
+		// Creates a buffer for RW structured buffer purposes of specific type.
+		// This resource is treated efficiently on the gpu and can be written at the beggining
+		// using the uploading version.
+		template<typename T>
+		gObj<Buffer> RWStructuredBuffer(int count) {
+			return GenericBuffer<T>(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, count, CPU_ACCESS_NONE, 
+				D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		}
 	};
 
 	// Represents the loading module of a device manager.
@@ -13301,9 +13340,15 @@ namespace CA4G {
 			inline void UAV(gObj<ResourceView> uav, const unsigned int &value) {
 				unsigned int v[4]{ value, value, value, value };
 				uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				long gpuHandleIndex = this->manager->manager->descriptors->gpu_csu->Malloc(1);
+				auto cpuHandleAtVisibleHeap = this->manager->manager->descriptors->gpu_csu->getCPUVersion(gpuHandleIndex);
+				auto gpuHandle = this->manager->manager->descriptors->gpu_csu->getGPUVersion(gpuHandleIndex);
+				auto cpuHandle = uav->getUAVHandle();
+				manager->getInternalDevice()->CopyDescriptorsSimple(1, cpuHandleAtVisibleHeap, cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				cmdList->ClearUnorderedAccessViewUint(
-					this->manager->manager->descriptors->gpu_csu->getGPUVersion(uav->getUAV()),
-					uav->getUAVHandle(), uav->resource->internalResource, v, 0, nullptr);
+					gpuHandle,
+					cpuHandle,
+					uav->resource->internalResource, v, 0, nullptr);
 			}
 			inline void UAV(gObj<ResourceView> uav, const uint4 &value) {
 				unsigned int v[4]{ value.x, value.y, value.z, value.w };

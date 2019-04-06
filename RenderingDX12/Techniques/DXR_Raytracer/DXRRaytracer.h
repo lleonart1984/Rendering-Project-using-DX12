@@ -28,7 +28,7 @@ public:
 		struct DXR_RT_Program : public RTProgram<DXR_Pipeline> {
 			void Setup() {
 				_ gSet Payload(16);
-				_ gSet StackSize(5);
+				_ gSet StackSize(6);
 				_ gLoad Shader(Context()->MainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
 				_ gCreate HitGroup(Context()->FresnelMaterial, Context()->FresnelScattering, nullptr, nullptr);
@@ -180,7 +180,7 @@ protected:
 			rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
 			rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-			if (sceneObject.Material->Roulette.z > 0) // Fresnel scattering
+			if (max(sceneObject.Material->Roulette.y, sceneObject.Material->Roulette.z) > 0) // Has mirror or fresnel scattering
 				manager gSet HitGroup(Pipeline->FresnelMaterial, i);
 			else
 				manager gSet HitGroup(Pipeline->LambertMaterial, i);

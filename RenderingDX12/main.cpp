@@ -57,6 +57,14 @@ LPSTR desktop_directory()
 		return "ERROR";
 }
 
+void MixGlassMaterial(SCENE_MATERIAL* material, float alpha) {
+	material->Roulette = CA4G::lerp(material->Roulette, float4(0, 0, 1, 1.6f), alpha);
+}
+
+void MixMirrorMaterial(SCENE_MATERIAL* material, float alpha) {
+	material->Roulette = CA4G::lerp(material->Roulette, float4(0, 1, 0, 1), alpha);
+}
+
 class ImGUIPresenter : public Presenter {
 public:
 	ImGUIPresenter(HWND hWnd, bool fullScreen = false, int buffers = 2, bool useFrameBuffering = false, bool warpDevice = false):Presenter(hWnd, fullScreen, buffers, useFrameBuffering, warpDevice)
@@ -108,8 +116,9 @@ int main(int, char**)
 		switch (USE_SCENE) {
 		case BASIC_OBJ:
 			filePath = desktop_directory();
-			strcat(filePath, "\\Models\\bunny.obj");
+			strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
 			scene = new Scene(filePath);
+			MixGlassMaterial(&scene->Materials()[0], 1);
 			lightSource->Position = float3(2, 2, 0);
 			lightSource->Intensity = float3(10, 10, 10);
 			break;
@@ -117,7 +126,7 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			scene->Materials()[9].Roulette = float4(0, 0, 1, 1);
+			MixMirrorMaterial(&scene->Materials()[9], 0.9f); // floor
 			camera->Position = float3(1, 1, 0);
 			camera->Target = float3(0, 0.5, 0);
 			lightSource->Position = float3(0, 2, 0);
@@ -127,6 +136,8 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sibenik\\sibenik.obj");
 			scene = new Scene(filePath);
+			MixGlassMaterial(&scene->Materials()[1], 0.9f); // window
+			MixMirrorMaterial(&scene->Materials()[4], 0.9f); // floor
 			camera->Position = float3(-1, -0.5f, 0);
 			camera->Target = float3(0, 0, 0);
 			lightSource->Position = float3(0, 2, 0);

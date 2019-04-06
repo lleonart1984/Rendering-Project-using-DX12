@@ -53,6 +53,7 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
 {
 	float3 color;
+	int bounce;
 };
 
 [shader("raygeneration")]
@@ -76,7 +77,7 @@ void MainRays()
 	ray.Direction = rayDir;
 	ray.TMin = 0.001;
 	ray.TMax = 10000.0;
-	RayPayload payload = { float3(0, 0, 0) };
+	RayPayload payload = { float3(0, 0, 0), 3 };
 	TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload);
 
 	// Write the raytraced color to the output texture.
@@ -87,7 +88,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	float3 L = normalize(float3(0, 1, 0) - surfel.P);
 	float3 Lin = float3(1, 1, 1);
 
-	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0.001, 0.001) : float4(1, 1, 1, 1);
+	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
 	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0.001, 0.001) : material.Specular;
 	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, 0.001, 0.001) : float3(0.5, 0.5, 1);
 	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, 0.001, 0.001) : 1;
@@ -132,11 +133,24 @@ void LambertScattering(inout RayPayload payload, in MyAttributes attr)
 		v1.B * barycentrics.x + v2.B * barycentrics.y + v3.B * barycentrics.z
 	};
 
+	surfel = Transform(surfel, ObjectToWorld4x3());
+
 	Material material = materials[materialIndex];
 	float3 V = -normalize(WorldRayDirection());
 
-	payload.color = ComputeDirectLightInWorldSpace(Transform(surfel, ObjectToWorld4x3()), material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
+	payload.color = ComputeDirectLightInWorldSpace(surfel, material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
 }
+
+void ComputeFresnel(float3 dir, float3 faceNormal, float ratio, out float reflection, out float refraction)
+{
+	float f = ((1.0 - ratio) * (1.0 - ratio)) / ((1.0 + ratio) * (1.0 + ratio));
+
+	float Ratio = f + (1.0 - f) * pow((1.0 + dot(dir, faceNormal)), 5);
+
+	reflection = min(1, Ratio);
+	refraction = max(0, 1 - reflection);
+}
+
 
 [shader("closesthit")]
 void FresnelScattering(inout RayPayload payload, in MyAttributes attr)
@@ -157,27 +171,62 @@ void FresnelScattering(inout RayPayload payload, in MyAttributes attr)
 		v1.B * barycentrics.x + v2.B * barycentrics.y + v3.B * barycentrics.z
 	};
 
+	surfel = Transform(surfel, ObjectToWorld4x3());
+
 	Material material = materials[materialIndex];
 	float3 V = -normalize(WorldRayDirection());
 
-	float3 directLight = ComputeDirectLightInWorldSpace(Transform(surfel, ObjectToWorld4x3()), material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
+	float3 totalLight = material.Emissive +
+		material.Roulette.x * ComputeDirectLightInWorldSpace(surfel, material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
 
-	// Trace the ray.
-	// Set the ray's extents.
-	RayDesc reflectionRay;
-	reflectionRay.Origin = surfel.P + surfel.N*0.001;
-	reflectionRay.Direction = reflect(WorldRayDirection(), surfel.N);
-	reflectionRay.TMin = 0.001;
-	reflectionRay.TMax = 10000.0;
-	RayPayload reflectionPayload = { float3(0, 0, 0) };
-	TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, reflectionRay, reflectionPayload);
+	if (payload.bounce > 0)
+	{
+		bool entering = dot(V, surfel.N) > 0;
+		float reflectionIndex, refractionIndex;
+		float eta = entering ? 1 / material.Roulette.w : material.Roulette.w;
+		float3 fN = entering ? surfel.N : -surfel.N;
+		ComputeFresnel(-V, fN, eta,
+			reflectionIndex, refractionIndex);
+		float3 reflectionDir = reflect(-V, fN);
+		float3 refractionDir = refract(-V, fN, eta);
+		if (!any(refractionDir))
+		{
+			reflectionIndex = 1;
+			refractionIndex = 0; // total internal reflection
+		}
 
-	payload.color = directLight * 0.2 + reflectionPayload.color * 0.8;
+		if (reflectionIndex > 0) {
+			// Trace the ray.
+			// Set the ray's extents.
+			RayDesc reflectionRay;
+			reflectionRay.Origin = surfel.P + fN*0.01;
+			reflectionRay.Direction = reflectionDir;
+			reflectionRay.TMin = 0.001;
+			reflectionRay.TMax = 10000.0;
+			RayPayload reflectionPayload = { float3(0, 0, 0), payload.bounce - 1 };
+			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, reflectionRay, reflectionPayload);
+			totalLight += (material.Roulette.y + material.Roulette.z * reflectionIndex)*reflectionPayload.color; /// Mirror and fresnel reflection
+		}
+
+		if (refractionIndex > 0) {
+			// Trace the ray.
+			// Set the ray's extents.
+			RayDesc refractionRay;
+			refractionRay.Origin = surfel.P - fN*0.01;
+			refractionRay.Direction = refractionDir;
+			refractionRay.TMin = 0.001;
+			refractionRay.TMax = 10000.0;
+			RayPayload refractionPayload = { float3(0, 0, 0), payload.bounce - 1 };
+			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, refractionRay, refractionPayload);
+			totalLight += material.Roulette.z * refractionIndex * refractionPayload.color;
+		}
+	}
+	payload.color = totalLight;
 }
 
 
 [shader("miss")]
 void EnvironmentMap(inout RayPayload payload)
 {
-	payload.color = float4(0.1, 0.1, 0.3, 1);
+	payload.color = float4(WorldRayDirection(), 1);
 }
