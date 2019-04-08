@@ -141,7 +141,7 @@ int main(int, char**)
 			camera->Position = float3(-1, -0.5f, 0);
 			camera->Target = float3(0, 0, 0);
 			lightSource->Position = float3(0, 2, 0);
-			lightSource->Intensity = float3(10, 10, 10);
+			lightSource->Intensity = float3(1000, 1000, 1000);
 			break;
 		case SANMIGUEL_OBJ:
 			filePath = desktop_directory();

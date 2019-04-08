@@ -170,7 +170,7 @@ void PTMainRays() {
 	ray.TMax = 10000.0;
 	// photons travel with a piece of intensity. This could produce numerical problems and it is better to add entire intensity
 	// and then divide by the number of photons.
-	RayPayload payload = { LightIntensity * 1000000 / (raysDimensions.x*raysDimensions.y), 5 };
+	RayPayload payload = { LightIntensity*10, 3 };
 	TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload); // Will be used with Photon scattering function
 }
 
@@ -295,7 +295,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 		else { // Photon absortion
 		}
 
-		if (newPhotonPayload.color.x + newPhotonPayload.color.y + newPhotonPayload.color.z > 0.000000001) // only continue with no-obscure photons
+		if (newPhotonPayload.color.x + newPhotonPayload.color.y + newPhotonPayload.color.z > 0.0000000001) // only continue with no-obscure photons
 		{
 			newPhotonRay.Origin += sign(dot(newPhotonRay.Direction, facedNormal))*0.01*facedNormal; // avoid self shadowing
 			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
@@ -318,17 +318,20 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	float radius = min(CellSize.x, min(CellSize.y, CellSize.z)) / 2;
 
 	int3 begCell = FromPositionToCell(surfel.P - radius);
+	int3 endCell = FromPositionToCell(surfel.P + radius);
 
 	float3 totalLighting = material.Emissive;
 
-	[unroll(2)]
-	for (int dz = 0; dz <= 1; dz++)
-		[unroll(2)]
-	for (int dy = 0; dy <= 1; dy++)
-		[unroll(2)]
-	for (int dx = 0; dx <= 1; dx++)
+	//radius *= 0.6;
+
+	//[unroll(2)]
+	for (int dz = begCell.z; dz <= endCell.z; dz++)
+	//	[unroll(2)]
+	for (int dy = begCell.y; dy <= endCell.y; dy++)
+	//	[unroll(2)]
+	for (int dx = begCell.x; dx <= endCell.x; dx++)
 	{
-		int cellIndexToQuery = FromCellToCellIndex(begCell + int3(dx, dy, dz));
+		int cellIndexToQuery = FromCellToCellIndex(int3(dx, dy, dz));
 
 		if (cellIndexToQuery != -1) // valid coordinates
 		{
@@ -353,7 +356,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 		}
 	}
 
-	return totalLighting / 1000;
+	return totalLighting / pi*radius*radius;
 }
 
 [shader("closesthit")]

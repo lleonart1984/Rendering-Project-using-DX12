@@ -176,7 +176,6 @@ protected:
 		auto instances = manager gCreate Instances();
 		instances gLoad Instance(geometriesOnGPU);
 		Pipeline->_Program->Scene = instances gCreate BakedScene();
-
 	}
 
 	void Frame() {
