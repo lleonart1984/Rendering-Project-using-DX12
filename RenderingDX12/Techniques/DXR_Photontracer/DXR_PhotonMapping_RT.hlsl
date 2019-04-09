@@ -195,7 +195,7 @@ void RTMainRays()
 	ray.Direction = rayDir;
 	ray.TMin = 0.001;
 	ray.TMax = 10000.0;
-	RayPayload payload = { float3(0, 0, 0), 3 };
+	RayPayload payload = { float3(0, 0, 0), 4 };
 	TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload);
 
 	// Write the raytraced color to the output texture.

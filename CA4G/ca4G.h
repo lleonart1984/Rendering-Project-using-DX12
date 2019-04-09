@@ -13834,9 +13834,9 @@ namespace CA4G {
 		// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
 		// If no such adapter can be found, *ppAdapter will be set to nullptr.
 		_Use_decl_annotations_
-			void GetHardwareAdapter(CComPtr<IDXGIFactory4> pFactory, CComPtr<IDXGIAdapter1> &ppAdapter)
+			void GetHardwareAdapter(CComPtr<IDXGIFactory4> pFactory, CComPtr<IDXGIAdapter1> & ppAdapter)
 		{
-			CComPtr<IDXGIAdapter1> adapter;
+			IDXGIAdapter1* adapter;
 			ppAdapter = nullptr;
 
 			for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
@@ -13925,8 +13925,10 @@ namespace CA4G {
 			CComPtr<IDXGIInfoQueue> dxgiInfoQueue;
 			if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
 			{
-#endif
 				CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory));
+
+#endif
+				CreateDXGIFactory2(0, IID_PPV_ARGS(&factory));
 #if _DEBUG
 				dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
 				dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
