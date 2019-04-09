@@ -170,7 +170,7 @@ void PTMainRays() {
 	ray.TMax = 10000.0;
 	// photons travel with a piece of intensity. This could produce numerical problems and it is better to add entire intensity
 	// and then divide by the number of photons.
-	RayPayload payload = { LightIntensity*10, 3 };
+	RayPayload payload = { LightIntensity / (raysDimensions.x * raysDimensions.y), 4 };
 	TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload); // Will be used with Photon scattering function
 }
 
@@ -356,7 +356,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 		}
 	}
 
-	return totalLighting / pi*radius*radius;
+	return totalLighting / (pi*radius*radius);
 }
 
 [shader("closesthit")]

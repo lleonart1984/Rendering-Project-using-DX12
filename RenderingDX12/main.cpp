@@ -120,7 +120,7 @@ int main(int, char**)
 			scene = new Scene(filePath);
 			MixGlassMaterial(&scene->Materials()[0], 1);
 			lightSource->Position = float3(2, 2, 0);
-			lightSource->Intensity = float3(10, 10, 10);
+			lightSource->Intensity = float3(100, 100, 100);
 			break;
 		case SPONZA_OBJ:
 			filePath = desktop_directory();
