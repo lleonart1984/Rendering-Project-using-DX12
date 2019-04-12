@@ -41,12 +41,17 @@ cbuffer Camera : register(b0) {
 	row_major matrix ProjectionToWorld;
 }
 
+cbuffer Lighting : register(b1) {
+	float3 LightPosition;
+	float3 LightIntensity;
+}
+
 struct ObjInfo {
 	int TriangleOffset;
 	int MaterialIndex;
 };
 // Locals for hit groups (fresnel and lambert)
-ConstantBuffer<ObjInfo> objectInfo : register(b1);
+ConstantBuffer<ObjInfo> objectInfo : register(b2);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
@@ -85,8 +90,11 @@ void MainRays()
 }
 
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
-	float3 L = normalize(float3(0, 1, 0) - surfel.P);
-	float3 Lin = float3(1, 1, 1);
+	float3 L = (LightPosition - surfel.P);
+	float d = length(L);
+	L /= d;
+
+	float3 I = LightIntensity / (2 * 3.14159*d*d);
 
 	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
 	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0.001, 0.001) : material.Specular;
@@ -98,8 +106,9 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	float3 normal = normalize(mul(BumpTex * 2 - 1, worldToTangent));
 
 	float3 H = normalize(V + L);
+	float NdotL = dot(L, normal);
 
-	return material.Diffuse * DiffTex * (saturate(dot(L, normal)) + 0.2) + max(SpecularTex, material.Specular)*pow(max(0, dot(H, normal)), material.SpecularSharpness);
+	return I * (material.Diffuse * DiffTex * saturate(NdotL) + (NdotL > 0 ? max(SpecularTex, material.Specular)*pow(max(0, dot(H, normal)), material.SpecularSharpness) : 0));
 }
 
 Vertex Transform(Vertex surfel, float4x3 transform) {

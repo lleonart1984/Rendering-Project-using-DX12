@@ -5,9 +5,9 @@
 class HybridPhotonTracerTechnique : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
 
-#define RESOLUTION 50
+#define RESOLUTION 64
 #define DISPATCH_RAYS_DIMENSION 1024
-#define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*6)
+#define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*3)
 
 	// Scene loading process to retain scene on the GPU
 	gObj<RetainedSceneLoader> sceneLoader;
@@ -157,7 +157,6 @@ public:
 		}
 	};
 
-
 	gObj<Buffer> screenVertices;
 	gObj<DXR_Pipeline> dxrPipeline;
 	gObj<DeferredHybridShadingPipeline> deferredPipeline;
@@ -295,7 +294,7 @@ public:
 		ExecuteFrame(gBufferFromLight);
 #pragma endregion
 
-		wait_for(signal(flush_all_to_gpu));
+		//wait_for(signal(flush_all_to_gpu));
 
 		perform(Photontracing);
 
@@ -317,8 +316,8 @@ public:
 
 		manager gCopy ValueData(rtProgram->CameraCB, lightView.getInverse());
 
-		float3 MinimumPosition{ -2, -2, -2 };
-		float3 BoxSize{ 4, 4, 4 };
+		float3 MinimumPosition{ -1, -1, -1 };
+		float3 BoxSize{ 2, 2, 2 };
 		int3 resolution{ RESOLUTION, RESOLUTION, RESOLUTION };
 
 		// Update SpaceInfo
@@ -383,8 +382,8 @@ public:
 		// Required during ray-trace stage
 		manager gCopy ValueData(rtProgram->CameraCB, view.getInverse());
 
-		float3 MinimumPosition{ -2, -2, -2 };
-		float3 BoxSize{ 4, 4, 4 };
+		float3 MinimumPosition{ -1, -1, -1 };
+		float3 BoxSize{ 2, 2, 2 };
 		int3 resolution{ RESOLUTION, RESOLUTION, RESOLUTION };
 
 		// Update SpaceInfo

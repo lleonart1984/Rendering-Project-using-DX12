@@ -41,6 +41,7 @@ public:
 			gObj<Texture2D> *Textures;
 			int TextureCount;
 			gObj<Buffer> CameraCB;
+			gObj<Buffer> LightingCB;
 			
 			gObj<Texture2D> ScreenOutput;
 
@@ -59,10 +60,11 @@ public:
 				Static_SMP(0, Sampler::Linear());
 
 				CBV(0, CameraCB);
+				CBV(1, LightingCB);
 			}
 
 			void HitGroup_Locals() {
-				CBV(1, CurrentObjectInfo);
+				CBV(2, CurrentObjectInfo);
 			}
 		};
 		gObj<DXR_RT_Program> _Program;
@@ -82,6 +84,7 @@ protected:
 	gObj<Buffer> Vertices;
 	gObj<Buffer> MaterialsB;
 	gObj<Buffer> CameraCB;
+	gObj<Buffer> LightingCB;
 
 	gObj<DXR_Pipeline> Pipeline;
 	gObj<Texture2D> rtRenderTarget;
@@ -99,6 +102,7 @@ protected:
 		Pipeline->_Program->Textures = Textures;
 		Pipeline->_Program->TextureCount = TextureCount;
 		Pipeline->_Program->CameraCB = CameraCB;
+		Pipeline->_Program->LightingCB = LightingCB;
 	}
 
 	void LoadingSceneAssets(gObj<CopyingManager> manager) {
@@ -122,6 +126,7 @@ protected:
 		manager gCopy PtrData(MaterialsB, &Scene->Materials().first());
 
 		CameraCB = _ gCreate ConstantBuffer<float4x4>();
+		LightingCB = _ gCreate ConstantBuffer<Lighting>();
 		// CameraCB will be updated every frame
 
 		rtRenderTarget = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
@@ -160,7 +165,12 @@ protected:
 
 		// Update camera
 		manager gCopy ValueData(rtProgram->CameraCB, projToWorld);
-		
+
+		manager gCopy ValueData(rtProgram->LightingCB, Lighting{
+				Light->Position, 0,
+				Light->Intensity, 0
+			});
+
 		// Set DXR Pipeline
 		manager gSet Pipeline(Pipeline);
 		// Activate program with main shaders

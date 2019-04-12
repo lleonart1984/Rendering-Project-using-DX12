@@ -10,7 +10,7 @@ Some of the highlighted features added so far includes:
 
 **Basic synchronization tools**: CA4G hides all proposed DX12 synchronization mechanisms and just exposes a Signal concept. Signals can be trigger by a graphic process and can be waitable for CPU programs to wait for GPU execution. Also, expose functions to flush pending CPU work to the GPU. All resource access barrier are managed by the engine.
 
-**Multi-engine support**: CA4G encapsulates the graphics pipeline usage through Technique concept and execution of process. Processes are methods receiving a command list manager. Depending on the type of the command list (Copying, Compute, Graphics) a different engine is used (Command Queue).
+**Multi-engine support**: CA4G encapsulates the graphics pipeline usage through Technique concept and execution of process. Processes are methods receiving a command list manager. Depending on the type of the command list (Copying, Compute, Graphics) a different engine is used (i.e. Command Queue).
 
 **Multi-threading support**: CA4G device manager has up to 8 threads for command population. All asynchronous processes are queued in producer-consumer queue that deploys process execution across all threads. CA4G exposes functions to flush all pending work to the GPU and wait (on the CPU) for it.
 
@@ -19,6 +19,8 @@ Some of the highlighted features added so far includes:
 Typed resource view helps in other aspects such as binding, root descriptor construction and static type-check of resource handling.
 
 **Customizable Pipeline state objects**: In CA4G there is a concept Pipeline Bindings with two roles. Representing bindings to the pipeline (resources, constants, samplers, render targets, depth buffers) used to construct the Root Signature object and, in the other hand, manage all settable states to the pipeline exposing functionalities to setup, such as Input Layout, Depth Tests, Rasterizer state, shader stages, etc., used to create the `ID3D12PipelineStateObject`.
+
+**DXR support**: CA4G can access to DXR engine in DX12. If there is not hardware support for this interface the CA4G will use the fallback device instead. DXR can be used through CA4G in a friendly manner hiding bothersome tasks and settings.
 
 ## Presenter Class
 
@@ -59,18 +61,18 @@ A technique is a class representing the developer's usage intention of the DX12 
 
 **Constructor**: Use the constructor of a technique to initialize the object with required parameters. Mostly will be used with constants for the technique (will never change). Creational parameters can be passed to the Technique with the additional variadic parameters of `Presenter::Load` method.
 
-**Startup**: This method will be called once the first time the technique is presented. You may use of any DX12 functionality here (even drawing!), but normally will be used to load assets, preprocess scene, populate bundles, and load resource data. Create pipeline objects.
+**Startup**: This method will be called once the first time the technique is presented. You may use of any DX12 functionality here (even drawing!), but normally will be used to load assets, preprocess scene, populate bundles, and load resource data. Create pipeline objects or other subtechniques objects.
 
 **Frame**: This method will be called every time the technique is presented in a Presenter object. You may use this method to draw in the render target.
 
-Both methods (Startup and Frame) receive the `DeviceManager` object used to execute graphics processes. Any method receiving a `CommandListManager` subclass can be considered as a graphics process. The main role of `Startup` and `Frame` method is the call to execute other methods as graphic process. This is the common usage of `PopulateCommandList` method in other DX12 engines.
+Both methods (Startup and Frame) can access to the `DeviceManager` object used to execute graphics processes. Any method receiving a `CommandListManager` subclass can be considered as a graphics process. The main role of `Startup` and `Frame` method is to call to execute other methods as graphic process. This is the common usage of `PopulateCommandList` method in other DX12 engines.
 
 Graphics process indicates with the parameter which kind of engine will process the command list. This is the way CA4G supports multiple engines usages. Next code shows a Startup method of a technique using a Copy engine to load some assets and a Compute engine to perform some preprocess computation.
 
 ```c++
-void LoadAssets (CopyingManager* manager) { ... }
+void LoadAssets (gObj<CopyingManager> manager) { ... }
 
-void ComputeSomePreprocessedData(ComputeManager* manager) { ... }
+void ComputeSomePreprocessedData(gObj<ComputeManager> manager) { ... }
 
 void Startup() {
 	perform(LoadAssets);
@@ -80,9 +82,9 @@ void Startup() {
 Notice perform macro hides internally the usage of the internal `DeviceManager` accessible from a technique used to enqueue all tasks. To perform this loading stage asynchronously you just need to enqueue the graphic process asynchronously.
 
 ```c++
-void LoadAssets (CopyingManager* manager) { ... }
+void LoadAssets (gObj<CopyingManager> manager) { ... }
 
-void ComputeSomePreprocessedData(ComputeManager* manager) { ... }
+void ComputeSomePreprocessedData(gObj<ComputeManager> manager) { ... }
 
 void Startup() {
     perform_async(LoadAssets);
@@ -108,7 +110,7 @@ There is a macro for such command that can be more easy to read.
 flush_all_to_gpu;
 ```
 
-Notice that this code means: "I want every pending work for every engine to be sent to the GPU and will wait until that occurs", but that doesn't mean the work was really finished by the GPU. Nevertheless, this command serves as a barrier for different graphic process you want to synchronize on the GPU.
+Notice that this code means: "I want every pending work for every engine to be sent to the GPU and will wait until that occurs", but that doesn't mean the work was really finished on the GPU. Nevertheless, this command serves as a barrier for different graphic process you want to synchronize on the GPU.
 
 For CPU-GPU synchronization you will need to send a signal through the GPU that will "trigger" an event object in CPU.
 
@@ -161,7 +163,7 @@ Grouping inner objects used are intended for:
 
 **loading**: The function represents an action of loading an existing object (and initialize). Macro `gLoad`. Used for loading `Technique` objects and `PipelineBindings` objects.
 
-**drawer**: The function represents an action of submitting some draw call. Macro `gDraw`. Used to perform draw calls in a `GraphicsManager` object.
+**dispatcher**: The function represents an action of submitting some draw call or dispatch. Macro `gDispatch`. Used to perform draw calls in a `GraphicsManager` object.
 
 **copying**: The function is intended to copy a buffer from one resource or memory to another. Macro `gCopy`. Used in all `CommandListManager` objects to copy from CPU to GPU and vice versa.
 
@@ -171,7 +173,7 @@ Grouping inner objects used are intended for:
 
 Despite DX12 proposes an unified resource handling through `ID3D12Resource` interface, in CA4G is used a typed version again. That means that there are several types for each kind of representation a resource may have. For instance, a Buffer, a Texture2D or even a Texture2DMS.
 
-The reason for this is because resource is hidden from developers and all the time the object managed is a `ResourceView`. Resource views hides internally the real resource and exposes functions for querying description of the resource, slicing (gets a range of sub-resources), among others functionalities.
+The reason for this is to hide resource object from developers and export all the time the object managed as a `ResourceView`. Resource views hides internally the real resource and exposes functions for querying description of the resource, slicing (gets a range of sub-resources), among others functionalities.
 
 Resources can be created by a `DeviceManager` object. Since technique manage internally a device manager in both, startup and frame methods, a resource can be created any time. Every resource usage is protected via smart pointers using the `gObj<T>` wrapper.
 
@@ -186,14 +188,14 @@ void Startup(){
 With the proposed DSL the code below looks like next.
 
 ```c++
-Buffer* vertices = nullptr;
+gObj<Buffer> vertices = nullptr;
 ...
 void Startup(){
 	vertices = _ gCreate VertexBuffer<VERTEX>(3);
 }
 ```
 
-In order to fill a resource with data, it may be used a `CopyingManager` graphics process. This is the most basic engine proposed in DX12 and in some architectures, submitting work to different engines may represent real parallel work on the GPU.
+In order to fill a resource with data, it may be used a `CopyingManager` graphics process. This is the most basic engine proposed in DX12 and in some architectures, submitting work to different engines might represent real parallel work submission to the GPU.
 
 ```c++
 void Startup() {
@@ -205,7 +207,7 @@ void Startup() {
 }
 
 // A copy engine can be used to populate buffers using GPU commands.
-void UploadData(CopyingManager *manager) {
+void UploadData(gObj<CopyingManager> manager) {
 	// Copies a buffer written using an initializer_list
 	manager	gCopy ListData(vertices, {
 			VERTEX { float3(0.5, 0, 0), float3(1, 0, 0)},
@@ -267,9 +269,9 @@ Texture pixel format can be specified using regular types, vector types (`float2
 
 ## Pipeline objects and resource bindings
 
-DX proposes a new concept to setup most of the render states required during draw calls and dispatching, the `ID3D12PipelineObjectState`. This object is constructed with all data regarded to states will be set on the GPU to setup the graphics pipeline. That includes shaders, rasterizer states, depth test, stencil tests, input layout description, information about bound render targets, depth buffers, etc.
+DX proposes a new concept to setup most of the render states required during draw calls and dispatching, the `ID3D12PipelineObjectState`. This object is constructed with all data regarded to states that will be set on the GPU to setup the graphics pipeline. These states include shaders, rasterizer states, depth test, stencil tests, input layout description, information about bound render targets, depth buffers, etc.
 
-Other states keep outside pipeline state object, such as viewport, scissor rectangle, vertex buffer and index buffer bindings.
+Other states needs to be setup outside pipeline state object, such as viewport, scissor rectangle, vertex buffer and index buffer bindings.
 
 In the other hand, bindings of resources to the GPU for shaders accessibility is done creating descriptor heaps, and copying needed descriptors to that memory, manage a root signature to know how pipeline shaders can access to such resources, and setup the offset of each entry in a root signature to the descriptor heap.
 
@@ -287,7 +289,7 @@ This subclass has three methods to override:
 
 **Globals**: This method will be used to collect all global resource bindings proposed for this pipeline. All resources and samplers fields declared as bound in this method will be updated once the pipeline object is set to the pipeline.
 
-**Locals**: This method will be used to collect all local resource bindings proposed for this pipeline. All resources and samplers fields declared as bound in this method will be updated in every draw call to the pipeline.
+**Locals**: This method will be used to collect all local resource bindings proposed for this pipeline. All resources and samplers fields declared as bound in this method will be updated just before any draw call to the pipeline.
 
 Next code shows a sample of pipeline bindings implementation.
 
@@ -318,7 +320,7 @@ struct MyBasicPipeline : public GraphicsPipelineBindings {
 
 > `Globals` and `Locals` are used when the `PipelineBindings` object is initialized internally (loaded in a technique) for collecting field references. Those methods will be only called during initialization and used to create root signature for the pipeline object state. Every time the pipeline object needs to be set or draw call requires for locals, the fields of the object are requested (accessed using a store reference pointer) and bind the real resource.
 >
-> It is an error to implement such methods using conditionals or loops that can be referring to a value will change after initialization.
+> Therefore, it is an error to implement such methods using conditionals or loops that can be referring to a value will change after initialization.
 
 For binding use the following methods:
 
@@ -367,7 +369,7 @@ In CA4G this feature is supported using a mixin strategy using inheritance and t
 > };
 > ```
 
-Each state manager struct used here has two roles. First the expanded memory required by the DX12 pipeline object construction method. Second, each manager has specific tool methods to easily set/modify values for that specific "slot". For instance, the `DepthStencilStateManager` has the functions shown next:
+Each state manager struct used here has two roles. First the expanded memory required by the DX12 pipeline object construction method. Second, each manager has specific tool methods to easily set/modify values for that specific state "slot". For instance, the `DepthStencilStateManager` has the functions shown next:
 
 ```c++
 void NoDepthTest() { ... }
@@ -444,7 +446,7 @@ One of the main ideas behind CA4G is to fully support all capabilities of Direct
 
 In CA4G is presented a new command list manager named `DXRManager`. This command list manager works internally over a DIRECT-type command list (can be cast to `GraphicsManager` if necessary). Similarly to a `GraphicsManager` setup (setting a pipeline object), DXR works setting a `RTPipelineManager` object into the pipeline. Then, developer can decide what ray-tracing program to activate and how to setup shaders (ray-generations, miss and hit groups) to obtain the desired ray-trace process.
 
-For devices that doesn't have DXR hardware support, internally in DXRManager will be used a fallback device object transparently. Developers do not need to handle this.
+For devices that doesn't have DXR hardware support, internally in DXRManager will be used a fallback device object. Developers do not need to handle this.
 
 To explain step-by-step proposed DXR support in CA4G will be used the first example from the DirectX Samples repository. In this example a basic library is defined with three shaders: a shader to generate parallel rays in a normalized viewport (`MyRaygenShader`), a miss shader to paint a solid color when ray misses the geometry (`MyMissShader`), and a closest hit shader (`MyClosestHitShader`) to color ray payload with the barycentric coordinates of the intersection.
 
@@ -566,7 +568,7 @@ gObj<DX_RTX_Sample_RT> _Library;
 
 ```
 
-Notice shaders are loaded (declared as exported by this library) and fill the handle present in the Context() object. The `Context()` method references to the RT pipeline manager that loaded this library. This is convenient to have only one object with the shader handles. Imaging there are three different libraries with shaders definitions required by a program. Instead of having the same shaders handles replicated in the RT Pipeline Manager object, the library object and the program object, we propose to have them only as fields of the `RTPipelineManager` subclass and the refers to them from other objects using the `Context()` method. The template is used to specify the `RTPipelineManager` type used to load this library, this way, the Context method will be statically typed to the context where this library is being used.
+Notice shaders are loaded (declared as exported by this library) and fill the handle present in the Context() object. The `Context()` method references to the RT pipeline manager that loaded this library. This is convenient to have only one object with the shader handles. Imagine there are three different libraries with shaders definitions required by a program. Instead of having the same shaders handles replicated in the RT Pipeline Manager object, the library object and the program object, we propose to have them only as fields of the `RTPipelineManager` subclass and the refers to them from other objects using the `Context()` method. The template is used to specify the `RTPipelineManager` type used to load this library, this way, the Context method will be statically typed to the context where this library is being used.
 
 ### Defining a Ray Tracing Program
 
@@ -595,7 +597,7 @@ protected:
 	}
 public:
 	// Generated by this program
-	HitGroupHandle ClosestHit;
+	gObj<HitGroupHandle> ClosestHit;
 	
 	// Input
 	gObj<SceneOnGPU> Scene;
@@ -623,9 +625,9 @@ Once we defined the library wrappers and ray-tracing programs, the RTPipelineMan
 ```c++
 struct DXRBasic : public RTPipelineManager {
 
-	RayGenerationHandle MyRaygenShader;
-	ClosestHitHandle MyClosestHitShader;
-	MissHandle MyMissShader;
+	gObj<RayGenerationHandle> MyRaygenShader;
+	gObj<ClosestHitHandle> MyClosestHitShader;
+	gObj<MissHandle> MyMissShader;
 
 	class DX_RTX_Sample_RT : public DXIL_Library<DXRBasic> {...};
 	gObj<DX_RTX_Sample_RT> _Library;
@@ -647,7 +649,7 @@ The CA4G façade hides internally in this object the construction of the DX12 st
 In CA4G, the process of building the bottom level acceleration DS is handled by a type named `GeometryCollection`. This object can be created by a `DXRManager` and stores geometries (using load commands) and then creates a buffer with all the bottom level structure using the method in creating module `BakedGeometries()`.
 
 ```c++
-void BuildScene(DXRManager* manager) {
+void BuildScene(gObj<DXRManager> manager) {
 	auto geometries = manager gCreate TriangleGeometries();
 	geometries gSet VertexBuffer(vertices, VERTEX::Layout());
 	geometries gLoad Geometry(0, 3);
@@ -668,7 +670,7 @@ Finally the `SceneOnGPU` object (mostly top level acceleration data-structure) c
 ## Dispatching rays
 
 ```c++
-void Raytracing(DXRManager *manager) {
+void Raytracing(gObj<DXRManager> manager) {
 	auto rtProgram = pipeline->_Program;
 	rtProgram->Output = rtRenderTarget;
 	rtProgram->Scene = this->Scene;

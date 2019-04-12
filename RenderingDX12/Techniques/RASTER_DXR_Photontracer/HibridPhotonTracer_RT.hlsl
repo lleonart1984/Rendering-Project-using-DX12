@@ -260,7 +260,9 @@ void PTMainRays() {
 	ray.TMax = 10000.0;
 	// photons travel with a piece of intensity. This could produce numerical problems and it is better to add entire intensity
 	// and then divide by the number of photons.
-	RayPayload payload = { LightIntensity / (raysDimensions.x * raysDimensions.y), 2 };
+	// Box distribution normalization factor
+	float nfactor = length(float3(2 * raysIndex / (float2)raysDimensions - 1, 1));
+	RayPayload payload = { LightIntensity / (nfactor * raysDimensions.x * raysDimensions.y), 2 };
 
 	float3 P = Positions[raysIndex];
 	float3 N = Normals[raysIndex];
@@ -313,7 +315,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 
 	float3 normal = normalize(mul(BumpTex * 2 - 1, worldToTangent));
 
-	float radius = min(CellSize.x, min(CellSize.y, CellSize.z));
+	float radius = 0.05f;// min(CellSize.x, min(CellSize.y, CellSize.z)) * 0.5;
 
 	int3 begCell = FromPositionToCell(surfel.P - radius);
 	int3 endCell = FromPositionToCell(surfel.P + radius);
@@ -366,8 +368,9 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 	L /= d;
 	float3 H = normalize(V + L);
 	float3 I = LightIntensity / (2 * 3.14159*d*d);
-	float3 diff = max(0, dot(surfel.N, L))*material.Diffuse*I;
-	float3 spec = pow(max(0, dot(H, surfel.N)), material.SpecularSharpness)*material.Specular*I;
+	float NdotL = dot(surfel.N, L);
+	float3 diff = max(0, NdotL)*material.Diffuse*I;
+	float3 spec = NdotL > 0 ? pow(max(0, dot(H, surfel.N)), material.SpecularSharpness)*material.Specular*I : 0;
 
 	float3 pInLightViewSpace = mul(float4(surfel.P, 1), LightView).xyz;
 	float4 pInLightProjSpace = mul(float4(pInLightViewSpace, 1), LightProj);
@@ -379,7 +382,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 
 	float visibility = (pInLightViewSpace.z - lightSampleP.z) < 0.01;
 
-	total += material.Emissive + 
+	total += material.Emissive +
 		material.Roulette.x * ((diff + spec) * visibility
 			+ ComputeDirectLightInWorldSpace(surfel, material, V));// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
 
@@ -476,7 +479,7 @@ void RTMainRays()
 	AugmentHitInfoWithTextureMapping(true, surfel, material);
 
 	// Write the raytraced color to the output texture.
-	Output[DispatchRaysIndex().xy] = RaytracingScattering(V, surfel, material, 4);
+	Output[DispatchRaysIndex().xy] = RaytracingScattering(V, surfel, material, 2);
 }
 
 void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)

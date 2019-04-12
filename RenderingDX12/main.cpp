@@ -127,10 +127,10 @@ int main(int, char**)
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
 			MixMirrorMaterial(&scene->Materials()[9], 0.9f); // floor
-			camera->Position = float3(1, 1, 0);
-			camera->Target = float3(0, 0.5, 0);
-			lightSource->Position = float3(0, 2, 0);
-			lightSource->Intensity = float3(10, 10, 10);
+			camera->Position = float3(0.5f, 0.1f, 0);
+			camera->Target = float3(0, 0.1f, 0);
+			lightSource->Position = float3(0, 1.2f, 0);
+			lightSource->Intensity = float3(20, 20, 20);
 			break;
 		case SIBENIK_OBJ:
 			filePath = desktop_directory();
@@ -139,9 +139,9 @@ int main(int, char**)
 			MixGlassMaterial(&scene->Materials()[1], 0.9f); // window
 			MixMirrorMaterial(&scene->Materials()[4], 0.9f); // floor
 			camera->Position = float3(-1, -0.5f, 0);
-			camera->Target = float3(0, 0, 0);
-			lightSource->Position = float3(0, 2, 0);
-			lightSource->Intensity = float3(1000, 1000, 1000);
+			camera->Target = float3(0, -0.7f, 0);
+			lightSource->Position = float3(0, 0.8, 0);
+			lightSource->Intensity = float3(10, 10, 10);
 			break;
 		case SANMIGUEL_OBJ:
 			filePath = desktop_directory();
@@ -196,7 +196,7 @@ int main(int, char**)
 		if (asLightRenderer)
 		{
 			// Light Updates here
-			asLightRenderer->Light->Position.x = 2 * sin(ImGui::GetTime());
+			asLightRenderer->Light->Position.x = 1 * sin(ImGui::GetTime()*0.1f);
 		}
 
         // Poll and handle messages (inputs, window resize, etc.)
