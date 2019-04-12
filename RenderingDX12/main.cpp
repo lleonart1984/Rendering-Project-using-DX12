@@ -126,7 +126,7 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			MixMirrorMaterial(&scene->Materials()[9], 0.9f); // floor
+			//MixMirrorMaterial(&scene->Materials()[9], 0.9f); // floor
 			camera->Position = float3(0.5f, 0.1f, 0);
 			camera->Target = float3(0, 0.1f, 0);
 			lightSource->Position = float3(0, 1.2f, 0);

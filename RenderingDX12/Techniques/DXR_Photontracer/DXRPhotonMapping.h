@@ -196,8 +196,8 @@ protected:
 			Light->Intensity, 0
 			});
 
-		float3 MinimumPosition{ -10, -10, -10 };
-		float3 BoxSize{ 20, 20, 20 };
+		float3 MinimumPosition{ -1, -1, -1 };
+		float3 BoxSize{ 2, 2, 2 };
 		int3 resolution{ RESOLUTION, RESOLUTION, RESOLUTION };
 
 		// Update SpaceInfo
@@ -260,8 +260,8 @@ protected:
 		float4x4 projToWorld = mul(view, proj).getInverse();
 		manager gCopy ValueData(rtProgram->CameraCB, projToWorld);
 
-		float3 MinimumPosition{ -10, -10, -10 };
-		float3 BoxSize{ 20, 20, 20 };
+		float3 MinimumPosition{ -1, -1, -1 };
+		float3 BoxSize{ 2, 2, 2 };
 		int3 resolution{ RESOLUTION, RESOLUTION, RESOLUTION };
 
 		// Update SpaceInfo
