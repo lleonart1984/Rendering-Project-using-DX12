@@ -2,7 +2,7 @@
 
 ![Tutorial1](Images/ca4g.jpg)
 
-![Tutorial1](Images/photonmap.png)
+![Tutorial1](Images/PhotonMap.png)
 
 The CA4G project allows to abstract to developers from the specific details for driving DX12-based applications. This programming can be bothersome for simple tasks such as resources handling, synchronization, and other graphic-related tasks. This header-only library serves as a façade for accessing to such functionalities and at the same time, uses good practices for DX managing guided using most of the Do’s and Don’ts NVidia advices.
 
