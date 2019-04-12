@@ -262,7 +262,7 @@ void PTMainRays() {
 	// and then divide by the number of photons.
 	// Box distribution normalization factor
 	float nfactor = length(float3(2 * raysIndex / (float2)raysDimensions - 1, 1));
-	RayPayload payload = { LightIntensity / (nfactor * raysDimensions.x * raysDimensions.y), 2 };
+	RayPayload payload = { LightIntensity / (nfactor * raysDimensions.x * raysDimensions.y), 1 };
 
 	float3 P = Positions[raysIndex];
 	float3 N = Normals[raysIndex];
@@ -380,7 +380,8 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 
 	float3 lightSampleP = LightPositions.SampleGrad(shadowSmp, cToTest, 0, 0);
 
-	float visibility = (pInLightViewSpace.z - lightSampleP.z) < 0.01;
+	float visibility = //cToTest.x < 0 || cToTest.y < 0 || cToTest.x > 1 || cToTest.y > 1 ? 0 :
+		((pInLightViewSpace.z) - (lightSampleP.z)) < 0.001;
 
 	total += material.Emissive +
 		material.Roulette.x * ((diff + spec) * visibility
@@ -406,7 +407,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			// Trace the ray.
 			// Set the ray's extents.
 			RayDesc reflectionRay;
-			reflectionRay.Origin = surfel.P + fN * 0.01;
+			reflectionRay.Origin = surfel.P + fN * 0.0001;
 			reflectionRay.Direction = reflectionDir;
 			reflectionRay.TMin = 0.001;
 			reflectionRay.TMax = 10000.0;
@@ -419,7 +420,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			// Trace the ray.
 			// Set the ray's extents.
 			RayDesc refractionRay;
-			refractionRay.Origin = surfel.P - fN * 0.01;
+			refractionRay.Origin = surfel.P - fN * 0.0001;
 			refractionRay.Direction = refractionDir;
 			refractionRay.TMin = 0.001;
 			refractionRay.TMax = 10000.0;
@@ -479,7 +480,7 @@ void RTMainRays()
 	AugmentHitInfoWithTextureMapping(true, surfel, material);
 
 	// Write the raytraced color to the output texture.
-	Output[DispatchRaysIndex().xy] = RaytracingScattering(V, surfel, material, 2);
+	Output[DispatchRaysIndex().xy] = RaytracingScattering(V, surfel, material, 1);
 }
 
 void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)
@@ -587,7 +588,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 
 		if (newPhotonPayload.color.x + newPhotonPayload.color.y + newPhotonPayload.color.z > 0.0000000001) // only continue with no-obscure photons
 		{
-			newPhotonRay.Origin += sign(dot(newPhotonRay.Direction, facedNormal))*0.01*facedNormal; // avoid self shadowing
+			newPhotonRay.Origin += sign(dot(newPhotonRay.Direction, facedNormal))*0.0001*facedNormal; // avoid self shadowing
 			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
 		}
 	}

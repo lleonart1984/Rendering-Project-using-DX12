@@ -170,7 +170,7 @@ void PTMainRays() {
 	ray.TMax = 10000.0;
 	// photons travel with a piece of intensity. This could produce numerical problems and it is better to add entire intensity
 	// and then divide by the number of photons.
-	RayPayload payload = { LightIntensity / (raysDimensions.x * raysDimensions.y), 4 };
+	RayPayload payload = { LightIntensity / (raysDimensions.x * raysDimensions.y), 5 };
 	TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload); // Will be used with Photon scattering function
 }
 
@@ -195,7 +195,7 @@ void RTMainRays()
 	ray.Direction = rayDir;
 	ray.TMin = 0.001;
 	ray.TMax = 10000.0;
-	RayPayload payload = { float3(0, 0, 0), 4 };
+	RayPayload payload = { float3(0, 0, 0), 3 };
 	TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload);
 
 	// Write the raytraced color to the output texture.
@@ -295,7 +295,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 		else { // Photon absortion
 		}
 
-		if (newPhotonPayload.color.x + newPhotonPayload.color.y + newPhotonPayload.color.z > 0.0000000001) // only continue with no-obscure photons
+		if (newPhotonPayload.color.x + newPhotonPayload.color.y + newPhotonPayload.color.z > 0) // only continue with no-obscure photons
 		{
 			newPhotonRay.Origin += sign(dot(newPhotonRay.Direction, facedNormal))*0.01*facedNormal; // avoid self shadowing
 			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
@@ -406,7 +406,7 @@ void RTScattering(inout RayPayload payload, in MyAttributes attr)
 			// Trace the ray.
 			// Set the ray's extents.
 			RayDesc reflectionRay;
-			reflectionRay.Origin = surfel.P + fN * 0.01;
+			reflectionRay.Origin = surfel.P + fN * 0.0001;
 			reflectionRay.Direction = reflectionDir;
 			reflectionRay.TMin = 0.001;
 			reflectionRay.TMax = 10000.0;
@@ -419,7 +419,7 @@ void RTScattering(inout RayPayload payload, in MyAttributes attr)
 			// Trace the ray.
 			// Set the ray's extents.
 			RayDesc refractionRay;
-			refractionRay.Origin = surfel.P - fN * 0.01;
+			refractionRay.Origin = surfel.P - fN * 0.0001;
 			refractionRay.Direction = refractionDir;
 			refractionRay.TMin = 0.001;
 			refractionRay.TMax = 10000.0;
