@@ -1,5 +1,9 @@
 # CA4G Implementation details
 
+This section cover most of the specific implementation details of CA4G framework.
+
+CA4G was designed to be a single header library to allow to graphics developers to quickly implement DX12-based techniques, algorithms and solutions.
+
 
 
 ## Errors handling
@@ -10,53 +14,53 @@
 
 
 
-Compiling and loading shaders
+## Compiling and loading shaders
 
 
 
-Imaging
+## Imaging
 
 
 
-Synchronization primitives
+## Synchronization primitives
 
 
 
-Math concepts
+## Math concepts
 
 
 
-Descriptors manager
+## Descriptors manager
 
 
 
-GPU Scheduler
+## GPU Scheduler
 
 
 
-Resources management
+## Resources management
 
 
 
-Pipeline Bindings
+## Pipeline Bindings
 
 
 
-Raytracing Pipeline Bindings
+## Raytracing Pipeline Bindings
 
 
 
-Device Manager
+## Device Manager
 
 
 
-Command List Managers
+## Command List Managers
 
 
 
-Technique
+## Technique
 
 
 
-Presenting
+## Presenting
 
