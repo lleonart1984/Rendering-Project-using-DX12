@@ -36,6 +36,9 @@
     <ClInclude Include="Techniques\GUI_Traits.h" />
     <ClInclude Include="Techniques\DXR_Raytracer\DXRRaytracer.h" />
     <ClInclude Include="Techniques\DXR_Photontracer\DXRPhotonMapping.h" />
+    <ClInclude Include="Techniques\DeferredShading\GBufferConstruction.h" />
+    <ClInclude Include="Techniques\DeferredShading\DeferredLighting.h" />
+    <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HibridPhotonTracer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -68,6 +71,11 @@
     <FxCompile Include="Techniques\Tutorials\Shaders\DX_RTX_Basic_RT.hlsl" />
     <FxCompile Include="Techniques\DXR_Raytracer\DXR_RTX_Basic_RT.hlsl" />
     <FxCompile Include="Techniques\DXR_Photontracer\DXR_PhotonMapping_RT.hlsl" />
+    <FxCompile Include="Techniques\DeferredShading\DeferredShading_VS.hlsl" />
+    <FxCompile Include="Techniques\DeferredShading\DeferredShading_PS.hlsl" />
+    <FxCompile Include="Techniques\DeferredShading\DeferredLighting_PS.hlsl" />
+    <FxCompile Include="Techniques\RASTER_DXR_Photontracer\HibridPhotonTracer_RT.hlsl" />
+    <FxCompile Include="Techniques\RASTER_DXR_Photontracer\DeferredHybridShading_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Techniques\Tutorials\Tutorials.rm" />

@@ -143,7 +143,7 @@ protected:
 		// Set the pipeline state object
 		manager gSet Pipeline(pipeline);
 		// Set the viewport to the dimensions of the Backbuffer
-		manager gSet Viewport(BackBufferWidth, BackBufferHeight);
+		manager gSet Viewport(render_target->Width, render_target->Height);
 		// Set the vertex buffer object to the pipeline
 		manager gSet VertexBuffer(vertices);
 		// Set the index buffer to the pipeline

@@ -22,9 +22,11 @@ private:
 };
 
 struct IHasScene {
-	Scene* Scene;
-private:
-	virtual void Boo() {}
+	gObj<Scene> Scene;
+
+	virtual void SetScene(gObj<CA4G::Scene> scene) {
+		this->Scene = scene;
+	}
 };
 
 #define MAX_NUMBER_OF_TRIANGLES 10000

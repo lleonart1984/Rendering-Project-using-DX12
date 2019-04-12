@@ -26,4 +26,6 @@
 //gObj<Tutorial9> technique;
 //gObj<Tutorial10> technique;
 //gObj<DXRBasicSceneRaytracer> technique;
-gObj<DXRBasicScenePhotontracer> technique;
+//gObj<DXRBasicScenePhotontracer> technique;
+//gObj<DeferredShadingTechnique> technique;
+gObj<HybridPhotonTracerTechnique> technique;

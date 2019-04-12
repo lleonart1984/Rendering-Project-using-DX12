@@ -51,17 +51,30 @@ protected:
 };
 
 
-class RetainedBasicRenderer : public RetainedSceneLoader, public IHasCamera, public IHasLight, public IHasBackcolor {
+class RetainedBasicRenderer : public Technique, public IHasScene, public IHasCamera, public IHasLight, public IHasBackcolor {
 public:
+	gObj<RetainedSceneLoader> sceneLoader;
+
 	gObj<Texture2D> depthBuffer;
 	gObj<RetainedPipeline> pipeline;
 	gObj<Buffer> globalsCB;
 	gObj<Buffer> lightingCB;
 
 protected:
+	void SetScene(gObj<CA4G::Scene> scene)
+	{
+		IHasScene::SetScene(scene);
+		if (sceneLoader != nullptr)
+			sceneLoader->SetScene(scene);
+	}
+
 	void Startup() {
-		// Load scene in retained mode
-		RetainedSceneLoader::Startup();
+		if (sceneLoader == nullptr) // no loader has be bound
+		{
+			sceneLoader = new RetainedSceneLoader();
+			sceneLoader->SetScene(this->Scene);
+			_ gLoad Subprocess(sceneLoader);
+		}
 
 		// Load and setup pipeline resource
 		_ gLoad Pipeline(pipeline);
@@ -77,13 +90,13 @@ protected:
 		pipeline->globals = globalsCB;
 		pipeline->lighting = lightingCB;
 
-		pipeline->TextureCount = TextureCount;
-		pipeline->Textures = Textures;
-		pipeline->vertices = VertexBuffer;
-		pipeline->objectIds = ObjectBuffer;
-		pipeline->materialIndices = MaterialIndexBuffer;
-		pipeline->materials = MaterialBuffer;
-		pipeline->transforms = TransformBuffer;
+		pipeline->TextureCount = sceneLoader->TextureCount;
+		pipeline->Textures = sceneLoader->Textures;
+		pipeline->vertices = sceneLoader->VertexBuffer;
+		pipeline->objectIds = sceneLoader->ObjectBuffer;
+		pipeline->materialIndices = sceneLoader->MaterialIndexBuffer;
+		pipeline->materials = sceneLoader->MaterialBuffer;
+		pipeline->transforms = sceneLoader->TransformBuffer;
 	}
 
 	void Graphics(gObj<GraphicsManager> manager) {
@@ -104,7 +117,7 @@ protected:
 		manager gSet Viewport(render_target->Width, render_target->Height);
 		manager gSet Pipeline(pipeline);
 
-		manager gDispatch Triangles(VertexBuffer->ElementCount);
+		manager gDispatch Triangles(sceneLoader->VertexBuffer->ElementCount);
 	}
 
 	void Frame() {

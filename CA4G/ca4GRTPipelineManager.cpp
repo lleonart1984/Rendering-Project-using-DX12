@@ -168,7 +168,6 @@ namespace CA4G {
 		if (manager->manager->fallbackDevice != nullptr) {
 			int index = manager->fallbackInstances.size();
 			D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC d{ };
-			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 			FillMat4x3(d.Transform, transform);
 			d.InstanceMask = mask;
 			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
@@ -180,7 +179,7 @@ namespace CA4G {
 		else {
 			int index = manager->instances.size();
 			D3D12_RAYTRACING_INSTANCE_DESC d{ };
-			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
 			FillMat4x3(d.Transform, transform);
 			d.InstanceMask = mask;
 			d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;

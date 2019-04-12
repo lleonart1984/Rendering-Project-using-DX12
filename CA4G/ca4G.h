@@ -358,6 +358,15 @@ namespace CA4G {
 			return obj;
 		}
 
+		template<typename T>
+		gObj<T> Static_Cast() {
+			gObj<T> obj;
+			obj._this = static_cast<T*>(_this);
+			obj.counter = counter;
+			obj.AddReference();
+			return obj;
+		}
+
 		operator bool() const {
 			return !isNull();
 		}
@@ -2324,6 +2333,18 @@ namespace CA4G {
 				AddressU,
 				AddressV,
 				AddressW);
+		}
+
+		static Sampler LinearWithoutMipMaps(
+			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER
+		)
+		{
+			return Create(D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT,
+				AddressU,
+				AddressV,
+				AddressW, 0, 0, D3D12_COMPARISON_FUNC_ALWAYS, float4(0, 0, 0, 0), 0, 0);
 		}
 
 		// Creates a default anisotropic sampling object
@@ -11564,7 +11585,13 @@ namespace CA4G {
 			if (HasSubobjectState(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE::D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS))
 			{
 				RenderTargetFormatsStateManager* rtfsm = (RenderTargetFormatsStateManager*)setting;
-				rtfsm->AllRenderTargets(8, DXGI_FORMAT_R8G8B8A8_UNORM);
+				if (rtfsm->_Description.NumRenderTargets == 0)
+					rtfsm->AllRenderTargets(8, DXGI_FORMAT_R8G8B8A8_UNORM);
+			}
+			if (HasSubobjectState(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT))
+			{
+				DepthStencilFormatStateManager* dsfsm = (DepthStencilFormatStateManager*)setting;
+				dsfsm->_Description = DXGI_FORMAT_D32_FLOAT;
 			}
 			/*if (HasSubobjectState(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE::D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT))
 			{
@@ -13054,7 +13081,7 @@ namespace CA4G {
 		}
 
 		// Tool function to create a wrapper from a created resource.
-		gObj<ResourceWrapper> CreateResourceAndWrap(const D3D12_RESOURCE_DESC &desc, D3D12_RESOURCE_STATES state, CPU_ACCESS cpuAccess = CPU_ACCESS_NONE) {
+		gObj<ResourceWrapper> CreateResourceAndWrap(const D3D12_RESOURCE_DESC &desc, D3D12_RESOURCE_STATES state, CPU_ACCESS cpuAccess = CPU_ACCESS_NONE, D3D12_CLEAR_VALUE* clearDefault = nullptr) {
 
 			D3D12_RESOURCE_DESC finalDesc = desc;
 			if (cpuAccess != CPU_ACCESS_NONE) {
@@ -13074,7 +13101,7 @@ namespace CA4G {
 
 			DX_Resource resource;
 			auto hr = manager->device->CreateCommittedResource(
-				cpuAccess == CPU_ACCESS_NONE ? &defaultProp : cpuAccess == CPU_WRITE_GPU_READ ? &uploadProp : &downloadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, state, nullptr,
+				cpuAccess == CPU_ACCESS_NONE ? &defaultProp : cpuAccess == CPU_WRITE_GPU_READ ? &uploadProp : &downloadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, state, clearDefault,
 				IID_PPV_ARGS(&resource));
 
 			if (FAILED(hr))
@@ -13145,6 +13172,8 @@ namespace CA4G {
 			return new Buffer(CreateResourceAndWrap(desc, state, cpuAccess), sizeof(T));
 		}
 
+	
+
 		// Creates a 2D texture of specific element type.
 		// Use int, float, unsigned int, float[2,3,4], int[2,3,4]
 		template <class T>
@@ -13161,7 +13190,9 @@ namespace CA4G {
 			d.SampleDesc.Quality = 0;
 			d.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 			d.Format = Formats<T>::Value;
-			return new Texture2D(CreateResourceAndWrap(d, state));
+			D3D12_CLEAR_VALUE clearing = { };
+			clearing.Format = d.Format;
+			return new Texture2D(CreateResourceAndWrap(d, state, CPU_ACCESS_NONE, &clearing));
 		}
 
 		// Creates a 2D texture for depth buffer purpose (32-bit float format).
@@ -13178,7 +13209,10 @@ namespace CA4G {
 			d.SampleDesc.Quality = 0;
 			d.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 			d.Format = DXGI_FORMAT_D32_FLOAT;
-			return new Texture2D(CreateResourceAndWrap(d, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+			D3D12_CLEAR_VALUE clearing = { };
+			clearing.Format = d.Format;
+			clearing.DepthStencil.Depth = 1.0f;
+			return new Texture2D(CreateResourceAndWrap(d, D3D12_RESOURCE_STATE_DEPTH_WRITE, CPU_ACCESS_NONE, &clearing));
 		}
 
 		// Creates a buffer for constants using specifc struct type for size.
@@ -13187,7 +13221,20 @@ namespace CA4G {
 		// will be uploaded less frequently you can create a generic buffer instead.
 		template<typename T>
 		gObj<Buffer> ConstantBuffer() {
-			return GenericBuffer<T>(D3D12_RESOURCE_STATE_GENERIC_READ, 1, CPU_WRITE_GPU_READ);
+
+			D3D12_RESOURCE_DESC desc = { };
+			desc.Width = (sizeof(T) + 255)&(~255);
+			desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+			desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+			desc.Format = DXGI_FORMAT_UNKNOWN;
+			desc.Height = 1;
+			desc.Alignment = 0;
+			desc.DepthOrArraySize = 1;
+			desc.MipLevels = 1;
+			desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+			desc.SampleDesc = { 1, 0 };
+
+			return new Buffer(CreateResourceAndWrap(desc, D3D12_RESOURCE_STATE_GENERIC_READ, CPU_WRITE_GPU_READ), sizeof(T));
 		}
 
 		// Creates a buffer for vertex storing purposes of specific type.
@@ -13236,14 +13283,9 @@ namespace CA4G {
 	public:
 		// Loads a technique can be used as child technique.
 		// Nevertheless, this engine proposes multiple inheritance of techniques instead for reusing logics.
-		// Receives the variable to store the loaded technique and the list of arguments for creating the technique object.
-		template<typename T, typename... A>
-		void Subprocess(gObj<T> &technique, A... args)
+		template<typename T>
+		void Subprocess(gObj<T> &technique)
 		{
-			technique = new T(args...);
-			technique->BackBufferWidth = manager->BackBuffer->Width;
-			technique->BackBufferHeight = manager->BackBuffer->Height;
-
 			technique->__OnInitialization(this->manager);
 		}
 
@@ -13360,14 +13402,17 @@ namespace CA4G {
 				cmdList->ClearUnorderedAccessViewUint(D3D12_GPU_DESCRIPTOR_HANDLE{}, uav->getUAVHandle(), uav->resource->internalResource, values, 0, nullptr);
 			}
 			inline void RT(gObj<Texture2D> rt, const FLOAT values[4]) {
+				rt->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 				cmdList->ClearRenderTargetView(rt->getRTVHandle(), values, 0, nullptr);
 			}
 			inline void RT(gObj<Texture2D> rt, const float4 &value) {
 				float v[4]{ value.x, value.y, value.z, value.w };
+				rt->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 				cmdList->ClearRenderTargetView(rt->getRTVHandle(), v, 0, nullptr);
 			}
 			// Clears the render target accessed by the Texture2D View with a specific float3 value
 			inline void RT(gObj<Texture2D> rt, const float3 &value) {
+				rt->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 				float v[4]{ value.x, value.y, value.z, 1.0f };
 				cmdList->ClearRenderTargetView(rt->getRTVHandle(), v, 0, nullptr);
 			}
@@ -13757,6 +13802,8 @@ namespace CA4G {
 // Use getManager() to access to the underlaying DX12 device.
 	class Technique {
 		friend Presenter;
+		friend Loading;
+
 		bool isInitialized = false;
 		void __OnInitialization(gObj<DeviceManager> manager);
 
@@ -13766,12 +13813,6 @@ namespace CA4G {
 
 		gObj<DeviceManager> manager;
 	protected:
-		// Gets the backbuffer width
-		int BackBufferWidth;
-
-		// Gets the backbuffer height
-		int BackBufferHeight;
-
 		// Loading module to load other techniques and pipelines
 		Loading *loading;
 
@@ -13789,6 +13830,11 @@ namespace CA4G {
 
 		// This method will be called every frame
 		virtual void Frame() {
+		}
+
+		template<typename T>
+		void ExecuteFrame(gObj<T> &technique) {
+			((gObj<Technique>)technique)->Frame();
 		}
 
 	public:
@@ -13926,15 +13972,13 @@ namespace CA4G {
 			if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
 			{
 				CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory));
-
-#endif
-				CreateDXGIFactory2(0, IID_PPV_ARGS(&factory));
-#if _DEBUG
 				dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
 				dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
 		}
 			else
 				CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory));
+#else
+			CreateDXGIFactory2(0, IID_PPV_ARGS(&factory));
 #endif
 
 			if (useWarpDevice)
@@ -14023,13 +14067,11 @@ namespace CA4G {
 					manager->device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gui_allocator[0], nullptr, IID_PPV_ARGS(&gui_cmd));*/
 		}
 
-		// Loads a technique.
+		// Loads a technique without initialize.
 		template<typename T, typename... A>
 		void Load(gObj<T> &technique, A... args)
 		{
 			technique = new T(args...);
-			technique->BackBufferWidth = manager->BackBuffer->Width;
-			technique->BackBufferHeight = manager->BackBuffer->Height;
 		}
 
 		// Presents a technique.
@@ -15219,8 +15261,10 @@ namespace CA4G {
 			if (!(*RenderTargets[i]))
 				RenderTargetDescriptors[i] = ResourceView::getNullView(this->manager, D3D12_RESOURCE_DIMENSION_TEXTURE2D)->getRTVHandle();
 			else
+			{
+				(*RenderTargets[i])->ChangeStateTo(manager->cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 				RenderTargetDescriptors[i] = (*RenderTargets[i])->getRTVHandle();
-
+			}
 		D3D12_CPU_DESCRIPTOR_HANDLE depthHandle;
 		if (!(DepthBufferField == nullptr || !(*DepthBufferField)))
 			depthHandle = (*DepthBufferField)->getDSVHandle();

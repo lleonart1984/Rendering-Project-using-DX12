@@ -1,7 +1,7 @@
 #pragma once
 
 class RetainedSceneLoader : public Technique, public IHasScene {
-protected:
+public:
 	gObj<Texture2D>* Textures;
 	int TextureCount;
 	gObj<Buffer> MaterialBuffer;
@@ -10,6 +10,15 @@ protected:
 	gObj<Buffer> VertexBuffer;
 	gObj<Buffer> ObjectBuffer;
 
+	void UpdateTransforms(gObj<CopyingManager> manager) {
+		manager gCopy PtrData(TransformBuffer, Scene->Transforms());
+	}
+
+	void UpdateMaterials(gObj<CopyingManager> manager) {
+		manager gCopy PtrData(MaterialBuffer, &Scene->Materials().first());
+	}
+
+protected:
 	void Startup() {
 		perform(CreatingAssets);
 	}
@@ -41,13 +50,4 @@ protected:
 		gBind(MaterialBuffer) _ gCreate StructuredBuffer<SCENE_MATERIAL>(Scene->Materials().size());
 		UpdateMaterials(manager);
 	}
-
-	void UpdateTransforms(gObj<CopyingManager> manager) {
-		manager gCopy PtrData(TransformBuffer, Scene->Transforms());
-	}
-
-	void UpdateMaterials(gObj<CopyingManager> manager) {
-		manager gCopy PtrData(MaterialBuffer, &Scene->Materials().first());
-	}
-
 };

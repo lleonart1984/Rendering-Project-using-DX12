@@ -181,7 +181,7 @@ protected:
 	void Frame() {
 		perform(Photontracing);
 
-		wait_for(signal(flush_all_to_gpu));
+		//wait_for(signal(flush_all_to_gpu));
 
 		perform(Raytracing);
 	}
