@@ -11,6 +11,15 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CA4G", "CA4G\CA4G.vcxproj",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTex", "Libraries\DirectXTex\DirectXTex_Desktop_2017_Win10.vcxproj", "{371B9FA9-4C90-4AC6-A123-ACED756D6C77}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Images", "Images", "{4D88534A-D62C-4632-A3CA-F77C5B963052}"
+	ProjectSection(SolutionItems) = preProject
+		Images\ca4g.jpg = Images\ca4g.jpg
+		Images\DXRSample1.jpg = Images\DXRSample1.jpg
+		Images\PhotonMap.png = Images\PhotonMap.png
+		Images\Tutorial1.jpg = Images\Tutorial1.jpg
+		Images\Tutorial3.jpg = Images\Tutorial3.jpg
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
