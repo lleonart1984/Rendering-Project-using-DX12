@@ -196,7 +196,7 @@ int main(int, char**)
 		if (asLightRenderer)
 		{
 			// Light Updates here
-			asLightRenderer->Light->Position.x = 1 * sin(ImGui::GetTime()*0.1f);
+			asLightRenderer->Light->Position.x = 1;// *sin(ImGui::GetTime()*0.1f);
 		}
 
         // Poll and handle messages (inputs, window resize, etc.)

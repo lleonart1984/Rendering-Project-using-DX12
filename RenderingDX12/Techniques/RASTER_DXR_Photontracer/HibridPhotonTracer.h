@@ -288,7 +288,7 @@ public:
 
 #pragma region Construct GBuffer from light
 		lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
-		lightProj = PerspectiveFovLH(PI / 2, 1, 0.01f, 10);
+		lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
 		gBufferFromLight->ViewMatrix = lightView;
 		gBufferFromLight->ProjectionMatrix = lightProj;
 		ExecuteFrame(gBufferFromLight);
