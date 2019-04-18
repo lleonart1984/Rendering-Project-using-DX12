@@ -82,7 +82,7 @@ class Tutorial10 : public Technique {
 
 	gObj<Texture2D> rtRenderTarget;
 
-	gObj<Buffer> Scene;
+	gObj<SceneOnGPU> Scene;
 
 	void Startup() {
 		// Creates the pipeline and close it to be used by the rendering process

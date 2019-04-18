@@ -170,7 +170,8 @@ namespace CA4G {
 			D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC d{ };
 			FillMat4x3(d.Transform, transform);
 			d.InstanceMask = mask;
-			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
+			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+			//d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
 			d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
 			d.InstanceContributionToHitGroupIndex = 0;
 			d.AccelerationStructure = geometries->emulatedPtr;
@@ -189,15 +190,17 @@ namespace CA4G {
 		}
 	}
 
-	gObj<GeometriesOnGPU> GeometryCollection::Creating::BakedGeometry() {
+	gObj<GeometriesOnGPU> GeometryCollection::Creating::BakedGeometry(bool allowUpdates, bool preferFastTrace) {
 		// creates the bottom level acc ds and emulated gpu pointer if necessary
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = 
+			(preferFastTrace ? D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE : D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD)
+			| (allowUpdates ? D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE : D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE);
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 		inputs.Flags = buildFlags;
-		inputs.NumDescs = manager->geometries.size();
+		inputs.NumDescs = manager->geometries->size();
 		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-		inputs.pGeometryDescs = &manager->geometries.first();
+		inputs.pGeometryDescs = &manager->geometries->first();
 
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
 		if (manager->manager->fallbackDevice != nullptr)
@@ -249,6 +252,7 @@ namespace CA4G {
 		gObj<GeometriesOnGPU> result = new GeometriesOnGPU();
 		result->bottomLevelAccDS = buffer;
 		result->scratchBottomLevelAccDS = scratchBuffer;
+		result->geometries = this->manager->geometries->clone();
 
 		if (manager->manager->fallbackDevice != nullptr) {
 			// store an emulated gpu pointer via UAV
@@ -258,7 +262,42 @@ namespace CA4G {
 
 		return result;
 	}
+	gObj<GeometriesOnGPU> GeometryCollection::Creating::UpdatedGeometry() {
+		if (!manager->isUpdating)
+			throw CA4GException("Can not update a geometry is being created.");
+		// creates the bottom level acc ds and emulated gpu pointer if necessary
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+		inputs.Flags = buildFlags;
+		inputs.NumDescs = manager->geometries->size();
+		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+		inputs.pGeometryDescs = &manager->geometries->first();
 
+		// Bottom Level Acceleration Structure desc
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
+		{
+			bottomLevelBuildDesc.Inputs = inputs;
+			bottomLevelBuildDesc.ScratchAccelerationStructureData = manager->updatingGeometry->scratchBottomLevelAccDS->resource->GetGPUVirtualAddress();
+			bottomLevelBuildDesc.DestAccelerationStructureData = manager->updatingGeometry->bottomLevelAccDS->resource->GetGPUVirtualAddress();
+			bottomLevelBuildDesc.SourceAccelerationStructureData = manager->updatingGeometry->bottomLevelAccDS->resource->GetGPUVirtualAddress();
+		}
+
+		if (manager->manager->fallbackDevice != nullptr)
+		{
+			ID3D12DescriptorHeap *pDescriptorHeaps[] = {
+				manager->manager->descriptors->gpu_csu->getInnerHeap(),
+				manager->manager->descriptors->gpu_smp->getInnerHeap() };
+			manager->cmdList->fallbackCmdList->SetDescriptorHeaps(ARRAYSIZE(pDescriptorHeaps), pDescriptorHeaps);
+			manager->cmdList->fallbackCmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+		}
+		else
+			manager->cmdList->cmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+
+		manager->updatingGeometry->bottomLevelAccDS->ChangeStateToUAV(manager->cmdList->cmdList);
+
+		return manager->updatingGeometry;
+	}
 
 	gObj<SceneOnGPU> InstanceCollection::Creating::BakedScene() {
 		// Bake scene using instance buffer and generate the top level DS
@@ -339,7 +378,9 @@ namespace CA4G {
 		result->scratchBuffer = scratchBuffer;
 		result->topLevelAccDS = buffer;
 		result->instancesBuffer = instanceBuffer;
-		result->usedGeometries = manager->usedGeometries->ptrClone();
+		result->usedGeometries = manager->usedGeometries->clone();
+		result->instances = manager->instances.clone();
+		result->fallbackInstances = manager->fallbackInstances.clone();
 		// Create a wrapped pointer to the acceleration structure.
 		if (manager->manager->fallbackDevice != nullptr)
 		{
@@ -349,6 +390,59 @@ namespace CA4G {
 
 		return result;
 	}
+
+	gObj<SceneOnGPU> InstanceCollection::Creating::UpdatedScene() {
+		// Bake scene using instance buffer and generate the top level DS
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+		inputs.Flags = buildFlags;
+
+		if (manager->manager->fallbackDevice != nullptr)
+			inputs.NumDescs = manager->fallbackInstances.size();
+		else
+			inputs.NumDescs = manager->instances.size();
+
+		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+		gObj<Buffer> instanceBuffer = manager->updatingScene->instancesBuffer;
+		if (manager->manager->fallbackDevice != nullptr) {
+			instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->fallbackInstances.first(), sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC)*manager->fallbackInstances.size());
+		}
+		else {
+			instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->instances.first(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC)*manager->instances.size());
+		}
+
+		// Build acc structure
+
+		// Top Level Acceleration Structure desc
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
+		{
+			inputs.InstanceDescs = instanceBuffer->resource->internalResource->GetGPUVirtualAddress();
+			topLevelBuildDesc.Inputs = inputs;
+			topLevelBuildDesc.ScratchAccelerationStructureData = manager->updatingScene->scratchBuffer->resource->GetGPUVirtualAddress();
+			topLevelBuildDesc.SourceAccelerationStructureData = manager->updatingScene->topLevelAccDS->resource->GetGPUVirtualAddress();
+			topLevelBuildDesc.DestAccelerationStructureData = manager->updatingScene->topLevelAccDS->resource->GetGPUVirtualAddress();
+		}
+
+		if (manager->manager->fallbackDevice != nullptr)
+		{
+			ID3D12DescriptorHeap *pDescriptorHeaps[] = {
+				manager->manager->descriptors->gpu_csu->getInnerHeap(),
+				manager->manager->descriptors->gpu_smp->getInnerHeap() };
+			manager->cmdList->fallbackCmdList->SetDescriptorHeaps(ARRAYSIZE(pDescriptorHeaps), pDescriptorHeaps);
+			manager->cmdList->fallbackCmdList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+		}
+		else
+			manager->cmdList->cmdList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+
+		// Valid for Top level ds as well?
+		//buffer->ChangeStateToUAV(manager->cmdList->cmdList);
+
+		manager->updatingScene->usedGeometries = manager->usedGeometries->clone();
+		return manager->updatingScene;
+	}
+
 
 	void RTPipelineManager::Close() {
 		// TODO: Create the so

@@ -202,8 +202,9 @@ namespace CA4G {
 	class Sampler;
 	class GPUScheduler;
 	class SceneBuilder;
-	class TriangleGeometryCollection;
 	class GeometryCollection;
+	class TriangleGeometryCollection;
+	class ProceduralGeometryCollection;
 	class InstanceCollection;
 	class HitGroupManager;
 	template<typename S, D3D12_STATE_SUBOBJECT_TYPE Type> class DynamicStateBindingOf;
@@ -286,6 +287,7 @@ namespace CA4G {
 	template<typename S>
 	class gObj {
 		friend S;
+		template<typename T> friend class list; // I dont like it... :(
 		template<typename T> friend class gObj;
 
 	private:
@@ -308,21 +310,25 @@ namespace CA4G {
 		gObj(const gObj<S>& other) {
 			this->counter = other.counter;
 			this->_this = other._this;
-			AddReference();
+			if (!isNull())
+				AddReference();
 		}
 
 		template <typename Subtype>
 		gObj(const gObj<Subtype>& other) {
 			this->counter = other.counter;
 			this->_this = (S*)other._this;
-			AddReference();
+			if (!isNull())
+				AddReference();
 		}
 
 		gObj<S>& operator = (const gObj<S>& other) {
-			RemoveReference();
+			if (!isNull())
+				RemoveReference();
 			this->counter = other.counter;
 			this->_this = other._this;
-			AddReference();
+			if (!isNull())
+				AddReference();
 			return *this;
 		}
 
@@ -334,8 +340,14 @@ namespace CA4G {
 			return other._this != _this;
 		}
 
+		template<typename A>
+		auto& operator[](A arg) {
+			return (*_this)[arg];
+		}
+
 		~gObj() {
-			RemoveReference();
+			if (!isNull())
+				RemoveReference();
 		}
 
 		//Dereference operator
@@ -1546,26 +1558,28 @@ namespace CA4G {
 			count = 0;
 			elements = new T[capacity];
 		}
-	private:
 		list(const list<T> &other) {
+			this->count = other.count;
+			this->elements = new T[other.capacity];
+			for (int i = 0; i < this->count; i++)
+				this->elements[i] = other.elements[i];
+			this->capacity = other.capacity;
 		}
 	public:
 
-		list<T> clone() {
-			list<T> result();
-			result.elements = new T[count];
-			result.capacity = result.count = count;
-			for (int i = 0; i < count; i++)
-				result.elements[i] = elements[i];
-			return result;
-		}
-
-		list<T>* ptrClone() {
+		/*list<T>* clone() {
 			list<T>* result = new list<T>();
 			result->elements = new T[count];
 			result->capacity = result->count = count;
 			for (int i = 0; i < count; i++)
 				result->elements[i] = elements[i];
+			return result;
+		}*/
+
+		gObj<list<T>> clone() {
+			gObj<list<T>> result = new list<T>();
+			for (int i = 0; i < count; i++)
+				result->add(elements[i]);
 			return result;
 		}
 
@@ -2565,6 +2579,7 @@ namespace CA4G {
 		friend RTPipelineManager;
 		friend IRTProgram;
 		friend TriangleGeometryCollection;
+		friend ProceduralGeometryCollection;
 		friend GeometryCollection;
 		friend InstanceCollection;
 
@@ -11935,10 +11950,14 @@ namespace CA4G {
 	{
 		friend GeometryCollection;
 		friend InstanceCollection;
+		friend ProceduralGeometryCollection;
+		friend TriangleGeometryCollection;
 
 		gObj<Buffer> bottomLevelAccDS;
 		gObj<Buffer> scratchBottomLevelAccDS;
 		WRAPPED_GPU_POINTER emulatedPtr;
+
+		gObj<list<D3D12_RAYTRACING_GEOMETRY_DESC>> geometries;
 	};
 
 	// Represents a geometry collection can be used to compose scenes
@@ -11946,6 +11965,7 @@ namespace CA4G {
 	// This structure can be lock/unlock for further modifications
 	class GeometryCollection {
 		friend TriangleGeometryCollection;
+		friend ProceduralGeometryCollection;
 
 		gObj<DeviceManager> manager;
 		DXRManager* cmdList;
@@ -11954,16 +11974,29 @@ namespace CA4G {
 			manager(manager), cmdList(cmdList),
 			creating(new Creating(this)) {
 		}
+		GeometryCollection(gObj<DeviceManager> manager, DXRManager* cmdList, gObj<GeometriesOnGPU> bakedGeometry) :
+			manager(manager), cmdList(cmdList),
+			creating(new Creating(this)) {
+			this->isUpdating = true;
+			this->currentGeometry = 0;
+			this->updatingGeometry = bakedGeometry;
+			this->geometries = bakedGeometry->geometries;
+		}
 
 	protected:
-		list<D3D12_RAYTRACING_GEOMETRY_DESC> geometries;
+		gObj<list<D3D12_RAYTRACING_GEOMETRY_DESC>> geometries = new list<D3D12_RAYTRACING_GEOMETRY_DESC>();
+		bool isUpdating = false;
+		int currentGeometry;
+		gObj<GeometriesOnGPU> updatingGeometry;
+
 	public:
 		class Creating {
 			friend GeometryCollection;
 			GeometryCollection* manager;
 			Creating(GeometryCollection* manager) :manager(manager) {}
 		public:
-			gObj<GeometriesOnGPU> BakedGeometry();
+			gObj<GeometriesOnGPU> BakedGeometry(bool allowUpdates = false, bool preferFastTrace = true);
+			gObj<GeometriesOnGPU> UpdatedGeometry();
 		} *const creating;
 	};
 
@@ -11980,6 +12013,11 @@ namespace CA4G {
 		TriangleGeometryCollection(gObj<DeviceManager> manager, DXRManager* cmdList) :
 			GeometryCollection(manager, cmdList),
 			loading(new Loader(this)), setting(new Setting(this)) {}
+
+		TriangleGeometryCollection(gObj<DeviceManager> manager, DXRManager* cmdList, gObj<GeometriesOnGPU> bakedGeometry) :
+			GeometryCollection(manager, cmdList, bakedGeometry),
+			loading(new Loader(this)), setting(new Setting(this)) {
+		}
 	public:
 		class Loader {
 			friend TriangleGeometryCollection;
@@ -11987,20 +12025,38 @@ namespace CA4G {
 			Loader(TriangleGeometryCollection* manager) :manager(manager) {}
 		public:
 			void Geometry(int startVertex, int count, int transformIndex = -1) {
-				D3D12_RAYTRACING_GEOMETRY_DESC desc{ };
-				desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE::D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-				desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-				desc.Triangles.VertexBuffer = D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE
-				{
-					manager->boundVertices->resource->GetGPUVirtualAddress() + startVertex*manager->boundVertices->Stride + manager->currentVertexOffset,
-					manager->boundVertices->Stride
-				};
-				if (transformIndex >= 0)
-					desc.Triangles.Transform3x4 = manager->boundTransforms->resource->GetGPUVirtualAddress() + transformIndex * sizeof(float3x4);
-				desc.Triangles.VertexFormat = manager->currentVertexFormat;
-				desc.Triangles.VertexCount = count;
+				if (manager->isUpdating) {
+					if (manager->currentGeometry >= manager->geometries->size())
+						throw CA4GException("Can not change geometry count during updating");
+					if (manager->geometries[manager->currentGeometry].Triangles.VertexCount != count)
+						throw CA4GException("Can not change vertex count during updating");
+					D3D12_RAYTRACING_GEOMETRY_DESC &desc = manager->geometries[manager->currentGeometry];
+					desc.Triangles.VertexBuffer = D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE
+					{
+						manager->boundVertices->resource->GetGPUVirtualAddress() + startVertex * manager->boundVertices->Stride + manager->currentVertexOffset,
+						manager->boundVertices->Stride
+					};
+					desc.Triangles.VertexFormat = manager->currentVertexFormat;
+					if (transformIndex >= 0)
+						desc.Triangles.Transform3x4 = manager->boundTransforms->resource->GetGPUVirtualAddress() + transformIndex * sizeof(float3x4);
+					manager->currentGeometry++;
+				}
+				else {
+					D3D12_RAYTRACING_GEOMETRY_DESC desc{ };
+					desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE::D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+					desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+					desc.Triangles.VertexBuffer = D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE
+					{
+						manager->boundVertices->resource->GetGPUVirtualAddress() + startVertex * manager->boundVertices->Stride + manager->currentVertexOffset,
+						manager->boundVertices->Stride
+					};
+					if (transformIndex >= 0)
+						desc.Triangles.Transform3x4 = manager->boundTransforms->resource->GetGPUVirtualAddress() + transformIndex * sizeof(float3x4);
+					desc.Triangles.VertexFormat = manager->currentVertexFormat;
+					desc.Triangles.VertexCount = count;
 
-				manager->geometries.add(desc);
+					manager->geometries->add(desc);
+				}
 			}
 		} *const loading;
 
@@ -12064,6 +12120,65 @@ namespace CA4G {
 		} *const setting;
 	};
 
+	struct ProceduralGeometryCollection : GeometryCollection {
+		friend DXRManager;
+	private:
+		gObj<Buffer> boundAABBs;
+		ProceduralGeometryCollection(gObj<DeviceManager> manager, DXRManager* cmdList) :
+			GeometryCollection(manager, cmdList),
+			loading(new Loader(this)), setting(new Setting(this)) {}
+
+		ProceduralGeometryCollection(gObj<DeviceManager> manager, DXRManager* cmdList, gObj<GeometriesOnGPU> bakedGeometries) :
+			GeometryCollection(manager, cmdList, bakedGeometries),
+			loading(new Loader(this)), setting(new Setting(this)) {
+		}
+
+	public:
+		class Loader {
+			friend ProceduralGeometryCollection;
+			ProceduralGeometryCollection* manager;
+			Loader(ProceduralGeometryCollection* manager) :manager(manager) {}
+		public:
+			void Geometry(int startBox, int count) {
+				if (manager->isUpdating) {
+					if (manager->geometries[manager->currentGeometry].AABBs.AABBCount != count)
+						throw CA4GException("Can not change number of boxes during updates.");
+					if (manager->currentGeometry >= manager->updatingGeometry->geometries->size())
+						throw CA4GException("Can not change the number of geometries during updates.");
+					manager->geometries[manager->currentGeometry].AABBs.AABBs = D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE
+					{
+						manager->boundAABBs->resource->GetGPUVirtualAddress() + startBox * manager->boundAABBs->Stride,
+						manager->boundAABBs->Stride
+					};
+					manager->currentGeometry++;
+				}
+				else {
+					D3D12_RAYTRACING_GEOMETRY_DESC desc{ };
+					desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE::D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
+					desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+					desc.AABBs.AABBCount = count;
+					desc.AABBs.AABBs = D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE
+					{
+						manager->boundAABBs->resource->GetGPUVirtualAddress() + startBox * manager->boundAABBs->Stride,
+						manager->boundAABBs->Stride
+					};
+					manager->geometries->add(desc);
+				}
+			}
+		} *const loading;
+
+		class Setting {
+			friend ProceduralGeometryCollection;
+			ProceduralGeometryCollection* manager;
+			Setting(ProceduralGeometryCollection* manager) :manager(manager) {}
+
+		public:
+			void AABBs(gObj<Buffer> aabbs) {
+				manager->boundAABBs = aabbs;
+			}
+		} *const setting;
+	};
+
 	class SceneOnGPU {
 		friend InstanceCollection;
 		friend IRTProgram;
@@ -12073,6 +12188,9 @@ namespace CA4G {
 		gObj<Buffer> instancesBuffer;
 		gObj<list<gObj<GeometriesOnGPU>>> usedGeometries;
 		WRAPPED_GPU_POINTER topLevelAccFallbackPtr;
+
+		gObj<list<D3D12_RAYTRACING_INSTANCE_DESC>> instances;
+		gObj<list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC>> fallbackInstances;
 	};
 
 	// Represents a scene as a collection of instances
@@ -12087,10 +12205,24 @@ namespace CA4G {
 		list<D3D12_RAYTRACING_INSTANCE_DESC> instances;
 		list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC> fallbackInstances;
 
+		// updating
+		gObj<SceneOnGPU> updatingScene = nullptr;
+		bool isUpdating = false;
+		int currentInstance;
+
 		InstanceCollection(gObj<DeviceManager> manager, DXRManager* cmdList) :manager(manager), cmdList(cmdList),
 			creating(new Creating(this)), loading(new Loading(this))
 		{
 			usedGeometries = new list<gObj<GeometriesOnGPU>>();
+		}
+
+		InstanceCollection(gObj<DeviceManager> manager, DXRManager* cmdList, gObj<SceneOnGPU> scene) :manager(manager), cmdList(cmdList),
+			creating(new Creating(this)), loading(new Loading(this))
+		{
+			usedGeometries = new list<gObj<GeometriesOnGPU>>();
+			updatingScene = scene;
+			isUpdating = true;
+			currentInstance = 0;
 		}
 	public:
 		class Loading {
@@ -12122,6 +12254,7 @@ namespace CA4G {
 			Creating(InstanceCollection* manager) :manager(manager) {}
 		public:
 			gObj<SceneOnGPU> BakedScene();
+			gObj<SceneOnGPU> UpdatedScene();
 
 		} *const creating;
 	};
@@ -12557,7 +12690,7 @@ namespace CA4G {
 
 		// Gets the maximum number of hit groups that will be setup before any 
 		// single dispatch rays
-		int MaxGroups = 1000000;
+		int MaxGroups = 1024*1024;
 		// Gets the maximum number of miss programs that will be setup before any
 		// single dispatch rays
 		int MaxMiss = 10;
@@ -12579,9 +12712,9 @@ namespace CA4G {
 		friend DXRManager;
 		friend gObj<RTProgram<R>>;
 
-		gObj<R> _rt_manager;
+		R* _rt_manager;
 
-		void __OnInitialization(gObj<DeviceManager> manager, gObj<RTPipelineManager> rtManager);
+		void __OnInitialization(gObj<DeviceManager> manager, RTPipelineManager* rtManager);
 
 		// Creates the root signature after closing
 		DX_RootSignature CreateRootSignature(gObj<BindingsHandle> bindings, int &size);
@@ -12841,7 +12974,7 @@ namespace CA4G {
 			}
 		} *const setting;
 
-		inline gObj<R> Context() { return _rt_manager; }
+		inline R* Context() { return _rt_manager; }
 
 		virtual void Setup() = 0;
 
@@ -13780,8 +13913,21 @@ namespace CA4G {
 			DXRManager* manager;
 			Creating(DXRManager* manager) :manager(manager) {}
 		public:
+			// Creates an empty geometry collection to add triangle-based geometries.
 			gObj<TriangleGeometryCollection> TriangleGeometries() {
 				return new TriangleGeometryCollection(manager->manager, manager);
+			}
+			// Creates an empty geometry collection to add procedural geometries.
+			gObj<ProceduralGeometryCollection> ProceduralGeometries() {
+				return new ProceduralGeometryCollection(manager->manager, manager);
+			}
+			// Creates a geometry collection to update triangle-based geometries.
+			gObj<TriangleGeometryCollection> TriangleGeometries(gObj<GeometriesOnGPU> updating) {
+				return new TriangleGeometryCollection(manager->manager, manager, updating);
+			}
+			// Creates a geometry collection to update procedural geometries.
+			gObj<ProceduralGeometryCollection> ProceduralGeometries(gObj<GeometriesOnGPU> updating) {
+				return new ProceduralGeometryCollection(manager->manager, manager, updating);
 			}
 			gObj<InstanceCollection> Instances() {
 				return new InstanceCollection(manager->manager, manager);
@@ -13839,7 +13985,8 @@ namespace CA4G {
 
 	public:
 		Technique() {}
-		virtual ~Technique() {}
+		virtual ~Technique() {
+		}
 	};
 }
 
@@ -15280,18 +15427,23 @@ namespace CA4G {
 namespace CA4G {
 	template<typename S>
 	void gObj<S>::AddReference() {
-		if (counter)
-			InterlockedAdd(counter, 1);
+		if (!counter)
+			throw new CA4GException("Error referencing");
+		
+		InterlockedAdd(counter, 1);
 	}
 
 	template<typename S>
 	void gObj<S>::RemoveReference() {
-		if (counter) {
-			InterlockedAdd(counter, -1);
-			if ((*counter) == 0) {
-				delete _this;
-				delete counter;
-			}
+		if (!counter)
+			throw new CA4GException("Error referencing");
+
+		InterlockedAdd(counter, -1);
+		if ((*counter) == 0) {
+			delete _this;
+			delete counter;
+			//_this = nullptr;
+			counter = nullptr;
 		}
 	}
 
@@ -15326,8 +15478,6 @@ namespace CA4G {
 		}
 		return false;
 	}
-
-
 }
 
 
@@ -15441,9 +15591,9 @@ namespace CA4G {
 	}
 
 	template<typename R>
-	void RTProgram<R>::__OnInitialization(gObj<DeviceManager> manager, gObj<RTPipelineManager> rtManager) {
+	void RTProgram<R>::__OnInitialization(gObj<DeviceManager> manager, RTPipelineManager* rtManager) {
 		this->manager = manager;
-		this->_rt_manager = rtManager.Dynamic_Cast<R>();
+		this->_rt_manager = dynamic_cast<R*>(rtManager);// .Dynamic_Cast<R>();
 		Setup();
 		// Build and append root signatures
 		globals = new BindingsHandle();

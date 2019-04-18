@@ -49,7 +49,7 @@ namespace FallbackLayer
 
         shaderInfo.resize(exportNames.size());
         CComPtr<IDxcOperationResult> pResult;
-        pFallbackCompiler->Compile(pLibBlobPtrs.data(), (UINT32)pLibBlobPtrs.size(), exportNames.data(), shaderInfo.data(), (UINT32)exportNames.size(), maxAttributeSize, &pResult);
+        auto hr = pFallbackCompiler->Compile(pLibBlobPtrs.data(), (UINT32)pLibBlobPtrs.size(), exportNames.data(), shaderInfo.data(), (UINT32)exportNames.size(), maxAttributeSize, &pResult);
 
         VerifyResult(pResult);
         ThrowInternalFailure(pResult->GetResult(ppOutputBlob));

@@ -107,7 +107,7 @@ int main(int, char**)
 
 	static Scene* scene = nullptr;
 	static Camera* camera = new Camera { float3(1,1.5f,2.0f), float3(0,0,0), float3(0,1,0), PI / 4, 0.001f, 1000.0f };
-	static LightSource *lightSource = new LightSource{ float3(1,3,2), float3(0,0,0), 0, float3(10, 10, 10) };
+	static LightSource *lightSource = new LightSource{ float3(0,1,0), float3(0,0,0), 0, float3(10, 10, 10) };
 
 	if (asSceneRenderer)
 	{
@@ -119,18 +119,18 @@ int main(int, char**)
 			strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
 			scene = new Scene(filePath);
 			MixGlassMaterial(&scene->Materials()[0], 1);
-			lightSource->Position = float3(2, 2, 0);
+			lightSource->Position = float3(0, 2, 0);
 			lightSource->Intensity = float3(100, 100, 100);
 			break;
 		case SPONZA_OBJ:
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			//MixMirrorMaterial(&scene->Materials()[9], 0.9f); // floor
+			MixMirrorMaterial(&scene->Materials()[9], 0.4f); // floor
 			camera->Position = float3(0.5f, 0.1f, 0);
 			camera->Target = float3(0, 0.1f, 0);
-			lightSource->Position = float3(0, 1.2f, 0);
-			lightSource->Intensity = float3(20, 20, 20);
+			lightSource->Position = float3(0, 2, 0);
+			lightSource->Intensity = float3(100, 100, 100);
 			break;
 		case SIBENIK_OBJ:
 			filePath = desktop_directory();
@@ -248,6 +248,13 @@ int main(int, char**)
 
         // Rendering
 		presenter->Present(technique);
+
+		static bool firstFrame = true;
+
+		if (firstFrame)
+			ImGui::GetIO().Framerate;
+
+		firstFrame = false;
     }
 
 	presenter->Close();

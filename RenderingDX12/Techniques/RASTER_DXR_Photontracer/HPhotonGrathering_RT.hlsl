@@ -32,7 +32,7 @@ struct Photon {
 };
 
 // Top level structure with the scene
-RaytracingAccelerationStructure Scene	: register(t0, space0);
+RaytracingAccelerationStructure Scene : register(t0, space0);
 StructuredBuffer<Vertex> vertices		: register(t1);
 StructuredBuffer<Material> materials	: register(t2);
 
@@ -41,21 +41,22 @@ Texture2D<float3> Positions				: register(t3);
 Texture2D<float3> Normals				: register(t4);
 Texture2D<float2> Coordinates			: register(t5);
 Texture2D<int> MaterialIndices			: register(t6);
+// Used for direct light visibility test
 Texture2D<float3> LightPositions		: register(t7);
+// Photon Map binding objects
+StructuredBuffer<int> HeadBuffer		: register(t8);
+StructuredBuffer<Photon> Photons		: register(t9);
+StructuredBuffer<int> NextBuffer		: register(t10);
 
 // Textures
-Texture2D<float4> Textures[500]			: register(t8);
+Texture2D<float4> Textures[500]			: register(t11);
 
 // Raytracing output image
 RWTexture2D<float3> Output				: register(u0);
 
-// Photon Map binding objects
-RWStructuredBuffer<int> HeadBuffer		: register(u1);
-RWStructuredBuffer<int> Malloc			: register(u2);
-RWStructuredBuffer<Photon> Photons		: register(u3);
-RWStructuredBuffer<int> NextBuffer		: register(u4);
-
+// Used for texture mapping
 SamplerState gSmp : register(s0);
+// Used for shadow map mapping
 SamplerState shadowSmp : register(s1);
 
 // Global constant buffer with view to world transform matrix
@@ -76,6 +77,7 @@ cbuffer SpaceInformation : register(b2) {
 	int3 Resolution;
 }
 
+// Matrices to transform from Light space (proj and view) to world space
 cbuffer LightTransforms : register(b3) {
 	row_major matrix LightProj;
 	row_major matrix LightView;
@@ -161,69 +163,6 @@ Vertex Transform(Vertex surfel, float4x3 transform) {
 	return v;
 }
 
-void PhotonScatter(float3 L, Vertex surfel, Material material, out float3 ratio, out float3 direction) {
-	ratio = 1;
-	direction = float3(0, 0, 0);
-
-	// Transparent hit
-	if (material.Roulette.w == 0)
-	{
-		direction = -L; // continue without interaction
-		return;
-	}
-
-	float scatteringSelection = random();
-
-	bool entering = dot(L, surfel.N) > 0;
-
-	float3 facedNormal = entering ? surfel.N : -surfel.N;
-
-	// Diffuse photon scattering
-	if (scatteringSelection < material.Roulette.x)
-	{
-		direction = randomDirection();
-		if (dot(direction, facedNormal) < 0)
-			direction *= -1; // invert direction to head correct hemisphere (facedNormal)
-		ratio = material.Diffuse * dot(L, facedNormal); // lambert factor only affects diffuse scattering
-		// uniform hemisphere distribution pdf would be 1/pi. but diffuse normalization is 1/pi. so,
-		// they are canceled
-		return;
-	}
-
-	// Mirror photon scattering
-	if (scatteringSelection < material.Roulette.x + material.Roulette.y)
-	{
-		direction = reflect(-L, facedNormal);
-		// impulse bounce is not affected by lambert law (cosine factor)
-		return;
-	}
-
-	// Fresnel scattering
-	if (scatteringSelection < material.Roulette.x + material.Roulette.y + material.Roulette.z)
-	{
-		float reflectionIndex, refractionIndex;
-		float eta = entering ? 1 / material.Roulette.w : material.Roulette.w;
-		ComputeFresnel(-L, facedNormal, eta,
-			reflectionIndex, refractionIndex);
-		float3 reflectionDir = reflect(-L, facedNormal);
-		float3 refractionDir = refract(-L, facedNormal, eta);
-		if (!any(refractionDir))
-		{
-			reflectionIndex = 1;
-			refractionIndex = 0; // total internal reflection
-		}
-		float fresnelSelection = random();
-		direction = (fresnelSelection < reflectionIndex) ?
-			// Select to reflect
-			reflectionDir :
-			// Select to refract
-			refractionDir;
-		// impulse bounce is not affected by lambert law (cosine factor)
-		return;
-	}
-	// Photon absortion
-}
-
 void AugmentHitInfoWithTextureMapping(bool onlyMaterial, inout Vertex surfel, inout Material material) {
 	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
 	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0, 0) : material.Specular;
@@ -238,70 +177,6 @@ void AugmentHitInfoWithTextureMapping(bool onlyMaterial, inout Vertex surfel, in
 
 	material.Diffuse *= DiffTex * MaskTex.x; // set transparent if necessary.
 	material.Specular.xyz = max(material.Specular.xyz, SpecularTex);
-}
-
-// Photon trace stage
-// Photon rays has the origin in light source and select a random direction (point source)
-[shader("raygeneration")]
-void PTMainRays() {
-	uint2 raysIndex = DispatchRaysIndex();
-	uint2 raysDimensions = DispatchRaysDimensions();
-
-	// Initialize random iterator using rays index as seed
-	rng_state = raysIndex.x + raysIndex.y*raysDimensions.x;
-	// avoid strong correlation at begining
-	random(); random(); random();
-	//random(); random(); random();
-
-	RayDesc ray;
-	ray.Origin = LightPosition;
-	ray.Direction = randomDirection();
-	ray.TMin = 0.001;
-	ray.TMax = 10000.0;
-	// photons travel with a piece of intensity. This could produce numerical problems and it is better to add entire intensity
-	// and then divide by the number of photons.
-	// Box distribution normalization factor
-	float nfactor = length(float3(2 * raysIndex / (float2)raysDimensions - 1, 1));
-	RayPayload payload = { LightIntensity *100000/ (nfactor * raysDimensions.x * raysDimensions.y), 1 };
-
-	float3 P = Positions[raysIndex];
-	float3 N = Normals[raysIndex];
-	float2 C = Coordinates[raysIndex];
-	Material material = materials[MaterialIndices[raysIndex]];
-	if (!any(P)) // force miss execution
-	{
-		return;
-	}
-
-	// Move to world space
-	P = mul(float4(P, 1), ViewToWorld).xyz;
-	N = mul(float4(N, 0), ViewToWorld).xyz;
-	float3 L = normalize(LightPosition - P); // V is really L in this case, since the "viewer" is positioned in light position to trace rays
-
-	Vertex surfel = {
-		P,
-		N, 
-		C, 
-		float3(0,0,0),
-		float3(0,0,0)
-	};
-
-	// only update material, Normal is affected with bump map from gbuffer construction
-	AugmentHitInfoWithTextureMapping(true, surfel, material);
-
-	float3 direction, ratio;
-	PhotonScatter(L, surfel, material, ratio, direction);
-
-	if (any(direction))
-	{
-		ray.Origin = surfel.P + sign(dot(direction, surfel.N))*surfel.N*0.001;
-		ray.Direction = direction;
-		payload.color *= ratio;
-		// Trace the ray.
-		// Set the ray's extents.
-		if (dot(payload.color, payload.color) > 0.0001)
-			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload); // Will be used with Photon scattering function
-	}
 }
 
 // Perform photon gathering
@@ -357,7 +232,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 				}
 			}
 
-	return totalLighting / (pi*radius*radius* 100000);
+	return totalLighting / (pi*radius*radius * 100000);
 }
 
 float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int bounces)
@@ -417,7 +292,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			reflectionRay.TMax = 10000.0;
 			RayPayload reflectionPayload = { float3(0, 0, 0), bounces - 1 };
 			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, reflectionRay, reflectionPayload);
-			total += reflectionFactor*reflectionPayload.color; /// Mirror and fresnel reflection
+			total += reflectionFactor * reflectionPayload.color; /// Mirror and fresnel reflection
 		}
 
 		if (refractionIndex > 0.01) {
@@ -437,11 +312,6 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 }
 
 [shader("miss")]
-void PhotonMiss(inout RayPayload payload) {
-	// Do nothing... farewell my photon friend...
-}
-
-[shader("miss")]
 void EnvironmentMap(inout RayPayload payload)
 {
 	payload.color = WorldRayDirection();
@@ -457,7 +327,7 @@ void RTMainRays()
 	float3 N = Normals[raysIndex];
 	float2 C = Coordinates[raysIndex];
 	Material material = materials[MaterialIndices[raysIndex]];
-	
+
 	if (!any(P)) // force miss execution
 	{
 		RayPayload payload = { float3(0,0,0), 0 };
@@ -504,98 +374,12 @@ void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)
 		v1.T * barycentrics.x + v2.T * barycentrics.y + v3.T * barycentrics.z,
 		v1.B * barycentrics.x + v2.B * barycentrics.y + v3.B * barycentrics.z
 	};
-	
+
 	surfel = Transform(s, ObjectToWorld4x3());
 
 	material = materials[materialIndex];
 
 	AugmentHitInfoWithTextureMapping(false, surfel, material);
-}
-
-[shader("closesthit")]
-void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
-{
-	Vertex surfel;
-	Material material;
-	GetHitInfo(attr, surfel, material);
-
-	float3 V = -normalize(WorldRayDirection());
-
-	if (material.Roulette.x > 0) // Material has some diffuse component
-	{ // Store the photon in the photon map
-		int cellIndex = FromPositionToCellIndex(surfel.P); // get the cellindex of the volume grid given the position in space
-		if (cellIndex != -1) {
-			int photonIndexInBuffer;
-			InterlockedAdd(Malloc[0], 1, photonIndexInBuffer);
-			InterlockedExchange(HeadBuffer[cellIndex], photonIndexInBuffer, NextBuffer[photonIndexInBuffer]); // Update head and next reference
-
-			Photon p = {
-				surfel.P,
-				WorldRayDirection(), // photon direction
-				payload.color // photon intensity
-			};
-			Photons[photonIndexInBuffer] = p;
-		}
-	}
-
-	//if (false)
-	if (payload.bounce > 0) // Photon can bounce one more time
-	{
-		float scatteringSelection = random();
-
-		RayPayload newPhotonPayload = { float3(0,0,0), payload.bounce - 1 };
-		RayDesc newPhotonRay;
-		newPhotonRay.Direction = float3(0, 0, 0);
-		newPhotonRay.Origin = surfel.P;
-		newPhotonRay.TMin = 0.001;
-		newPhotonRay.TMax = 10000.0;
-
-		float3 facedNormal = dot(V, surfel.N) > 0 ? surfel.N : -surfel.N;
-
-		if (scatteringSelection < material.Roulette.x) // Diffuse photon scattering
-		{
-			newPhotonRay.Direction = randomDirection();
-			if (dot(newPhotonRay.Direction, facedNormal) < 0)
-				newPhotonRay.Direction *= -1; // invert direction to head correct hemisphere (facedNormal)
-			newPhotonPayload.color = payload.color * material.Diffuse * dot(V, facedNormal);
-		}
-		else if (scatteringSelection < material.Roulette.x + material.Roulette.y) // Mirror photon scattering
-		{
-			newPhotonRay.Direction = reflect(-V, facedNormal);
-			newPhotonPayload.color = payload.color; // impulse bounce is not affected by lambert law (cosine factor)
-		}
-		else if (scatteringSelection < material.Roulette.x + material.Roulette.y + material.Roulette.z) // Fresnel scattering
-		{
-			bool entering = dot(V, surfel.N) > 0;
-			float reflectionIndex, refractionIndex;
-			float eta = entering ? 1 / material.Roulette.w : material.Roulette.w;
-			float3 fN = entering ? surfel.N : -surfel.N;
-			ComputeFresnel(-V, fN, eta,
-				reflectionIndex, refractionIndex);
-			float3 reflectionDir = reflect(-V, fN);
-			float3 refractionDir = refract(-V, fN, eta);
-			if (!any(refractionDir))
-			{
-				reflectionIndex = 1;
-				refractionIndex = 0; // total internal reflection
-			}
-			float fresnelSelection = random();
-			newPhotonRay.Direction = (fresnelSelection < reflectionIndex) ?
-				// Select to reflect
-				reflectionDir :
-				// Select to refract
-				refractionDir;
-			newPhotonPayload.color = payload.color; // impulse bounce is not affected by lambert law (cosine factor)
-		}
-		else { // Photon absortion
-		}
-
-		if (newPhotonPayload.color.x + newPhotonPayload.color.y + newPhotonPayload.color.z > 0.0000000001) // only continue with no-obscure photons
-		{
-			newPhotonRay.Origin += sign(dot(newPhotonRay.Direction, facedNormal))*0.0001*facedNormal; // avoid self shadowing
-			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
-		}
-	}
 }
 
 [shader("closesthit")]
@@ -609,6 +393,3 @@ void RTScattering(inout RayPayload payload, in MyAttributes attr)
 
 	payload.color = RaytracingScattering(V, surfel, material, payload.bounce);
 }
-
-
-
