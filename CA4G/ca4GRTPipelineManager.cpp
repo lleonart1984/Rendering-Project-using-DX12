@@ -166,7 +166,7 @@ namespace CA4G {
 		manager->usedGeometries->add(geometries);
 
 		if (manager->manager->fallbackDevice != nullptr) {
-			int index = manager->fallbackInstances.size();
+			int index = manager->fallbackInstances->size();
 			D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC d{ };
 			FillMat4x3(d.Transform, transform);
 			d.InstanceMask = mask;
@@ -175,10 +175,17 @@ namespace CA4G {
 			d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
 			d.InstanceContributionToHitGroupIndex = 0;
 			d.AccelerationStructure = geometries->emulatedPtr;
-			manager->fallbackInstances.add(d);
+			if (manager->isUpdating)
+			{
+				manager->fallbackInstances[manager->currentInstance++] = d;
+			}
+			else
+			{
+				manager->fallbackInstances->add(d);
+			}
 		}
 		else {
-			int index = manager->instances.size();
+			int index = manager->instances->size();
 			D3D12_RAYTRACING_INSTANCE_DESC d{ };
 			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
 			FillMat4x3(d.Transform, transform);
@@ -186,7 +193,12 @@ namespace CA4G {
 			d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
 			d.InstanceContributionToHitGroupIndex = 0;
 			d.AccelerationStructure = geometries->bottomLevelAccDS->resource->GetGPUVirtualAddress();
-			manager->instances.add(d);
+			if (manager->isUpdating) {
+				manager->instances[manager->currentInstance++] = d;
+			}
+			else {
+				manager->instances->add(d);
+			}
 		}
 	}
 
@@ -299,18 +311,20 @@ namespace CA4G {
 		return manager->updatingGeometry;
 	}
 
-	gObj<SceneOnGPU> InstanceCollection::Creating::BakedScene() {
+	gObj<SceneOnGPU> InstanceCollection::Creating::BakedScene(bool allowUpdate, bool preferFastTrace) {
 		// Bake scene using instance buffer and generate the top level DS
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = 
+			(allowUpdate ? D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE : D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE) |
+			(preferFastTrace ? D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE : D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD);
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 		inputs.Flags = buildFlags;
 
 		if (manager->manager->fallbackDevice != nullptr)
-			inputs.NumDescs = manager->fallbackInstances.size();
+			inputs.NumDescs = manager->fallbackInstances->size();
 		else
-			inputs.NumDescs = manager->instances.size();
+			inputs.NumDescs = manager->instances->size();
 
 		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
@@ -339,13 +353,13 @@ namespace CA4G {
 
 		if (manager->manager->fallbackDevice != nullptr) {
 			instanceBuffer = manager->manager->creating->GenericBuffer<byte>(D3D12_RESOURCE_STATE_GENERIC_READ,
-				sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC)*manager->fallbackInstances.size(), CPU_WRITE_GPU_READ, D3D12_RESOURCE_FLAG_NONE);
-			instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->fallbackInstances.first(), sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC)*manager->fallbackInstances.size());
+				sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC)*manager->fallbackInstances->size(), CPU_WRITE_GPU_READ, D3D12_RESOURCE_FLAG_NONE);
+			instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->fallbackInstances->first(), sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC)*manager->fallbackInstances->size());
 		}
 		else {
 			instanceBuffer = manager->manager->creating->GenericBuffer<byte>(D3D12_RESOURCE_STATE_GENERIC_READ,
-				sizeof(D3D12_RAYTRACING_INSTANCE_DESC)*manager->instances.size(), CPU_WRITE_GPU_READ, D3D12_RESOURCE_FLAG_NONE);
-			instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->instances.first(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC)*manager->instances.size());
+				sizeof(D3D12_RAYTRACING_INSTANCE_DESC)*manager->instances->size(), CPU_WRITE_GPU_READ, D3D12_RESOURCE_FLAG_NONE);
+			instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->instances->first(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC)*manager->instances->size());
 		}
 
 		// Build acc structure
@@ -379,8 +393,8 @@ namespace CA4G {
 		result->topLevelAccDS = buffer;
 		result->instancesBuffer = instanceBuffer;
 		result->usedGeometries = manager->usedGeometries->clone();
-		result->instances = manager->instances.clone();
-		result->fallbackInstances = manager->fallbackInstances.clone();
+		result->instances = manager->instances->clone();
+		result->fallbackInstances = manager->fallbackInstances->clone();
 		// Create a wrapped pointer to the acceleration structure.
 		if (manager->manager->fallbackDevice != nullptr)
 		{
@@ -399,18 +413,18 @@ namespace CA4G {
 		inputs.Flags = buildFlags;
 
 		if (manager->manager->fallbackDevice != nullptr)
-			inputs.NumDescs = manager->fallbackInstances.size();
+			inputs.NumDescs = manager->fallbackInstances->size();
 		else
-			inputs.NumDescs = manager->instances.size();
+			inputs.NumDescs = manager->instances->size();
 
 		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 		gObj<Buffer> instanceBuffer = manager->updatingScene->instancesBuffer;
 		if (manager->manager->fallbackDevice != nullptr) {
-			instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->fallbackInstances.first(), sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC)*manager->fallbackInstances.size());
+			instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->fallbackInstances->first(), sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC)*manager->fallbackInstances->size());
 		}
 		else {
-			instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->instances.first(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC)*manager->instances.size());
+			instanceBuffer->resource->UpdateMappedData(0, (void*)&manager->instances->first(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC)*manager->instances->size());
 		}
 
 		// Build acc structure

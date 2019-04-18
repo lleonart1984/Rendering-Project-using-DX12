@@ -12202,8 +12202,8 @@ namespace CA4G {
 		DXRManager* cmdList;
 
 		gObj<list<gObj<GeometriesOnGPU>>> usedGeometries;
-		list<D3D12_RAYTRACING_INSTANCE_DESC> instances;
-		list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC> fallbackInstances;
+		gObj<list<D3D12_RAYTRACING_INSTANCE_DESC>> instances;
+		gObj<list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC>> fallbackInstances;
 
 		// updating
 		gObj<SceneOnGPU> updatingScene = nullptr;
@@ -12214,12 +12214,16 @@ namespace CA4G {
 			creating(new Creating(this)), loading(new Loading(this))
 		{
 			usedGeometries = new list<gObj<GeometriesOnGPU>>();
+			instances = new list<D3D12_RAYTRACING_INSTANCE_DESC>();
+			fallbackInstances = new list<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC>();
 		}
 
 		InstanceCollection(gObj<DeviceManager> manager, DXRManager* cmdList, gObj<SceneOnGPU> scene) :manager(manager), cmdList(cmdList),
 			creating(new Creating(this)), loading(new Loading(this))
 		{
 			usedGeometries = new list<gObj<GeometriesOnGPU>>();
+			fallbackInstances = scene->fallbackInstances;
+			instances = scene->instances;
 			updatingScene = scene;
 			isUpdating = true;
 			currentInstance = 0;
@@ -12253,7 +12257,7 @@ namespace CA4G {
 			InstanceCollection* manager;
 			Creating(InstanceCollection* manager) :manager(manager) {}
 		public:
-			gObj<SceneOnGPU> BakedScene();
+			gObj<SceneOnGPU> BakedScene(bool allowUpdate = false, bool preferFastTrace = true);
 			gObj<SceneOnGPU> UpdatedScene();
 
 		} *const creating;
@@ -13931,6 +13935,9 @@ namespace CA4G {
 			}
 			gObj<InstanceCollection> Instances() {
 				return new InstanceCollection(manager->manager, manager);
+			}
+			gObj<InstanceCollection> Instances(gObj<SceneOnGPU> updatingScene) {
+				return new InstanceCollection(manager->manager, manager, updatingScene);
 			}
 		} *const creating;
 	};

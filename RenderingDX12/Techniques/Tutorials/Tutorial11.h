@@ -96,7 +96,7 @@ class Tutorial11 : public Technique {
 
 		auto instances = manager gCreate Instances();
 		instances gLoad Instance(geometriesOnGPU);
-		this->Scene = instances gCreate BakedScene();
+		this->Scene = instances gCreate BakedScene(true, true);
 	}
 
 	// A copy engine can be used to populate buffers using GPU commands.
@@ -142,7 +142,9 @@ class Tutorial11 : public Technique {
 		updatingGeometries gLoad Geometry(0, RES*RES);
 		geometriesOnGPU = updatingGeometries gCreate UpdatedGeometry();
 
-		//auto updatingScene = manager gCreate Instances(this->Scene);
+		auto updatingScene = manager gCreate Instances(this->Scene);
+		updatingScene gLoad Instance(geometriesOnGPU);
+		this->Scene = updatingScene gCreate UpdatedScene();
 
 		auto rtProgram = pipeline->_Program;
 		rtProgram->Output = rtRenderTarget;
