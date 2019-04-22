@@ -25,5 +25,5 @@ using namespace CA4G;
 #include "Techniques/DeferredShading/DeferredLighting.h"
 #include "Techniques/RASTER_DXR_Photontracer/HibridPhotonTracer.h"
 #include "Techniques/RASTER_DXR_Photontracer/HybridPhotonTracer.h"
-
+#include "Techniques/AccPathtracing/DXRPathtracer.h"
 #include "main.h"

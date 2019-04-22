@@ -21,7 +21,7 @@ class Tutorial11 : public Technique {
 
 				_ gLoad Shader(Context()->MyRaygenShader, L"MyRaygenShader");
 				_ gLoad Shader(Context()->MyClosestHitShader, L"MyClosestHitShader");
-				//_ gLoad Shader(Context()->MyAnyHitShader, L"MyAnyHitShader");
+				_ gLoad Shader(Context()->MyAnyHitShader, L"MyAnyHit");
 				_ gLoad Shader(Context()->MyIntersectionShader, L"MyIntersectionShader");
 				_ gLoad Shader(Context()->MyMissShader, L"MyMissShader");
 			}
@@ -35,7 +35,7 @@ class Tutorial11 : public Technique {
 				_ gSet Payload(16);
 				_ gLoad Shader(Context()->MyRaygenShader);
 				_ gLoad Shader(Context()->MyMissShader);
-				_ gCreate HitGroup(ClosestHit, Context()->MyClosestHitShader, nullptr, Context()->MyIntersectionShader);
+				_ gCreate HitGroup(ClosestHit, Context()->MyClosestHitShader, Context()->MyAnyHitShader, Context()->MyIntersectionShader);
 			}
 
 			void Globals() override {
@@ -74,7 +74,8 @@ class Tutorial11 : public Technique {
 		// _ gCreate ConstantBuffer<RayGenConstantBuffer>();
 
 		rtRenderTarget = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
-		aabbs = _ gCreate GenericBuffer<D3D12_RAYTRACING_AABB>(D3D12_RESOURCE_STATE_GENERIC_READ, RES*RES, CPU_WRITE_GPU_READ);
+		aabbs = _ gCreate GenericBuffer<D3D12_RAYTRACING_AABB>(D3D12_RESOURCE_STATE_GENERIC_READ, RES*RES, CPU_WRITE_GPU_READ,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
 		// Performs a copying commanding execution for uploading data to resources
 		perform(UploadData);
@@ -92,7 +93,7 @@ class Tutorial11 : public Technique {
 		auto geometries = manager gCreate ProceduralGeometries();
 		geometries gSet AABBs(aabbs);
 		geometries gLoad Geometry(0, RES*RES);
-		geometriesOnGPU = geometries gCreate BakedGeometry(true, false);
+		geometriesOnGPU = geometries gCreate BakedGeometry(true, true);
 
 		auto instances = manager gCreate Instances();
 		instances gLoad Instance(geometriesOnGPU);
@@ -122,8 +123,9 @@ class Tutorial11 : public Technique {
 			{
 				float x = -0.5 + i * 1.0f / RES + 0.5f*sinf(ImGui::GetTime()*0.1f + 3.14f*(float)j / RES);
 				float y = -0.5 + j * 1.0f / RES + 0.5f*cosf(3 * ImGui::GetTime()*0.1f + 3.14f*(float)i / RES);
+				float z = sinf(ImGui::GetTime()*0.1f + 3.14f*(float)j / RES);
 				aabbsData[j * RES + i] = D3D12_RAYTRACING_AABB{
-					x, y, 0.0f, x + 6.5f / RES, y + 6.5f / RES, 1.0f / RES
+					x, y, z, x + 1.5f / RES, y + 1.5f / RES, z + 1.0f / RES
 				};
 			}
 		// Copies a buffer written using an initializer_list
@@ -135,7 +137,6 @@ class Tutorial11 : public Technique {
 	}
 
 	void Raytracing(gObj<DXRManager> manager) {
-
 		UploadData2(manager);
 		auto updatingGeometries = manager gCreate ProceduralGeometries(geometriesOnGPU);
 		updatingGeometries gSet AABBs(aabbs);

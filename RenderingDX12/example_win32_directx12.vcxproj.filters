@@ -41,6 +41,7 @@
     <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HibridPhotonTracer.h" />
     <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HybridPhotonTracer.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial11.h" />
+    <ClInclude Include="Techniques\AccPathtracing\DXRPathtracer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -81,6 +82,8 @@
     <FxCompile Include="Techniques\RASTER_DXR_Photontracer\HPhotonTracer_RT.hlsl" />
     <FxCompile Include="Techniques\RASTER_DXR_Photontracer\HPhotonGrathering_RT.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\DXR_ProceduralGeometrySample_RT.hlsl" />
+    <FxCompile Include="Techniques\AccPathtracing\AccPathtracer_RT.hlsl" />
+    <FxCompile Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotonTracing_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Techniques\Tutorials\Tutorials.rm" />

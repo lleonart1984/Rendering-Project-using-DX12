@@ -12155,7 +12155,7 @@ namespace CA4G {
 				else {
 					D3D12_RAYTRACING_GEOMETRY_DESC desc{ };
 					desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE::D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
-					desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+					desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 					desc.AABBs.AABBCount = count;
 					desc.AABBs.AABBs = D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE
 					{
@@ -12959,6 +12959,22 @@ namespace CA4G {
 				manager->hitGroups.add(handle);
 				manager->associationsToGlobal.add(handle->shaderHandle);
 				manager->associationsToHitGroupLocals.add(handle->shaderHandle);
+
+				if (!closest.isNull() && !closest->IsNull())
+				{
+					manager->associationsToGlobal.add(closest->shaderHandle);
+					manager->associationsToHitGroupLocals.add(closest->shaderHandle);
+				}
+				if (!anyHit.isNull() && !anyHit->IsNull())
+				{
+					manager->associationsToGlobal.add(anyHit->shaderHandle);
+					manager->associationsToHitGroupLocals.add(anyHit->shaderHandle);
+				}
+				if (!intersection.isNull() && !intersection->IsNull())
+				{
+					manager->associationsToGlobal.add(intersection->shaderHandle);
+					manager->associationsToHitGroupLocals.add(intersection->shaderHandle);
+				}
 				manager->loadedShaderPrograms.add(handle);
 			}
 		} *const creating;
@@ -14001,6 +14017,14 @@ namespace CA4G {
 
 #pragma region ca4GPresenting.h
 
+
+static const UUID D3D12RaytracingPrototype2 = { /* 5d15d3b2-015a-4f39-8d47-299ac37190d3 */
+	0x5d15d3b2,
+	0x015a,
+	0x4f39,
+{ 0x8d, 0x47, 0x29, 0x9a, 0xc3, 0x71, 0x90, 0xd3 }
+};
+
 namespace CA4G {
 
 	// Represents a presenter object. This is a factory class that allows to create a 
@@ -14016,7 +14040,7 @@ namespace CA4G {
 			ID3D12Device* testDevice;
 			UUID experimentalFeatures[] = { D3D12ExperimentalShaderModels };
 
-			return SUCCEEDED(D3D12EnableExperimentalFeatures(1, experimentalFeatures, nullptr, nullptr))
+			return SUCCEEDED(D3D12EnableExperimentalFeatures(ARRAYSIZE(experimentalFeatures), experimentalFeatures, nullptr, nullptr))
 				&& SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice)));
 		}
 

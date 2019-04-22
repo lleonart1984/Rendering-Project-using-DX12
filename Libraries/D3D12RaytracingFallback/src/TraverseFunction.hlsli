@@ -106,12 +106,12 @@ int InvokeAnyHit(int stateId)
     return Fallback_AnyHitResult();
 }
 
-void Fallback_IgnoreHit()
+export void Fallback_IgnoreHit()
 {
     Fallback_SetAnyHitResult(IGNORE);
 }
 
-void Fallback_AcceptHitAndEndSearch()
+export void Fallback_AcceptHitAndEndSearch()
 {
     Fallback_SetAnyHitResult(END_SEARCH);
 }
