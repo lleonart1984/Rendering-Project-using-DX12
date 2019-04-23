@@ -6,7 +6,7 @@
 #define SIBENIK_OBJ 2
 #define SANMIGUEL_OBJ 3
 
-#define USE_SCENE BASIC_OBJ 
+#define USE_SCENE SPONZA_OBJ 
 
 // Uncomment this to use warp device for unsupported DX12 functionalities in your device
 //#define WARP
@@ -25,10 +25,11 @@
 //gObj<Tutorial8> technique;
 //gObj<Tutorial9> technique;
 //gObj<Tutorial10> technique;
-gObj<Tutorial11> technique;
+//gObj<Tutorial11> technique;
 //gObj<DXRBasicSceneRaytracer> technique;
 //gObj<DXRBasicScenePhotontracer> technique;
 //gObj<DeferredShadingTechnique> technique;
 //gObj<HybridPhotonTracerTechnique> technique;
-//gObj<HybridPhotonTracer> technique;
+gObj<HybridPhotonTracer> technique;
 //gObj<DXRPathtracer> technique;
+//gObj<FullDXRPhotonTracer> technique;

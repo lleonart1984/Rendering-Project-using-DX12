@@ -26,33 +26,36 @@ struct Vertex
 
 // Photon Data
 struct Photon {
-	float3 Position;
 	float3 Direction;
 	float3 Intensity;
+	float3 Position;
+	float Radius;
 };
 
 // Top level structure with the scene
-RaytracingAccelerationStructure Scene : register(t0, space0);
-StructuredBuffer<Vertex> vertices		: register(t1);
-StructuredBuffer<Material> materials	: register(t2);
+RaytracingAccelerationStructure Scene		: register(t0);
+// Photon Map
+// > Acceleration structure with the photon map based on AABBs
+RaytracingAccelerationStructure PhotonMap	: register(t1);
+// > Photons buffer with photon information (position, direction, alpha and radius)
+StructuredBuffer<Photon> Photons			: register(t2);
+// > Number of photons (to discard intersections with unused AABBs)
+StructuredBuffer<int> PhotonCount			: register(t3);
+StructuredBuffer<Vertex> vertices			: register(t4);
+StructuredBuffer<Material> materials		: register(t5);
 
 // GBuffer Used for primary rays (from light in photon trace and from viewer in raytrace)
-Texture2D<float3> Positions				: register(t3);
-Texture2D<float3> Normals				: register(t4);
-Texture2D<float2> Coordinates			: register(t5);
-Texture2D<int> MaterialIndices			: register(t6);
+Texture2D<float3> Positions					: register(t6);
+Texture2D<float3> Normals					: register(t7);
+Texture2D<float2> Coordinates				: register(t8);
+Texture2D<int> MaterialIndices				: register(t9);
 // Used for direct light visibility test
-Texture2D<float3> LightPositions		: register(t7);
-// Photon Map binding objects
-StructuredBuffer<int> HeadBuffer		: register(t8);
-StructuredBuffer<Photon> Photons		: register(t9);
-StructuredBuffer<int> NextBuffer		: register(t10);
+Texture2D<float3> LightPositions			: register(t10);
 
 // Textures
-Texture2D<float4> Textures[500]			: register(t11);
+Texture2D<float4> Textures[500]				: register(t11);
 
-// Raytracing output image
-RWTexture2D<float3> Output				: register(u0);
+RWTexture2D<float3> Output					: register(u0);
 
 // Used for texture mapping
 SamplerState gSmp : register(s0);
@@ -61,6 +64,7 @@ SamplerState shadowSmp : register(s1);
 
 // Global constant buffer with view to world transform matrix
 cbuffer Camera : register(b0) {
+	// Light Space (View) to world space transform
 	row_major matrix ViewToWorld;
 }
 
@@ -69,16 +73,8 @@ cbuffer Lighting : register(b1) {
 	float3 LightIntensity;
 }
 
-cbuffer SpaceInformation : register(b2) {
-	// Grid space
-	float3 MinimumPosition;
-	float3 BoxSize;
-	float3 CellSize;
-	int3 Resolution;
-}
-
 // Matrices to transform from Light space (proj and view) to world space
-cbuffer LightTransforms : register(b3) {
+cbuffer LightTransforms : register(b2) {
 	row_major matrix LightProj;
 	row_major matrix LightView;
 }
@@ -87,35 +83,23 @@ struct ObjInfo {
 	int TriangleOffset;
 	int MaterialIndex;
 };
-// Locals for hit groups (fresnel and lambert)
-ConstantBuffer<ObjInfo> objectInfo : register(b4);
+// Locals for hit groups
+ConstantBuffer<ObjInfo> objectInfo : register(b3);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
+
+struct PhotonHitAttributes {
+	// Photon Index
+	int PhotonIdx;
+	// Projected photon plane distance
+	float Distance;
+};
 
 struct RayPayload
 {
 	float3 color;
 	int bounce;
 };
-
-int3 FromPositionToCell(float3 P) {
-	return (int3)((P - MinimumPosition) / CellSize);
-}
-
-int FromCellToCellIndex(int3 cell)
-{
-	if (any(cell < 0) || any(cell >= Resolution))
-		return -1;
-	return cell.x + cell.y * Resolution.x + cell.z * Resolution.x * Resolution.y;
-}
-
-int3 FromCellIndexToCell(int index) {
-	return int3 (index % Resolution.x, index % (Resolution.x * Resolution.y) / Resolution.x, index / (Resolution.x * Resolution.y));
-}
-
-int FromPositionToCellIndex(float3 P) {
-	return FromCellToCellIndex(FromPositionToCell(P));
-}
 
 static float pi = 3.1415926;
 static uint rng_state;
@@ -127,12 +111,10 @@ uint rand_xorshift()
 	rng_state ^= (rng_state << 5);
 	return rng_state;
 }
-
 float random()
 {
 	return rand_xorshift() * (1.0 / 4294967296.0);
 }
-
 float3 randomDirection()
 {
 	float r1 = random();
@@ -179,53 +161,9 @@ void AugmentHitInfoWithTextureMapping(bool onlyMaterial, inout Vertex surfel, in
 	material.Specular.xyz = max(material.Specular.xyz, SpecularTex);
 }
 
-// Perform photon gathering
+// Perform photon gathering using DXR API
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
-
-	float3 normal = surfel.N;// normalize(mul(BumpTex * 2 - 1, worldToTangent));
-
-	float radius = 0.02f;// min(CellSize.x, min(CellSize.y, CellSize.z)) * 0.5;
-
-	int3 begCell = FromPositionToCell(surfel.P - radius);
-	int3 endCell = FromPositionToCell(surfel.P + radius);
-
-	float3 totalLighting = material.Emissive;
-
-	//radius *= 0.6;
-
-	//[unroll(2)]
-	for (int dz = begCell.z; dz <= endCell.z; dz++)
-		//	[unroll(2)]
-		for (int dy = begCell.y; dy <= endCell.y; dy++)
-			//	[unroll(2)]
-			for (int dx = begCell.x; dx <= endCell.x; dx++)
-			{
-				int cellIndexToQuery = FromCellToCellIndex(int3(dx, dy, dz));
-
-				if (cellIndexToQuery != -1) // valid coordinates
-				{
-					int currentPhotonPtr = HeadBuffer[cellIndexToQuery];
-
-					while (currentPhotonPtr != -1) {
-
-						Photon p = Photons[currentPhotonPtr];
-
-						// Aggregate current Photon contribution if inside radius
-						if (length(p.Position - surfel.P) < radius)
-						{
-							float3 H = normalize(V - p.Direction);
-
-							float3 BRDF = material.Diffuse + material.Specular * pow(saturate(dot(normal, H)), material.SpecularSharpness);
-
-							totalLighting += p.Intensity * BRDF;
-						}
-
-						currentPhotonPtr = NextBuffer[currentPhotonPtr];
-					}
-				}
-			}
-
-	return totalLighting / (pi*radius*radius * 100000);
+	return float3(1, 1, 0);
 }
 
 float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int bounces)

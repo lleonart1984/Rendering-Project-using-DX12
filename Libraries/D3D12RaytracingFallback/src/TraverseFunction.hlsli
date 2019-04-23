@@ -106,12 +106,18 @@ int InvokeAnyHit(int stateId)
     return Fallback_AnyHitResult();
 }
 
-export void Fallback_IgnoreHit()
+SHADER_internal
+export void Fallback_IgnoreHit();
+
+void Fallback_IgnoreHit()
 {
     Fallback_SetAnyHitResult(IGNORE);
 }
 
-export void Fallback_AcceptHitAndEndSearch()
+SHADER_internal
+export void Fallback_AcceptHitAndEndSearch();
+
+void Fallback_AcceptHitAndEndSearch()
 {
     Fallback_SetAnyHitResult(END_SEARCH);
 }

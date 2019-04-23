@@ -39,8 +39,7 @@ void MyRaygenShader()
 
 [shader("anyhit")]
 void MyAnyHit(inout RayPayload payload, in MyAttributes attr) {
-	payload.color += float4(0.1, 0.01, 0.01, 0);
-	//AcceptHitAndEndSearch();
+	payload.color = payload.color + float4(0.01, 0.01, 0.01, 0);
 	IgnoreHit();
 }
 

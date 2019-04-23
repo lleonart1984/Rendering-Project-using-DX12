@@ -61,6 +61,7 @@ SamplerState gSmp : register(s0);
 
 // Global constant buffer with view to world transform matrix
 cbuffer Camera : register(b0) {
+	// Light Space (View) to world space transform
 	row_major matrix ViewToWorld;
 }
 
@@ -69,20 +70,12 @@ cbuffer Lighting : register(b1) {
 	float3 LightIntensity;
 }
 
-cbuffer SpaceInformation : register(b2) {
-	// Grid space
-	float3 MinimumPosition;
-	float3 BoxSize;
-	float3 CellSize;
-	int3 Resolution;
-}
-
 struct ObjInfo {
 	int TriangleOffset;
 	int MaterialIndex;
 };
-// Locals for hit groups (fresnel and lambert)
-ConstantBuffer<ObjInfo> objectInfo : register(b3);
+// Locals for hit groups
+ConstantBuffer<ObjInfo> objectInfo : register(b2);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
@@ -353,6 +346,9 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 
 		if (scatteringSelection < material.Roulette.x) // Diffuse photon scattering
 		{
+			//// THIS SHOULD BE COMMENTED TO BOUNCE ONLY IN SPECULAR (MIRROR AND FRESNEL) SCATTERED MATERIALS
+			//// ONLY FOR PERFORMANCE PURPOSES
+
 			//newPhotonRay.Direction = randomDirection();
 			//if (dot(newPhotonRay.Direction, facedNormal) < 0)
 			//	newPhotonRay.Direction *= -1; // invert direction to head correct hemisphere (facedNormal)
