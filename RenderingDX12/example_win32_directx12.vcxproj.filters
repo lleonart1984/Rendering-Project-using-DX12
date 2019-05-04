@@ -43,6 +43,11 @@
     <ClInclude Include="Techniques\Tutorials\Tutorial11.h" />
     <ClInclude Include="Techniques\AccPathtracing\DXRPathtracer.h" />
     <ClInclude Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotontracerTechnique.h" />
+    <ClInclude Include="Techniques\FULL_DXR_PhotonMap2\FullDXRPhotontracerTechnique2.h" />
+    <ClInclude Include="Techniques\Randoms\RandomHLSL.h" />
+    <ClInclude Include="Techniques\CommonGI\ScatteringHLSL.h" />
+    <ClInclude Include="Techniques\CommonGI\Definitions.h" />
+    <ClInclude Include="Techniques\CommonGI\ScatteringTools.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -86,6 +91,8 @@
     <FxCompile Include="Techniques\AccPathtracing\AccPathtracer_RT.hlsl" />
     <FxCompile Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotonTracing_RT.hlsl" />
     <FxCompile Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotonGathering_RT.hlsl" />
+    <FxCompile Include="Techniques\FULL_DXR_PhotonMap2\FullDXRPhotonTracing2_RT.hlsl" />
+    <FxCompile Include="Techniques\FULL_DXR_PhotonMap2\FullDXRRTWithDeferedGathering2_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Techniques\Tutorials\Tutorials.rm" />

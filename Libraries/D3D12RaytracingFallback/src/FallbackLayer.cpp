@@ -592,6 +592,8 @@ namespace FallbackLayer
                 
             m_pBoundDescriptorHeaps[D3D12EnumToFallbackEnum(heapDesc.Type)] = ppDescriptorHeaps[heapIndex];
         }
+
+		m_BoundAccelerationStructures.clear();
     }
 
     void STDMETHODCALLTYPE D3D12RaytracingCommandList::SetTopLevelAccelerationStructure(

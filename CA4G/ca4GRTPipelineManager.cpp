@@ -100,7 +100,18 @@ namespace CA4G {
 					if (!resource)
 						// Grant a resource view to create null descriptor if missing resource.
 						resource = ResourceView::getNullView(this->manager, binding.DescriptorData.Dimension);
-
+					else
+					{
+						switch (binding.Root_Parameter.DescriptorTable.pDescriptorRanges[0].RangeType)
+						{
+						case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+							resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_GENERIC_READ);
+							break;
+						case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+							resource->ChangeStateToUAV(cmdList);
+							break;
+						}
+					}
 					// Gets the cpu handle at not visible descriptor heap for the resource
 					D3D12_CPU_DESCRIPTOR_HANDLE handle;
 					resource->getCPUHandleFor(binding.Root_Parameter.DescriptorTable.pDescriptorRanges[0].RangeType, handle);
@@ -166,43 +177,46 @@ namespace CA4G {
 		manager->usedGeometries->add(geometries);
 
 		if (manager->manager->fallbackDevice != nullptr) {
-			int index = manager->fallbackInstances->size();
 			D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC d{ };
 			FillMat4x3(d.Transform, transform);
 			d.InstanceMask = mask;
 			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 			//d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
-			d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
 			d.InstanceContributionToHitGroupIndex = 0;
 			d.AccelerationStructure = geometries->emulatedPtr;
 			if (manager->isUpdating)
 			{
+				d.InstanceID = instanceID == INTSAFE_UINT_MAX ? manager->currentInstance : instanceID;
 				manager->fallbackInstances[manager->currentInstance++] = d;
 			}
 			else
 			{
+				int index = manager->fallbackInstances->size();
+				d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
 				manager->fallbackInstances->add(d);
 			}
 		}
 		else {
-			int index = manager->instances->size();
 			D3D12_RAYTRACING_INSTANCE_DESC d{ };
 			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
 			FillMat4x3(d.Transform, transform);
 			d.InstanceMask = mask;
-			d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
 			d.InstanceContributionToHitGroupIndex = 0;
 			d.AccelerationStructure = geometries->bottomLevelAccDS->resource->GetGPUVirtualAddress();
 			if (manager->isUpdating) {
+				d.InstanceID = instanceID == INTSAFE_UINT_MAX ? manager->currentInstance : instanceID;
 				manager->instances[manager->currentInstance++] = d;
 			}
 			else {
+				int index = manager->instances->size();
+				d.InstanceID = instanceID == INTSAFE_UINT_MAX ? index : instanceID;
 				manager->instances->add(d);
 			}
 		}
 	}
 
 	gObj<GeometriesOnGPU> GeometryCollection::Creating::BakedGeometry(bool allowUpdates, bool preferFastTrace) {
+
 		// creates the bottom level acc ds and emulated gpu pointer if necessary
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = 
 			(preferFastTrace ? D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE : D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD)
@@ -309,6 +323,10 @@ namespace CA4G {
 		manager->updatingGeometry->bottomLevelAccDS->ChangeStateToUAV(manager->cmdList->cmdList);
 
 		return manager->updatingGeometry;
+	}
+
+	void GeometryCollection::PrepareBuffer(gObj<Buffer> bufferForGeometry) {
+		bufferForGeometry->ChangeStateTo(cmdList->cmdList, D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
 
 	gObj<SceneOnGPU> InstanceCollection::Creating::BakedScene(bool allowUpdate, bool preferFastTrace) {

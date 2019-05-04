@@ -9,6 +9,14 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="HLSL|Win32">
+      <Configuration>HLSL</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="HLSL|x64">
+      <Configuration>HLSL</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
@@ -49,6 +57,12 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='HLSL|Win32'">
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='HLSL|x64'">
     <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -184,14 +198,19 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="main.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="Techniques\AccPathtracing\DXRPathtracer.h" />
+    <ClInclude Include="Techniques\CommonGI\Definitions.h" />
+    <ClInclude Include="Techniques\CommonGI\ScatteringHLSL.h" />
+    <ClInclude Include="Techniques\CommonGI\ScatteringTools.h" />
     <ClInclude Include="Techniques\Common\ConstantBuffers.h" />
     <ClInclude Include="Techniques\Common\RetainedSceneLoader.h" />
     <ClInclude Include="Techniques\DeferredShading\DeferredLighting.h" />
     <ClInclude Include="Techniques\DeferredShading\GBufferConstruction.h" />
     <ClInclude Include="Techniques\DXR_Photontracer\DXRPhotonMapping.h" />
     <ClInclude Include="Techniques\DXR_Raytracer\DXRRaytracer.h" />
+    <ClInclude Include="Techniques\FULL_DXR_PhotonMap2\FullDXRPhotontracerTechnique2.h" />
     <ClInclude Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotontracerTechnique.h" />
     <ClInclude Include="Techniques\GUI_Traits.h" />
+    <ClInclude Include="Techniques\Randoms\RandomHLSL.h" />
     <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HibridPhotonTracer.h" />
     <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HybridPhotonTracer.h" />
     <ClInclude Include="Techniques\RetainedBasic\RetainedBasicRenderer.h" />
@@ -289,6 +308,28 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
       </EntryPointName>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </EntryPointName>
+    </FxCompile>
+    <FxCompile Include="Techniques\FULL_DXR_PhotonMap2\FullDXRPhotonTracing2_RT.hlsl">
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </EntryPointName>
+      <DisableOptimizations Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DisableOptimizations>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Techniques\FULL_DXR_PhotonMap2\FullDXRRTWithDeferedGathering2_RT.hlsl">
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </EntryPointName>
+      <DisableOptimizations Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DisableOptimizations>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
     </FxCompile>
     <FxCompile Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotonGathering_RT.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>

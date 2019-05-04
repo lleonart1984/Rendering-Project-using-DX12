@@ -126,11 +126,11 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			MixMirrorMaterial(&scene->Materials()[9], 0.4f); // floor
+			MixMirrorMaterial(&scene->Materials()[9], 0.8f); // floor
 			camera->Position = float3(0.5f, 0.1f, 0);
 			camera->Target = float3(0, 0.1f, 0);
 			lightSource->Position = float3(0, 2, 0);
-			lightSource->Intensity = float3(100, 100, 100);
+			lightSource->Intensity = float3(400, 400, 400);
 			break;
 		case SIBENIK_OBJ:
 			filePath = desktop_directory();

@@ -94,10 +94,12 @@ class Tutorial10 : public Technique {
 
 		// Create a simple vertex buffer for the triangle
 		//vertices = _ gCreate VertexBuffer<VERTEX>(3);
-		vertices = _ gCreate GenericBuffer<VERTEX>(D3D12_RESOURCE_STATE_GENERIC_READ, 3, CPU_WRITE_GPU_READ);
+		vertices = _ gCreate GenericBuffer<VERTEX>(D3D12_RESOURCE_STATE_COMMON, 6, CPU_ACCESS_NONE, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
 		// Performs a copying commanding execution for uploading data to resources
 		perform(UploadData);
+
+		flush_all_to_gpu;
 
 		// Performs a building process to generate acceleration data structures (scene)
 		// using a DXRManager object.
@@ -106,6 +108,7 @@ class Tutorial10 : public Technique {
 
 	void BuildScene(gObj<DXRManager> manager) {
 		auto geometries = manager gCreate TriangleGeometries();
+		//geometries->PrepareBuffer(vertices);
 		geometries gSet VertexBuffer(vertices, VERTEX::Layout());
 		geometries gLoad Geometry(0, 3);
 		gObj<GeometriesOnGPU> geometriesOnGPU;
@@ -116,12 +119,13 @@ class Tutorial10 : public Technique {
 	}
 
 	// A copy engine can be used to populate buffers using GPU commands.
-	void UploadData(gObj<CopyingManager> manager) {
+	void UploadData(gObj<ComputeManager> manager) {
+		manager gClear UAV(vertices, float4(0, 0, 0, 0));
 		// Copies a buffer written using an initializer_list
 		manager	gCopy ListData(vertices, {
 				VERTEX { float3(0.8, -0.4, 0), float3(1, 0, 0)},
 				VERTEX { float3(-0.8, -0.4, 0), float3(0, 1, 0)},
-				VERTEX { float3(0, 0.8, 0), float3(0, 0, 1)},
+				VERTEX { float3(0, 0.8, 0), float3(0, 0, 1)}
 			});
 	}
 

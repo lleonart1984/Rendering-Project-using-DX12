@@ -2336,6 +2336,19 @@ namespace CA4G {
 				AddressW);
 		}
 
+		// Creates a default point sampling object.
+		static Sampler PointWithoutMipMaps(
+			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP
+		)
+		{
+			return Create(D3D12_FILTER_MIN_MAG_MIP_POINT,
+				AddressU,
+				AddressV,
+				AddressW, 0, 0, D3D12_COMPARISON_FUNC_ALWAYS, float4(0,0,0,0), 0, 0);
+		}
+
 		// Creates a default linear sampling object
 		static Sampler Linear(
 			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
@@ -11990,6 +12003,9 @@ namespace CA4G {
 		gObj<GeometriesOnGPU> updatingGeometry;
 
 	public:
+
+		void PrepareBuffer(gObj<Buffer> bufferForGeometry);
+
 		class Creating {
 			friend GeometryCollection;
 			GeometryCollection* manager;
@@ -12986,6 +13002,9 @@ namespace CA4G {
 			void Payload(int sizeInBytes) {
 				manager->PayloadSize = sizeInBytes;
 			}
+			void MaxHitGroupIndex(int index) {
+				manager->MaxGroups = index + 1;
+			}
 			void StackSize(int maxDeep) {
 				manager->StackSize = maxDeep;
 			}
@@ -13424,6 +13443,15 @@ namespace CA4G {
 			return GenericBuffer<T>(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, count, CPU_ACCESS_NONE, 
 				D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		}
+
+		// Creates a buffer to store modifiable acceleration datastructure geometry and instance buffers.
+		// This resource is treated efficiently on the gpu and can be written at the beggining
+		// using the uploading version.
+		template<typename T>
+		gObj<Buffer> RWAccelerationDatastructureBuffer(int count) {
+			return GenericBuffer<T>(D3D12_RESOURCE_STATE_COMMON, count, CPU_ACCESS_NONE,
+				D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		}
 	};
 
 	// Represents the loading module of a device manager.
@@ -13524,13 +13552,29 @@ namespace CA4G {
 			Clearing(CommandListManager* manager, DX_CommandList cmdList) :manager(manager), cmdList(cmdList) {}
 
 			inline void UAV(gObj<ResourceView> uav, const FLOAT values[4]) {
-				cmdList->ClearUnorderedAccessViewFloat(D3D12_GPU_DESCRIPTOR_HANDLE{}, uav->getUAVHandle(), uav->resource->internalResource, values, 0, nullptr);
+				uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				long gpuHandleIndex = this->manager->manager->descriptors->gpu_csu->Malloc(1);
+				auto cpuHandleAtVisibleHeap = this->manager->manager->descriptors->gpu_csu->getCPUVersion(gpuHandleIndex);
+				auto gpuHandle = this->manager->manager->descriptors->gpu_csu->getGPUVersion(gpuHandleIndex);
+				auto cpuHandle = uav->getUAVHandle();
+				manager->getInternalDevice()->CopyDescriptorsSimple(1, cpuHandleAtVisibleHeap, cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				cmdList->ClearUnorderedAccessViewFloat(
+					gpuHandle,
+					cpuHandle,
+					uav->resource->internalResource, values, 0, nullptr); 
 			}
 			inline void UAV(gObj<ResourceView> uav, const float4 &value) {
 				float v[4]{ value.x, value.y, value.z, value.w };
+				uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				long gpuHandleIndex = this->manager->manager->descriptors->gpu_csu->Malloc(1);
+				auto cpuHandleAtVisibleHeap = this->manager->manager->descriptors->gpu_csu->getCPUVersion(gpuHandleIndex);
+				auto gpuHandle = this->manager->manager->descriptors->gpu_csu->getGPUVersion(gpuHandleIndex);
+				auto cpuHandle = uav->getUAVHandle();
+				manager->getInternalDevice()->CopyDescriptorsSimple(1, cpuHandleAtVisibleHeap, cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				cmdList->ClearUnorderedAccessViewFloat(
-					this->manager->manager->descriptors->gpu_csu->getGPUVersion(uav->getUAV()),
-					uav->getUAVHandle(), uav->resource->internalResource, v, 0, nullptr);
+					gpuHandle,
+					cpuHandle,
+					uav->resource->internalResource, v, 0, nullptr);
 			}
 			inline void UAV(gObj<ResourceView> uav, const unsigned int &value) {
 				unsigned int v[4]{ value, value, value, value };
@@ -13547,12 +13591,28 @@ namespace CA4G {
 			}
 			inline void UAV(gObj<ResourceView> uav, const uint4 &value) {
 				unsigned int v[4]{ value.x, value.y, value.z, value.w };
+				uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				long gpuHandleIndex = this->manager->manager->descriptors->gpu_csu->Malloc(1);
+				auto cpuHandleAtVisibleHeap = this->manager->manager->descriptors->gpu_csu->getCPUVersion(gpuHandleIndex);
+				auto gpuHandle = this->manager->manager->descriptors->gpu_csu->getGPUVersion(gpuHandleIndex);
+				auto cpuHandle = uav->getUAVHandle();
+				manager->getInternalDevice()->CopyDescriptorsSimple(1, cpuHandleAtVisibleHeap, cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				cmdList->ClearUnorderedAccessViewUint(
-					this->manager->manager->descriptors->gpu_csu->getGPUVersion(uav->getUAV()),
-					uav->getUAVHandle(), uav->resource->internalResource, v, 0, nullptr);
+					gpuHandle,
+					cpuHandle,
+					uav->resource->internalResource, v, 0, nullptr);
 			}
 			inline void UAV(gObj<ResourceView> uav, const unsigned int values[4]) {
-				cmdList->ClearUnorderedAccessViewUint(D3D12_GPU_DESCRIPTOR_HANDLE{}, uav->getUAVHandle(), uav->resource->internalResource, values, 0, nullptr);
+				uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				long gpuHandleIndex = this->manager->manager->descriptors->gpu_csu->Malloc(1);
+				auto cpuHandleAtVisibleHeap = this->manager->manager->descriptors->gpu_csu->getCPUVersion(gpuHandleIndex);
+				auto gpuHandle = this->manager->manager->descriptors->gpu_csu->getGPUVersion(gpuHandleIndex);
+				auto cpuHandle = uav->getUAVHandle();
+				manager->getInternalDevice()->CopyDescriptorsSimple(1, cpuHandleAtVisibleHeap, cpuHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				cmdList->ClearUnorderedAccessViewUint(
+					gpuHandle,
+					cpuHandle,
+					uav->resource->internalResource, values, 0, nullptr);
 			}
 			inline void RT(gObj<Texture2D> rt, const FLOAT values[4]) {
 				rt->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -13905,7 +13965,7 @@ namespace CA4G {
 
 					dispatchDesc->MissShaderTable.StartAddress = rtMissShaderTable->resource->GetGPUVirtualAddress();
 					dispatchDesc->MissShaderTable.SizeInBytes = rtMissShaderTable->resource->desc.Width;
-					dispatchDesc->MissShaderTable.StrideInBytes = dispatchDesc->MissShaderTable.SizeInBytes;
+					dispatchDesc->MissShaderTable.StrideInBytes = rtMissShaderTable->Stride;
 
 					dispatchDesc->RayGenerationShaderRecord.StartAddress = rtRayGenShaderTable->resource->GetGPUVirtualAddress();
 					dispatchDesc->RayGenerationShaderRecord.SizeInBytes = rtRayGenShaderTable->resource->desc.Width;
@@ -14001,6 +14061,8 @@ namespace CA4G {
 		virtual void Frame() {
 		}
 
+		// Triggers the frame execution of a technique.
+		// Use this method from a technique to execute subtechniques
 		template<typename T>
 		void ExecuteFrame(gObj<T> &technique) {
 			((gObj<Technique>)technique)->Frame();
@@ -15684,11 +15746,6 @@ namespace CA4G {
 		code.pShaderBytecode = (void*)bytecodeData;
 		return code;
 	}
-
-
-
-
-	
 }
 #pragma endregion
 

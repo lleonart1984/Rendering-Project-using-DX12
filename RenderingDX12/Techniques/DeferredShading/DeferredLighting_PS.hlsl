@@ -52,7 +52,7 @@ float4 main(float4 proj : SV_POSITION) : SV_TARGET
 	float3 V = normalize(-P);
 	float3 H = normalize(V + L);
 
-	float3 I = LightIntensity / (2*3.14159*d*d);
+	float3 I = LightIntensity * L.y / (2*3.14159*d*d);
 	float NdotL = dot(N, L);
 	float3 diff = max(0, NdotL)*D*I;
 	float3 spec = NdotL > 0 ? pow(max(0, dot(H, N)), S.w)*S.xyz*I : 0;

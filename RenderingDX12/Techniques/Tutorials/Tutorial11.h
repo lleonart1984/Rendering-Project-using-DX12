@@ -2,7 +2,7 @@
 
 // Drawing a single triangle with ray-tracing
 #include "../../stdafx.h"
-#define RES 1024
+#define RES 128
 
 
 class Tutorial11 : public Technique {

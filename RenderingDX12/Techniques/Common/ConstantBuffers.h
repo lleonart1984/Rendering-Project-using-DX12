@@ -13,6 +13,7 @@ struct Lighting
 {
 	float3 LightPosition; float res0;
 	float3 LightIntensity; float res1;
+	float3 LightDirection; float res2;
 };
 
 struct Materialing {

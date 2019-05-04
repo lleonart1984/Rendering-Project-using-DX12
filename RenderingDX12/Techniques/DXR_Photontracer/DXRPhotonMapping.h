@@ -120,9 +120,9 @@ protected:
 		float3 Intensity;
 	};
 
-	#define RESOLUTION 300
-	#define DISPATCH_RAYS_DIMENSION 1000
-	#define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*6)
+	#define RESOLUTION 128
+	#define DISPATCH_RAYS_DIMENSION 1024
+	#define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*3)
 
 	void LoadingSceneAssets(gObj<CopyingManager> manager) {
 		// loading scene textures
@@ -181,7 +181,7 @@ protected:
 	void Frame() {
 		perform(Photontracing);
 
-		//wait_for(signal(flush_all_to_gpu));
+		wait_for(signal(flush_all_to_gpu));
 
 		perform(Raytracing);
 	}
@@ -196,8 +196,8 @@ protected:
 			Light->Intensity, 0
 			});
 
-		float3 MinimumPosition{ -1, -1, -1 };
-		float3 BoxSize{ 2, 2, 2 };
+		float3 MinimumPosition{ -2, -2, -2 };
+		float3 BoxSize{ 4, 4, 4 };
 		int3 resolution{ RESOLUTION, RESOLUTION, RESOLUTION };
 
 		// Update SpaceInfo
@@ -260,17 +260,17 @@ protected:
 		float4x4 projToWorld = mul(view, proj).getInverse();
 		manager gCopy ValueData(rtProgram->CameraCB, projToWorld);
 
-		float3 MinimumPosition{ -1, -1, -1 };
-		float3 BoxSize{ 2, 2, 2 };
-		int3 resolution{ RESOLUTION, RESOLUTION, RESOLUTION };
+		//float3 MinimumPosition{ -2, -2, -2 };
+		//float3 BoxSize{ 4, 4, 4 };
+		//int3 resolution{ RESOLUTION, RESOLUTION, RESOLUTION };
 
-		// Update SpaceInfo
-		manager gCopy ValueData(rtProgram->SpaceInfoCB, SpaceInfo{
-			MinimumPosition, 0, // Minimum Position
-			BoxSize, 0, // Box Size,
-			BoxSize / resolution, 0, // Cell Size
-			resolution, 0
-			});
+		//// Update SpaceInfo
+		//manager gCopy ValueData(rtProgram->SpaceInfoCB, SpaceInfo{
+		//	MinimumPosition, 0, // Minimum Position
+		//	BoxSize, 0, // Box Size,
+		//	BoxSize / resolution, 0, // Cell Size
+		//	resolution, 0
+		//	});
 
 		// Set DXR Pipeline
 		manager gSet Pipeline(Pipeline);

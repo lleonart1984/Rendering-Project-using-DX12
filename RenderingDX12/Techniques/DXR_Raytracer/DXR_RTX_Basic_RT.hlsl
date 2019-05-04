@@ -1,29 +1,4 @@
-
-// Material info
-struct Material
-{
-	float3 Diffuse;
-	float3 Specular;
-	float SpecularSharpness;
-	int4 Texture_Index; // X - diffuse map, Y - Specular map, Z - Bump Map, W - Mask Map
-	float3 Emissive; // Emissive component for lights
-	float4 Roulette; // X - Diffuse ammount, Y - Mirror scattering, Z - Fresnell scattering, W - Refraction Index (if fresnel)
-};
-
-// Vertex Data
-struct Vertex
-{
-	// Position
-	float3 P;
-	// Normal
-	float3 N;
-	// Texture coordinates
-	float2 C;
-	// Tangent Vector
-	float3 T;
-	// Binormal Vector
-	float3 B;
-};
+#include "../CommonGI/Definitions.h"
 
 // Top level structure with the scene
 RaytracingAccelerationStructure Scene : register(t0, space0);
@@ -94,7 +69,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	float d = length(L);
 	L /= d;
 
-	float3 I = LightIntensity / (2 * 3.14159*d*d);
+	float3 I = LightIntensity * L.y / (2 * 3.14159*d*d);
 
 	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
 	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0.001, 0.001) : material.Specular;
@@ -156,8 +131,8 @@ void ComputeFresnel(float3 dir, float3 faceNormal, float ratio, out float reflec
 
 	float Ratio = f + (1.0 - f) * pow((1.0 + dot(dir, faceNormal)), 5);
 
-	reflection = min(1, Ratio);
-	refraction = max(0, 1 - reflection);
+	reflection = saturate(Ratio);
+	refraction = saturate(1 - Ratio);
 }
 
 
@@ -237,5 +212,5 @@ void FresnelScattering(inout RayPayload payload, in MyAttributes attr)
 [shader("miss")]
 void EnvironmentMap(inout RayPayload payload)
 {
-	payload.color = float4(WorldRayDirection(), 1);
+	//payload.color = float4(WorldRayDirection(), 1);
 }

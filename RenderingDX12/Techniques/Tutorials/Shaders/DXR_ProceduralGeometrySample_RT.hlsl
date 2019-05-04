@@ -31,7 +31,7 @@ void MyRaygenShader()
 	ray.TMin = 0.001;
 	ray.TMax = 10000.0;
 	RayPayload payload = { float4(0, 0, 0, 1) };
-	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 1, 0, ray, payload);
+	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 0, 0, ray, payload);
 
 	// Write the raytraced color to the output texture.
 	RenderTarget[DispatchRaysIndex().xy] = payload.color;// float4(lerpValues, 0, 1);// payload.color;
@@ -39,7 +39,13 @@ void MyRaygenShader()
 
 [shader("anyhit")]
 void MyAnyHit(inout RayPayload payload, in MyAttributes attr) {
-	payload.color = payload.color + float4(0.01, 0.01, 0.01, 0);
+	
+	if ((int)PrimitiveIndex() == -1)
+		payload.color += float4(0.01, 1, 0.01, 0);
+	else {
+		int f = abs((int)PrimitiveIndex()) / (float)(128 * 128);
+		payload.color += float4(0.01, f, 0.01, 0);
+	}
 	IgnoreHit();
 }
 
@@ -47,7 +53,9 @@ void MyAnyHit(inout RayPayload payload, in MyAttributes attr) {
 void MyIntersectionShader() {
 	float THit = RayTCurrent();
 	MyAttributes attr = (MyAttributes)float2(RayTCurrent(), THit/20000.0);
-	ReportHit(0.5, /*hitKind*/ 0, attr);
+
+	//if (PrimitiveIndex() <= 10000000000)
+		ReportHit(0.5, /*hitKind*/ 0, attr);
 }
 
 [shader("closesthit")]

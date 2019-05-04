@@ -10,7 +10,6 @@ public:
 	}
 
 #define SHADOWMAP_DIMENSION 2048
-#define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*3)
 
 	// Scene loading process to retain scene on the GPU
 	gObj<RetainedSceneLoader> sceneLoader;
@@ -234,9 +233,11 @@ public:
 
 	void Raytracing(gObj<DXRManager> manager) {
 
+		static int FrameIndex = 0;
+
 		auto rtProgram = dxrPTPipeline->_Program;
 
-		manager gClear UAV(rtProgram->Output, float4(0, 0, 0, 0));
+		//manager gClear UAV(rtProgram->Output, float4(0, 0, 0, 0));
 
 		// Update camera
 		// Required during ray-trace stage
@@ -252,6 +253,8 @@ public:
 			Light->Position, 0,
 			Light->Intensity, 0
 			});
+
+		manager gCopy ValueData(rtProgram->PathtracingInfo, FrameIndex);
 
 		dxrPTPipeline->_Program->Positions = gBufferFromViewer->pipeline->GBuffer_P;
 		dxrPTPipeline->_Program->Normals = gBufferFromViewer->pipeline->GBuffer_N;
@@ -295,6 +298,8 @@ public:
 
 		// Copy DXR output texture to the render target
 		manager gCopy All(render_target, rtProgram->Output);
+
+		FrameIndex++;
 #pragma endregion
 	}
 

@@ -32,6 +32,9 @@ struct Photon {
 	float Radius;
 };
 
+#define IS_TRIANGLE_MASK 1
+#define IS_PHOTON_MASK 2
+
 // Photon AABB created to construct future photon map (via raytracing acceleration data structure)
 struct AABB {
 	float3 Minimum;
@@ -266,7 +269,7 @@ void PTMainRays() {
 		// Trace the ray.
 		// Set the ray's extents.
 		if (dot(payload.color, payload.color) > 0.0001)
-			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload); // Will be used with Photon scattering function
+			TraceRay(Scene, RAY_FLAG_NONE, IS_TRIANGLE_MASK, 0, 1, 0, ray, payload); // Will be used with Photon scattering function
 	}
 }
 
@@ -313,7 +316,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 	{ // Store the photon in the photon map
 		int photonIndexInBuffer;
 		InterlockedAdd(Malloc[0], 1, photonIndexInBuffer);
-		float radius = 0.1;
+		float radius = 0.01;
 		Photon p = {
 			surfel.P,
 			WorldRayDirection(), // photon direction
@@ -388,7 +391,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 		if (newPhotonPayload.color.x + newPhotonPayload.color.y + newPhotonPayload.color.z > 0.001) // only continue with no-obscure photons
 		{
 			newPhotonRay.Origin += sign(dot(newPhotonRay.Direction, facedNormal))*0.01*facedNormal; // avoid self shadowing
-			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, ~0, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
 		}
 	}
 }

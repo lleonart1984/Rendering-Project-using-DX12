@@ -1,28 +1,4 @@
-// Material info
-struct Material
-{
-	float3 Diffuse;
-	float3 Specular;
-	float SpecularSharpness;
-	int4 Texture_Index; // X - diffuse map, Y - Specular map, Z - Bump Map, W - Mask Map
-	float3 Emissive; // Emissive component for lights
-	float4 Roulette; // X - Diffuse ammount, Y - Mirror scattering, Z - Fresnell scattering, W - Refraction Index (if fresnel)
-};
-
-// Vertex Data
-struct Vertex
-{
-	// Position
-	float3 P;
-	// Normal
-	float3 N;
-	// Texture coordinates
-	float2 C;
-	// Tangent Vector
-	float3 T;
-	// Binormal Vector
-	float3 B;
-};
+#include "../CommonGI/Definitions.h"
 
 // Top level structure with the scene
 RaytracingAccelerationStructure Scene : register(t0, space0);
@@ -82,75 +58,23 @@ struct RayPayload
 	int bounce;
 };
 
-static float pi = 3.1415926;
-static uint rng_state;
-uint rand_xorshift()
+#include "../CommonGI/ScatteringTools.h"
+
+// Gets true if current surfel is lit by the light source
+// checking not with DXR but with classic shadow maps represented
+// by GBuffer obtained from light
+float ShadowCast(Vertex surfel)
 {
-	// Xorshift algorithm from George Marsaglia's paper
-	rng_state ^= (rng_state << 13);
-	rng_state ^= (rng_state >> 17);
-	rng_state ^= (rng_state << 5);
-	return rng_state;
+	float3 pInLightViewSpace = mul(float4(surfel.P, 1), LightView).xyz;
+	float4 pInLightProjSpace = mul(float4(pInLightViewSpace, 1), LightProj);
+	float2 cToTest = 0.5 + 0.5 * pInLightProjSpace.xy / pInLightProjSpace.w;
+	cToTest.y = 1 - cToTest.y;
+	float3 lightSampleP = LightPositions.SampleGrad(shadowSmp, cToTest, 0, 0);
+	return pInLightViewSpace.z - lightSampleP.z < 0.001 ? 1 : 0;
 }
 
-float random()
-{
-	return rand_xorshift() * (1.0 / 4294967296.0);
-}
-
-float3 randomDirection()
-{
-	float r1 = random();
-	float r2 = random() * 2 - 1;
-	float x = cos(2.0 * pi * r1) * sqrt(1.0 - r2 * r2);
-	float y = sin(2.0 * pi * r1) * sqrt(1.0 - r2 * r2);
-	float z = r2;
-	return float3(x, y, z);
-}
-
-void ComputeFresnel(float3 dir, float3 faceNormal, float ratio, out float reflection, out float refraction)
-{
-	float f = ((1.0 - ratio) * (1.0 - ratio)) / ((1.0 + ratio) * (1.0 + ratio));
-
-	float Ratio = f + (1.0 - f) * pow((1.0 + dot(dir, faceNormal)), 5);
-
-	reflection = min(1, Ratio);
-	refraction = max(0, 1 - reflection);
-}
-
-Vertex Transform(Vertex surfel, float4x3 transform) {
-	Vertex v = {
-		mul(float4(surfel.P, 1), transform),
-		mul(float4(surfel.N, 0), transform),
-		surfel.C,
-		mul(float4(surfel.T, 0), transform),
-		mul(float4(surfel.B, 0), transform) };
-	return v;
-}
-
-void AugmentHitInfoWithTextureMapping(bool onlyMaterial, inout Vertex surfel, inout Material material) {
-	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
-	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0, 0) : material.Specular;
-	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, 0, 0) : float3(0.5, 0.5, 1);
-	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, 0, 0) : 1;
-
-	if (!onlyMaterial) {
-		float3x3 TangentToWorld = { surfel.T, surfel.B, surfel.N };
-		// Change normal according to bump map
-		surfel.N = normalize(mul(BumpTex * 2 - 1, TangentToWorld));
-	}
-
-	material.Diffuse *= DiffTex * MaskTex.x; // set transparent if necessary.
-	material.Specular.xyz = max(material.Specular.xyz, SpecularTex);
-}
-
-float3 BRDFxLambert(float3 V, float3 L, Vertex surfel, Material material) {
-	float NdotL = dot(surfel.N, L);
-	float3 H = normalize(V + L);
-	float3 diff = max(0, NdotL)*material.Diffuse;
-	float3 spec = NdotL > 0 ? pow(max(0, dot(H, surfel.N)), material.SpecularSharpness)*material.Specular : 0;
-
-	return diff + spec;
+float LightSphereRadius() {
+	return 0.5;
 }
 
 float3 PathtracingScattering(float3 V, Vertex surfel, Material material, int bounces)
@@ -161,59 +85,13 @@ float3 PathtracingScattering(float3 V, Vertex surfel, Material material, int bou
 	total += material.Emissive;
 
 	// Adding direct lighting
-
-	// Adding diffuse contribution (Diffuse + specular)
-	float3 L = LightPosition - surfel.P;
-	float d = length(L);
-	L /= d;
-	float3 I = LightIntensity / (2 * 3.14159*d*d);
-	float3 pInLightViewSpace = mul(float4(surfel.P, 1), LightView).xyz;
-	float4 pInLightProjSpace = mul(float4(pInLightViewSpace, 1), LightProj);
-	float2 cToTest = 0.5 + 0.5 * pInLightProjSpace.xy / pInLightProjSpace.w;
-	cToTest.y = 1 - cToTest.y;
-	float3 lightSampleP = LightPositions.SampleGrad(shadowSmp, cToTest, 0, 0);
-
-	bool entering = dot(V, surfel.N) > 0;
-	float reflectionIndex, refractionIndex;
-	float eta = entering ? 1 / material.Roulette.w : material.Roulette.w;
-	float3 fN = entering ? surfel.N : -surfel.N;
-	ComputeFresnel(-V, fN, eta,
-		reflectionIndex, refractionIndex);
-	float3 reflectionDir = reflect(-V, fN);
-	float3 refractionDir = refract(-V, fN, eta);
-
-	if (!any(refractionDir))
-	{
-		reflectionIndex = 1;
-		refractionIndex = 0; // total internal reflection
-	}
-
-	//float visibility = //cToTest.x < 0 || cToTest.y < 0 || cToTest.x > 1 || cToTest.y > 1 ? 0 :
-	if (((pInLightViewSpace.z) - (lightSampleP.z)) < 0.001)
-	{
-		// Adding direct diffuse contribution
-		total += material.Roulette.x * BRDFxLambert(V, L, surfel, material) * I;
-
-		// Adding direct impulses contribution
-		float reflectionFactor = material.Roulette.y + material.Roulette.z * reflectionIndex;
-		float refractionFactor = material.Roulette.z * refractionIndex;
-
-		float lightRadius = 0.5;
-		float lightArea = pi * lightRadius*lightRadius;
-		if (reflectionFactor > 0) // has some reflection contribution
-		{
-			float radius = length(reflectionDir*d - L * d);// angle * 2 * pi * d;
-			if (radius <= lightRadius) // hit the light
-				total += LightIntensity * reflectionFactor / lightArea;
-		}
-
-		if (refractionFactor > 0) // has some reflection contribution
-		{
-			float radius = length(refractionDir*d - L * d);
-			if (radius <= lightRadius) // hit the light
-				total += LightIntensity * refractionFactor / lightArea;
-		}
-	}
+	float NdotV;
+	bool invertNormal;
+	float3 fN;
+	float4 R, T;
+	total += ComputeDirectLighting(V, surfel, material, LightPosition, LightIntensity,
+		// Outputs
+		NdotV, invertNormal, fN, R, T);
 
 	// Adding Indirect lighting
 	if (bounces > 0)
@@ -228,35 +106,29 @@ float3 PathtracingScattering(float3 V, Vertex surfel, Material material, int bou
 		float3 ratio = float3(1, 1, 1);
 
 		float scatteringSelection = random();
-		if (scatteringSelection < material.Roulette.x) // Diffuse photon scattering
+		if (scatteringSelection < material.Roulette.x) // diffuse scattering
 		{
-			ratio = float3(0, 0, 0);
-			newRay.Direction = randomDirection();
-			if (dot(newRay.Direction, fN) < 0)
-				newRay.Direction *= -1; // invert direction to head correct hemisphere (facedNormal)
-			ratio = BRDFxLambert(V, newRay.Direction, surfel, material);
+			newRay.Direction = randomHSDirection(fN);
+			float NdotD = dot(newRay.Direction, fN);
+			ratio = BRDFxLambertDivPDF(V, newRay.Direction, fN, NdotD, material);
 		}
-		else if (scatteringSelection < material.Roulette.x + material.Roulette.y) // Mirror photon scattering
+		else 
+			if (scatteringSelection < material.Roulette.x + R.w) // reflection scattering
 		{
-			newRay.Direction = reflectionDir;
+			newRay.Direction = R.xyz;
 		}
-		else if (scatteringSelection < material.Roulette.x + material.Roulette.y + material.Roulette.z) // Fresnel scattering
+		else if (scatteringSelection < material.Roulette.x + R.w + T.w) // refraction scattering
 		{
-			float fresnelSelection = random();
-			newRay.Direction = (fresnelSelection < reflectionIndex) ?
-				// Select to reflect
-				reflectionDir :
-				// Select to refract
-				refractionDir;
+			newRay.Direction = T.xyz;
 		}
 		else { // Photon absortion
 			ratio = float3(0, 0, 0);
 		}
 
-		if (ratio.x + ratio.y + ratio.z > 0.001) // only continue with no-obscure light paths
+		if (all(ratio > 0)) // only continue with no-obscure light paths
 		{
-			newRay.Origin += sign(dot(newRay.Direction, fN))*0.01*fN; // avoid self shadowing
-			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, newRay, newPayload);
+			newRay.Origin += sign(dot(newRay.Direction, fN))*0.0001*fN; // avoid self shadowing
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, newPayload);
 			total += newPayload.color * ratio;
 		}
 	}
@@ -266,8 +138,9 @@ float3 PathtracingScattering(float3 V, Vertex surfel, Material material, int bou
 [shader("miss")]
 void EnvironmentMap(inout RayPayload payload)
 {
-	payload.color = WorldRayDirection();
 }
+
+#define PATHS_PER_PASS 10
 
 [shader("raygeneration")]
 void PTMainRays()
@@ -276,10 +149,7 @@ void PTMainRays()
 	uint2 raysDimensions = DispatchRaysDimensions();
 
 	// Initialize random iterator using rays index as seed
-	rng_state = raysIndex.x + raysIndex.y*raysDimensions.x;
-	// avoid strong correlation at begining
-	random(); random(); random();
-	random(); random(); random();
+	initializeRandom(raysIndex.x + raysIndex.y*raysDimensions.x + raysDimensions.x*raysDimensions.y*CurrentPass);
 
 	float3 P = Positions[raysIndex];
 	float3 N = Normals[raysIndex];
@@ -309,14 +179,14 @@ void PTMainRays()
 	};
 
 	// only update material, Normal is affected with bump map from gbuffer construction
-	AugmentHitInfoWithTextureMapping(true, surfel, material);
+	AugmentMaterialWithTextureMapping(surfel, material);
 
 	float3 totalAcc = 0;
 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < PATHS_PER_PASS; i++)
 		totalAcc += PathtracingScattering(V, surfel, material, 2);
 	// Write the raytraced color to the output texture.
-	Output[DispatchRaysIndex().xy] = totalAcc / 10;
+	Output[DispatchRaysIndex().xy] = (Output[DispatchRaysIndex().xy] * PATHS_PER_PASS * CurrentPass + totalAcc) / (PATHS_PER_PASS * (CurrentPass + 1));
 }
 
 void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)
@@ -341,7 +211,7 @@ void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)
 
 	material = materials[materialIndex];
 
-	AugmentHitInfoWithTextureMapping(false, surfel, material);
+	AugmentHitInfoWithTextureMapping(surfel, material);
 }
 
 [shader("closesthit")]
@@ -350,9 +220,5 @@ void PTScattering(inout RayPayload payload, in MyAttributes attr)
 	Vertex surfel;
 	Material material;
 	GetHitInfo(attr, surfel, material);
-	AugmentHitInfoWithTextureMapping(false, surfel, material);
-
-	float3 V = -normalize(WorldRayDirection());
-
-	payload.color = PathtracingScattering(V, surfel, material, payload.bounce);
+	payload.color = PathtracingScattering(-WorldRayDirection(), surfel, material, payload.bounce);
 }
