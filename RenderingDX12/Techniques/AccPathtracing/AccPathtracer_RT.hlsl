@@ -98,34 +98,48 @@ float3 PathtracingScattering(float3 V, Vertex surfel, Material material, int bou
 	{
 		RayPayload newPayload = { float3(0,0,0), bounces - 1 };
 		RayDesc newRay;
-		newRay.Direction = float3(0, 0, 0);
 		newRay.Origin = surfel.P;
 		newRay.TMin = 0.001;
 		newRay.TMax = 10000.0;
 
-		float3 ratio = float3(1, 1, 1);
+		float NdotD;
+		float3 D = randomHSDirection(fN, NdotD);
 
-		float scatteringSelection = random();
-		if (scatteringSelection < material.Roulette.x) // diffuse scattering
-		{
-			newRay.Direction = randomHSDirection(fN);
-			float NdotD = dot(newRay.Direction, fN);
-			ratio = BRDFxLambertDivPDF(V, newRay.Direction, fN, NdotD, material);
-		}
-		else 
-			if (scatteringSelection < material.Roulette.x + R.w) // reflection scattering
-		{
-			newRay.Direction = R.xyz;
-		}
-		else if (scatteringSelection < material.Roulette.x + R.w + T.w) // refraction scattering
-		{
-			newRay.Direction = T.xyz;
-		}
-		else { // Photon absortion
-			ratio = float3(0, 0, 0);
-		}
+		float3x3 ratios = {
+			BRDFxLambertDivPDF(V, D, fN, NdotD, material), // Diffuse
+			float3(1,1,1),
+			float3(1,1,1)
+		};
 
-		if (all(ratio > 0)) // only continue with no-obscure light paths
+		float3x3 directions = {
+			D,
+			R.xyz,
+			T.xyz
+		};
+
+		float3 roulette = float3(material.Roulette.x, R.w, T.w);
+
+		float3 lowerBound = mul(roulette, 
+			float3x3(
+				0, 1, 1, 
+				0, 0, 1, 
+				0, 0, 0));
+		float3 upperBound = mul(roulette, 
+			float3x3(
+				1, 1, 1, 
+				0, 1, 1, 
+				0, 0, 1));
+
+		float3 scatteringSelection = random();
+
+		float3 selectionMask =
+			(lowerBound <= scatteringSelection)
+			* (scatteringSelection < upperBound);
+
+		float3 ratio = mul(selectionMask, ratios);
+		newRay.Direction = mul(selectionMask, directions);
+
+		if (any(ratio > 0)) // only continue with no-obscure light paths
 		{
 			newRay.Origin += sign(dot(newRay.Direction, fN))*0.0001*fN; // avoid self shadowing
 			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, newPayload);

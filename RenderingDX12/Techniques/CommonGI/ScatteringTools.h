@@ -48,11 +48,11 @@ void AugmentMaterialWithTextureMapping(inout Vertex surfel, inout Material mater
 
 float3 BRDFxLambertDivPDF(float3 V, float3 L, float3 fN, float NdotL, Material material) {
 	float3 H = normalize(V + L);
-	float3 diff = max(0, NdotL)*material.Diffuse * 2; // normalized dividing by pi but then pdf is two_pi, thats why multiplied by 2
-	float HdotN = dot(H, fN);
-	float3 spec = NdotL > 0 && HdotN > 0 ? pow(HdotN, material.SpecularSharpness)*material.Specular * (2 + material.SpecularSharpness) : 0;
+	float3 diff = 2*material.Diffuse;// max(0, NdotL)*material.Diffuse * 2; // normalized dividing by pi but then pdf is two_pi, thats why multiplied by 2
+	float HdotN = max(0, dot(H, fN));
+	float3 spec = pow(HdotN, material.SpecularSharpness)*material.Specular;// *(2 + material.SpecularSharpness) : 0;
 
-	return diff + spec;
+	return (diff + spec)*NdotL;
 }
 
 float ShadowCast(Vertex surfel);
@@ -124,7 +124,7 @@ float3 ComputeDirectLighting(
 	// Normalize direction to light (L)
 	L /= d;
 	// compute lambert coefficient
-	float NdotL = dot(fN, L);
+	float NdotL = max(0, dot(fN, L));
 
 	// Incomming radiance
 	// Correct formula would be:
@@ -142,16 +142,16 @@ float3 ComputeDirectLighting(
 	float3 diffuseAdd = material.Diffuse  / pi;
 	// Blinn Specular component (normalized dividing by (2+n)/(2pi)
 	float3 H = normalize(V + L);
-	float NdotH = dot(H, fN);
-	float3 spec = (NdotL > 0) ? pow(NdotH, material.SpecularSharpness)*material.Specular : 0;
-	float3 specularAdd = spec * NdotL * (2 + material.SpecularSharpness) / two_pi;
+	float NdotH = max(0, dot(H, fN));
+	float3 spec = material.Specular*pow(NdotH, material.SpecularSharpness);
+	float3 specularAdd = spec;// *(2 + material.SpecularSharpness) / two_pi;
 
 	float3 reflectionAdd = R.w * HitLight(L, R.xyz, d, lightRadius);
 	float3 refractionAdd = T.w * HitLight(L, T.xyz, d, lightRadius);
 
 	return visibility * (
-		(diffuseAdd + specularAdd)*material.Roulette.x* NdotL*Ip
-		+ (reflectionAdd + refractionAdd)*I*two_pi);
+		NdotL*material.Roulette.x*(diffuseAdd + specularAdd)* Ip
+		+ (reflectionAdd + refractionAdd)*I/(lightRadius*lightRadius));
 }
 
 #endif // !SCATTERING_TOOLS_H

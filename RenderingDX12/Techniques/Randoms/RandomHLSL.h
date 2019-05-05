@@ -34,7 +34,7 @@ float3 randomDirection()
 	return float3(x, y, z);
 }
 
-float3 randomHSDirection(float3 N)
+float3 randomHSDirection(float3 N, out float NdotD)
 {
 	float r1 = random();
 	float r2 = random() * 2 - 1;
@@ -45,14 +45,16 @@ float3 randomHSDirection(float3 N)
 	float y = sin(two_pi_by_r1) * sqrt_of_one_minus_sqrR2;
 	float z = r2;
 	float3 d = float3(x, y, z);
-	
-	return d * sign(dot(N, d));
+	NdotD = dot(N, d);
+	d *= (NdotD < 0 ? -1 : 1);
+	NdotD *= NdotD < 0 ? -1 : 1;
+	return d;
 }
 
 void initializeRandom(uint seed) {
-	rng_state = seed ^ 0xFEFE;
+	rng_state = seed;// ^ 0xFEFE;
 	[loop]
-	for (int i = 0; i < rng_state % 10; i++)
+	for (int i = 0; i < seed % 10; i++)
 		random();
 }
 

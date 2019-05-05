@@ -6,7 +6,7 @@
 #define SIBENIK_OBJ 2
 #define SANMIGUEL_OBJ 3
 
-#define USE_SCENE SPONZA_OBJ 
+#define USE_SCENE BASIC_OBJ 
 
 // Uncomment this to use warp device for unsupported DX12 functionalities in your device
 //#define WARP
