@@ -17,6 +17,7 @@ cbuffer Lighting : register(b0)
 cbuffer Materialing : register(b1)
 {
 	float3 Diffuse; 
+	float RefractionIndex; // not used here
 	float3 Specular; 
 	float SpecularSharpness;
 	int4 Texture_Mask;
@@ -37,10 +38,10 @@ float4 PSMain(PSInput input) : SV_TARGET
 	float d = length(L);
 	L /= d;
 
-	float3 Lin = LightIntensity / max(0.1, d * d);
+	float3 Lin = LightIntensity / (4 * 3.14159*max(0.1, d * d));
 
 	float3 DiffTex = Texture_Mask.x > 0 ? Diffuse_Texture.Sample(Sampler, input.uv) : 1;
-	float3 SpecularTex = Texture_Mask.y > 0 ? Specular_Texture.Sample(Sampler, input.uv) : Specular;
+	float3 SpecularTex = Texture_Mask.y > 0 ? Specular_Texture.Sample(Sampler, input.uv) : 0;
 	float3 BumpTex = Texture_Mask.z > 0 ? Bump_Texture.Sample(Sampler, input.uv) : float3(0.5, 0.5, 1);
 	float3 MaskTex = Texture_Mask.w > 0 ? Mask_Texture.Sample(Sampler, input.uv) : 1;
 
@@ -50,15 +51,18 @@ float4 PSMain(PSInput input) : SV_TARGET
 	float3x3 worldToTangent = { input.tangent, input.binormal, input.normal };
 
 	float3 normal = normalize(mul(BumpTex * 2 - 1, worldToTangent));
-	//return float4(normal, 1);
 
 	float3 V = normalize(-input.position);
 	float3 H = normalize(V + L);
 
-	float4 coef = lit(dot(L, normal), dot(H, normal), SpecularSharpness);
+	float NdotL = max(0, dot(normal, L));
+	float NdotH = NdotL < 0 ? 0 : max(0, dot(normal, H));
 
-	float3 light = (Diffuse * DiffTex * coef.y + SpecularTex * coef.z)*Lin + Diffuse * DiffTex * coef.x*0.5;
+	float3 diff = Diffuse * DiffTex / 3.14159;
+	float3 spec = max(Specular, SpecularTex) * pow(NdotH, SpecularSharpness);
+
+	float3 light = (
+		Roulette.x * diff * NdotL +
+		Roulette.y * spec) * Lin;
 	return float4(light, 1);
-	//return float4(1,1,0,1);// g_texture.Sample(g_sampler, input.uv);
-	//return g_texture.Sample(g_sampler, input.uv);
 }

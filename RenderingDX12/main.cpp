@@ -58,11 +58,12 @@ LPSTR desktop_directory()
 }
 
 void MixGlassMaterial(SCENE_MATERIAL* material, float alpha) {
-	material->Roulette = CA4G::lerp(material->Roulette, float4(0, 0, 1, 1.6f), alpha);
+	material->RefractionIndex = 1.6;
+	material->Roulette = CA4G::lerp(material->Roulette, float4(0, 0, 0, 1), alpha);
 }
 
 void MixMirrorMaterial(SCENE_MATERIAL* material, float alpha) {
-	material->Roulette = CA4G::lerp(material->Roulette, float4(0, 1, 0, 1), alpha);
+	material->Roulette = CA4G::lerp(material->Roulette, float4(0, 0, 1, 0), alpha);
 }
 
 class ImGUIPresenter : public Presenter {
@@ -114,23 +115,38 @@ int main(int, char**)
 		char * filePath;
 
 		switch (USE_SCENE) {
-		case BASIC_OBJ:
+		case BUNNY_OBJ:
 			filePath = desktop_directory();
-			strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
+			//strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
+			//strcat(filePath, "\\Models\\BunnyInCornell\\BunnyScene.obj");
+			strcat(filePath, "\\Models\\CornellBox\\BoxBox.obj");
 			scene = new Scene(filePath);
-			MixGlassMaterial(&scene->Materials()[0], 1);
-			lightSource->Position = float3(0, 2, 0);
-			lightSource->Intensity = float3(500, 500, 500);
+			camera->Position = float3(0, 0, 1.7f);
+			camera->Target = float3(0, 0, 0);
+			lightSource->Position = float3(0, 0.48, 0);
+			lightSource->Intensity = float3(300, 300, 300);
+			//MixGlassMaterial(&scene->Materials()[0], 1);
+			break;
+		case RING_OBJ:
+			filePath = desktop_directory();
+			strcat(filePath, "\\Models\\weddingRing\\ring.obj");
+			scene = new Scene(filePath);
+			camera->Position = float3(.4f, .6f, .3f);
+			camera->Target = float3(0, 0.1f, 0);
+			lightSource->Position = float3(0.1, 0.4, 0.2);
+			lightSource->Intensity = float3(240, 240, 240);
+			MixMirrorMaterial(&scene->Materials()[0], 1);
+			//MixGlassMaterial(&scene->Materials()[0], 1);
 			break;
 		case SPONZA_OBJ:
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			MixMirrorMaterial(&scene->Materials()[9], 0.6f); // floor
-			camera->Position = float3(0.5f, 0.1f, 0);
-			camera->Target = float3(0, 0.1f, 0);
-			lightSource->Position = float3(0, 2, 0);
-			lightSource->Intensity = float3(500, 500, 500);
+			//MixMirrorMaterial(&scene->Materials()[9], 0.4f); // floor
+			camera->Position = float3(0.25f, 0.07f, 0);
+			camera->Target = float3(0, 0.07f, 0);
+			lightSource->Position = float3(0, 0.7, 0);
+			lightSource->Intensity = float3(300, 300, 300);
 			break;
 		case SIBENIK_OBJ:
 			filePath = desktop_directory();
@@ -141,7 +157,7 @@ int main(int, char**)
 			camera->Position = float3(-1, -0.5f, 0);
 			camera->Target = float3(0, -0.7f, 0);
 			lightSource->Position = float3(0, 0.8, 0);
-			lightSource->Intensity = float3(10, 10, 10);
+			lightSource->Intensity = float3(300, 300, 300);
 			break;
 		case SANMIGUEL_OBJ:
 			filePath = desktop_directory();
@@ -196,7 +212,7 @@ int main(int, char**)
 		if (asLightRenderer)
 		{
 			// Light Updates here
-			asLightRenderer->Light->Position.x = 1;// *sin(ImGui::GetTime()*0.1f);
+			//asLightRenderer->Light->Position.x = 1;// *sin(ImGui::GetTime()*0.1f);
 		}
 
         // Poll and handle messages (inputs, window resize, etc.)

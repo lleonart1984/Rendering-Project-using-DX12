@@ -9,9 +9,7 @@ public:
 		gObj<RayGenerationHandle> MainRays;
 		gObj<MissHandle> EnvironmentMap;
 		gObj<ClosestHitHandle> FresnelScattering;
-		gObj<ClosestHitHandle> LambertScattering;
 		gObj<HitGroupHandle> FresnelMaterial;
-		gObj<HitGroupHandle> LambertMaterial;
 
 		class DXR_Basic_IL : public DXIL_Library<DXR_Pipeline> {
 			void Setup() {
@@ -20,7 +18,6 @@ public:
 				_ gLoad Shader(Context()->MainRays, L"MainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
 				_ gLoad Shader(Context()->FresnelScattering, L"FresnelScattering");
-				_ gLoad Shader(Context()->LambertScattering, L"LambertScattering");
 			}
 		};
 		gObj<DXR_Basic_IL> _Library;
@@ -32,7 +29,6 @@ public:
 				_ gLoad Shader(Context()->MainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
 				_ gCreate HitGroup(Context()->FresnelMaterial, Context()->FresnelScattering, nullptr, nullptr);
-				_ gCreate HitGroup(Context()->LambertMaterial, Context()->LambertScattering, nullptr, nullptr);
 			}
 
 			gObj<SceneOnGPU> Scene;
@@ -190,10 +186,7 @@ protected:
 			rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
 			rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-			if (max(sceneObject.Material->Roulette.y, sceneObject.Material->Roulette.z) > 0) // Has mirror or fresnel scattering
-				manager gSet HitGroup(Pipeline->FresnelMaterial, i);
-			else
-				manager gSet HitGroup(Pipeline->LambertMaterial, i);
+			manager gSet HitGroup(Pipeline->FresnelMaterial, i);
 
 			startTriangle += sceneObject.vertexesCount / 3;
 		}

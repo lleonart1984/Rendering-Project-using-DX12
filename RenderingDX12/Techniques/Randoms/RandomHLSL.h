@@ -1,5 +1,5 @@
-#ifndef RANDOMHLSL.H
-#define RANDOMHLSL.H
+#ifndef RANDOMHLSL_H
+#define RANDOMHLSL_H
 
 // HLSL code for random functions
 
@@ -58,4 +58,4 @@ void initializeRandom(uint seed) {
 		random();
 }
 
-#endif // RANDOMHLSL.H
+#endif // RANDOMHLSL_H

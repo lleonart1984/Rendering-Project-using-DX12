@@ -196,8 +196,8 @@ protected:
 			Light->Intensity, 0
 			});
 
-		float3 MinimumPosition{ -2, -2, -2 };
-		float3 BoxSize{ 4, 4, 4 };
+		float3 MinimumPosition{ -0.5, -0.5, -0.5 };
+		float3 BoxSize{ 1, 1, 1 };
 		int3 resolution{ RESOLUTION, RESOLUTION, RESOLUTION };
 
 		// Update SpaceInfo

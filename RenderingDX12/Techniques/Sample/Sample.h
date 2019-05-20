@@ -107,6 +107,7 @@ protected:
 			materialing.SpecularSharpness = object.Material->SpecularSharpness;
 			materialing.Emissive = object.Material->Emissive;
 			materialing.Texture_Mask = { object.Material->Diffuse_Map >= 0 ? 1 : 0, object.Material->Specular_Map >= 0 ? 1 : 0, object.Material->Bump_Map >= 0 ? 1 : 0, object.Material->Mask_Map >= 0 ? 1 : 0 };
+			materialing.Roulette = object.Material->Roulette;
 
 			manager gCopy ValueData(materials[i], materialing);
 		}

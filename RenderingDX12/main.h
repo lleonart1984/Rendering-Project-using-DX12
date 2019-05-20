@@ -1,20 +1,19 @@
 #pragma once
 
 
-#define BASIC_OBJ 0
-#define SPONZA_OBJ 1
-#define SIBENIK_OBJ 2
-#define SANMIGUEL_OBJ 3
+#define BUNNY_OBJ 0
+#define RING_OBJ 1
+#define SPONZA_OBJ 2
+#define SIBENIK_OBJ 3
+#define SANMIGUEL_OBJ 4
 
-#define USE_SCENE BASIC_OBJ 
+#define USE_SCENE BUNNY_OBJ  
 
 // Uncomment this to use warp device for unsupported DX12 functionalities in your device
 //#define WARP
 
 //class NoTechnique : public Technique {}; gObj<NoTechnique> technique;
 
-//gObj<SampleTechnique> technique;
-//gObj<RetainedBasicRenderer> technique;
 //gObj<Tutorial1> technique;
 //gObj<Tutorial2> technique;
 //gObj<Tutorial3> technique;
@@ -26,9 +25,12 @@
 //gObj<Tutorial9> technique;
 //gObj<Tutorial10> technique;
 //gObj<Tutorial11> technique;
+//gObj<SampleTechnique> technique;
+//gObj<RetainedBasicRenderer> technique;
 //gObj<DXRBasicSceneRaytracer> technique;
 //gObj<DXRBasicScenePhotontracer> technique;
+//gObj<DXRItPathtracer> technique;
 //gObj<DeferredShadingTechnique> technique;
-//gObj<HybridPhotonTracer> technique;
-gObj<DXRPathtracer> technique;
+gObj<HybridPhotonTracer> technique;
+//gObj<DXRPathtracer> technique;
 //gObj<FullDXRPhotonTracer> technique;

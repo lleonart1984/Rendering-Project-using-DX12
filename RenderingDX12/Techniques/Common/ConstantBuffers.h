@@ -18,7 +18,7 @@ struct Lighting
 
 struct Materialing {
 	float3 Diffuse;
-	float res0;
+	float RefractionIndex;
 	float3 Specular;
 	float SpecularSharpness;
 	int4 Texture_Mask;

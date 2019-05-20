@@ -28,6 +28,7 @@ namespace CA4G {
 
 	struct SCENE_MATERIAL {
 		float3 Diffuse;
+		float RefractionIndex;
 		float3 Specular;
 		float SpecularSharpness;
 		int Diffuse_Map;
@@ -35,9 +36,10 @@ namespace CA4G {
 		int Bump_Map;
 		int Mask_Map;
 		float3 Emissive;
-		float4 Roulette; // x-diffuse, y-mirror, z-fresnell, w-reflection index
+		float4 Roulette; // x-diffuse, y-specular, z-mirror, w-fresnell
 		SCENE_MATERIAL() {
 			Diffuse = float3(1, 1, 1);
+			RefractionIndex = 1;
 			Specular = float3(0, 0, 0);
 			SpecularSharpness = 1;
 			Diffuse_Map = -1;
@@ -45,7 +47,7 @@ namespace CA4G {
 			Bump_Map = -1;
 			Mask_Map = -1;
 			Emissive = float3(0, 0, 0);
-			Roulette = float4(1, 0, 0, 1);
+			Roulette = float4(1, 0, 0, 0);
 		}
 	};
 

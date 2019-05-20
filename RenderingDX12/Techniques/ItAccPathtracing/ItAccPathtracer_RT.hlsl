@@ -52,14 +52,21 @@ ConstantBuffer<ObjInfo> objectInfo : register(b4);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
+struct Ray {
+	float3 Position;
+	float3 Direction;
+};
+
 struct RayPayload
 {
-	float3 color;
-	int bounce;
+	float3 Importance;
+	float3 AccRadiance;
+	Ray ScatteredRay;
 };
 
 #include "../CommonGI/ScatteringTools.h"
 
+// Overriden Shadow cast computation for direct light computation
 // Gets true if current surfel is lit by the light source
 // checking not with DXR but with classic shadow maps represented
 // by GBuffer obtained from light
@@ -67,54 +74,73 @@ float ShadowCast(Vertex surfel)
 {
 	float3 pInLightViewSpace = mul(float4(surfel.P, 1), LightView).xyz;
 	float4 pInLightProjSpace = mul(float4(pInLightViewSpace, 1), LightProj);
-	float2 cToTest = 0.5 + 0.5 * pInLightProjSpace.xy / pInLightProjSpace.w;
+	if (pInLightProjSpace.z <= 0.01)
+		return 0;
+	pInLightProjSpace.xyz /= pInLightProjSpace.w;
+	float2 cToTest = 0.5 + 0.5 * pInLightProjSpace.xy;
 	cToTest.y = 1 - cToTest.y;
 	float3 lightSampleP = LightPositions.SampleGrad(shadowSmp, cToTest, 0, 0);
 	return pInLightViewSpace.z - lightSampleP.z < 0.001 ? 1 : 0;
 }
 
+// Overriden light sphere radius for direct light computation
 float LightSphereRadius() {
-	return 0.5;
+	return 0.1;
 }
 
-float3 PathtracingScattering(float3 V, Vertex surfel, Material material, int bounces)
+// Represents a single bounce of path tracing
+// Will accumulate emissive and direct lighting modulated by the carrying importance
+// Will update importance with scattered ratio divided by pdf
+// Will output scattered ray to continue with
+void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPayload payload)
 {
-	float3 total = float3(0, 0, 0); // total = emissive + direct + indirect
-
-	// Adding Emissive
-	total += material.Emissive;
-
-	// Adding direct lighting
+	// Adding emissive and direct lighting
 	float NdotV;
 	bool invertNormal;
 	float3 fN;
 	float4 R, T;
-	total += ComputeDirectLighting(V, surfel, material, LightPosition, LightIntensity,
-		// Outputs
-		NdotV, invertNormal, fN, R, T);
+	// Update Accumulated Radiance to the viewer
+	payload.AccRadiance += payload.Importance *
+		(material.Emissive 
+			// Next Event estimation
+			+ ComputeDirectLighting(V, surfel, material, LightPosition, LightIntensity,
+				// Co-lateral outputs
+				NdotV, invertNormal, fN, R, T));
 
-	// Adding Indirect lighting
-	if (bounces > 0)
+	float3 ratio;
+	float3 direction;
+
+	RandomScatterRay(V, fN, R, T, material, ratio, direction);
+
+	// Update gathered Importance to the viewer
+	payload.Importance *= ratio;// / (1 - russianRoulette);
+	// Update scattered ray
+	payload.ScatteredRay.Direction = direction;
+	payload.ScatteredRay.Position = surfel.P + sign(dot(direction, fN))*0.001*fN;
+}
+
+float3 ComputePath(float3 V, Vertex surfel, Material material, int bounces)
+{
+	RayPayload payload = (RayPayload)0;
+	payload.Importance = 1;
+
+	// initial scatter (primary rays)
+	SurfelScattering(V, surfel, material, payload);
+
+	[loop]
+	for (int bounce = 0; bounce < bounces; bounce++)
 	{
-		float3 ratio;
-		float3 direction;
+		RayDesc newRay;
+		newRay.Origin = payload.ScatteredRay.Position;
+		newRay.Direction = payload.ScatteredRay.Direction;
+		newRay.TMin = 0.001;
+		newRay.TMax = 10000.0;
 
-		RandomScatterRay(V, fN, R, T, material, ratio, direction);
-
-		if (any(ratio > 0.001)) // only continue with no-obscure light paths
-		{
-			RayPayload newPayload = { float3(0,0,0), bounces - 1 };
-			RayDesc newRay;
-			newRay.Origin = surfel.P + sign(dot(newRay.Direction, fN))*0.0001*fN; // avoid self shadowing;
-			newRay.Direction = direction;
-			newRay.TMin = 0.001;
-			newRay.TMax = 10000.0;
-
-			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, newRay, newPayload);
-			total += newPayload.color * ratio;
-		}
+		if (any(payload.Importance > 0.01))
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, payload);
 	}
-	return total;
+
+	return payload.AccRadiance;
 }
 
 [shader("miss")]
@@ -140,9 +166,7 @@ void PTMainRays()
 
 	if (!any(P)) // force miss execution
 	{
-		RayPayload payload = { float3(0,0,0), 0 };
-		//EnvironmentMap(payload);
-		Output[DispatchRaysIndex().xy] += float4(payload.color, 1);
+		Output[DispatchRaysIndex().xy] += float4(0,0,0, 1);
 		return;
 	}
 	float3 V = normalize(-P); // In view spce "viewer" is positioned in (0,0,0) 
@@ -165,8 +189,9 @@ void PTMainRays()
 
 	float3 totalAcc = 0;
 
+	[loop]
 	for (int i = 0; i < PATHS_PER_PASS; i++)
-		totalAcc += PathtracingScattering(V, surfel, material, 2);
+		totalAcc += ComputePath(V, surfel, material, 2);
 	// Write the raytraced color to the output texture.
 	Output[DispatchRaysIndex().xy] = (Output[DispatchRaysIndex().xy] * PATHS_PER_PASS * CurrentPass + totalAcc) / (PATHS_PER_PASS * (CurrentPass + 1));
 }
@@ -202,5 +227,8 @@ void PTScattering(inout RayPayload payload, in MyAttributes attr)
 	Vertex surfel;
 	Material material;
 	GetHitInfo(attr, surfel, material);
-	payload.color = PathtracingScattering(-WorldRayDirection(), surfel, material, payload.bounce);
+
+	// This is not a recursive closest hit but it will accumulate in payload
+	// all the result of the scattering to this surface
+	SurfelScattering(-WorldRayDirection(), surfel, material, payload);
 }

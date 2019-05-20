@@ -18,6 +18,7 @@ cbuffer Lighting : register(b0)
 struct Material
 {
 	float3 Diffuse;
+	float RefractionIndex;
 	float3 Specular;
 	float SpecularSharpness;
 	int4 Texture_Index;
@@ -41,7 +42,7 @@ float4 main(PSInput input) : SV_TARGET
 	int materialIndex = MaterialIndexBuffer[input.objectId];
 	Material material = Materials[materialIndex];
 
-	float3 Lin = LightIntensity / max(0.1, d * d);
+	float3 Lin = LightIntensity / (4 * 3.141596 * 3.14159*6*max(0.1, d * d));
 
 	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].Sample(Sampler, input.uv) : float4(1,1,1,1);
 	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].Sample(Sampler, input.uv) : material.Specular;
@@ -54,15 +55,18 @@ float4 main(PSInput input) : SV_TARGET
 	float3x3 worldToTangent = { input.tangent, input.binormal, input.normal };
 
 	float3 normal = normalize(mul(BumpTex * 2 - 1, worldToTangent));
-	//return float4(normal, 1);
 
 	float3 V = normalize(-input.position);
 	float3 H = normalize(V + L);
 
-	float4 coef = lit(dot(L, normal), dot(H, normal), material.SpecularSharpness);
+	float NdotL = max(0, dot(normal, L));
+	float NdotH = NdotL < 0 ? 0 : max(0, dot(normal, H));
 
-	float3 light = (material.Diffuse * DiffTex * coef.y + SpecularTex * coef.z)*Lin + material.Diffuse * DiffTex * coef.x*0.5;
+	float3 diff = material.Diffuse * DiffTex / 3.14159;
+	float3 spec = max(material.Specular, SpecularTex) * pow(NdotH, material.SpecularSharpness)*(2 + material.SpecularSharpness)/(6.28);
+
+	float3 light = (
+		material.Roulette.x * diff * NdotL +
+		material.Roulette.y * spec) * Lin;
 	return float4(light, 1);
-	//return float4(1,1,0,1);// g_texture.Sample(g_sampler, input.uv);
-	//return g_texture.Sample(g_sampler, input.uv);
 }

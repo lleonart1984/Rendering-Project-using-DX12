@@ -199,7 +199,7 @@ namespace CA4G {
 	class CubeTexture;
 	class Texture2DMS;
 	class Texture3D;
-	class Sampler;
+	struct Sampler;
 	class GPUScheduler;
 	class SceneBuilder;
 	class GeometryCollection;
@@ -14417,6 +14417,7 @@ namespace CA4G {
 
 	struct SCENE_MATERIAL {
 		float3 Diffuse;
+		float RefractionIndex;
 		float3 Specular;
 		float SpecularSharpness;
 		int Diffuse_Map;
@@ -14424,9 +14425,10 @@ namespace CA4G {
 		int Bump_Map;
 		int Mask_Map;
 		float3 Emissive;
-		float4 Roulette; // x-diffuse, y-mirror, z-fresnell, w-reflection index
+		float4 Roulette; // x-diffuse, y-specular, z-mirror, w-fresnel
 		SCENE_MATERIAL() {
 			Diffuse = float3(1, 1, 1);
+			RefractionIndex = 1;
 			Specular = float3(0, 0, 0);
 			SpecularSharpness = 1;
 			Diffuse_Map = -1;
@@ -14434,7 +14436,7 @@ namespace CA4G {
 			Bump_Map = -1;
 			Mask_Map = -1;
 			Emissive = float3(0, 0, 0);
-			Roulette = float4(1, 0, 0, 1);
+			Roulette = float4(1, 0, 0, 0);
 		}
 	};
 
@@ -14748,7 +14750,12 @@ namespace CA4G {
 					t.readFloatToken(r);
 					t.readFloatToken(g);
 					t.readFloatToken(b);
-					MaterialsData.last().Diffuse = float3(r, g, b);
+					float norm = max(0.0001f, max(r, max(g, b)));
+					MaterialsData.last().Roulette.x = norm;
+					MaterialsData.last().Diffuse = float3(r/norm, g/norm, b/norm);
+					float rouletteXY = MaterialsData.last().Roulette.x + MaterialsData.last().Roulette.y;
+					MaterialsData.last().Roulette.x /= rouletteXY;
+					MaterialsData.last().Roulette.y /= rouletteXY;
 					t.skipCurrentLine();
 					continue;
 				}
@@ -14759,7 +14766,12 @@ namespace CA4G {
 					t.readFloatToken(r);
 					t.readFloatToken(g);
 					t.readFloatToken(b);
-					MaterialsData.last().Specular = float3(r, g, b);
+					float norm = max(0.0001f, max(r, max(g, b)));
+					MaterialsData.last().Roulette.y = norm;
+					MaterialsData.last().Specular = float3(r / norm, g / norm, b / norm);
+					float rouletteXY = MaterialsData.last().Roulette.x + MaterialsData.last().Roulette.y;
+					MaterialsData.last().Roulette.x /= rouletteXY;
+					MaterialsData.last().Roulette.y /= rouletteXY;
 					t.skipCurrentLine();
 					continue;
 				}
@@ -14768,30 +14780,39 @@ namespace CA4G {
 				{
 					float r, g, b;
 					t.readFloatToken(r);
-					//t.readFloatToken(g);
-					//t.readFloatToken(b);
-					MaterialsData.last().Roulette.x = (1 - r);
-					MaterialsData.last().Roulette.y = r;
+					if (r > 0) {
+						//t.readFloatToken(g);
+						//t.readFloatToken(b);
+						MaterialsData.last().Roulette.x = (1 - r);
+						MaterialsData.last().Roulette.y = (1 - r);
+						MaterialsData.last().Roulette.z = r;
+					}
 					t.skipCurrentLine();
 					continue;
 				}
 
-				/*if (t.match("Tf "))
+				if (t.match("Tf "))
 				{
-				float r, g, b;
-				t.readFloatToken(r);
-				t.readFloatToken(g);
-				t.readFloatToken(b);
-				activeMaterial->Roulette.y = (r + g + b) / 3;
-				t.skipCurrentLine();
-				continue;
-				}*/
+					float r, g, b;
+					t.readFloatToken(r);
+					t.readFloatToken(g);
+					t.readFloatToken(b);
+					float fresnel = (r + g + b) / 3;
+					if (fresnel > 0)
+					{
+						MaterialsData.last().Roulette.x = (1 - fresnel);
+						MaterialsData.last().Roulette.y = (1 - fresnel);
+						MaterialsData.last().Roulette.w = fresnel;
+					}
+					t.skipCurrentLine();
+					continue;
+				}
 
 				if (t.match("Ni "))
 				{
 					float ni;
 					t.readFloatToken(ni);
-					MaterialsData.last().Roulette.w = ni;
+					MaterialsData.last().RefractionIndex = ni;
 					t.skipCurrentLine();
 					continue;
 				}
@@ -15155,7 +15176,7 @@ namespace CA4G {
 			float scaleX = Maxim.x - Minim.x;
 			float scaleY = Maxim.y - Minim.y;
 			float scaleZ = Maxim.z - Minim.z;
-			float scale = max(0.01f, min(scaleX, min(scaleY, scaleZ)));
+			float scale = max(0.01f, max(scaleX, max(scaleY, scaleZ)));
 
 			for (int i = 0; i < positionIndices.size(); i++)
 			{
@@ -15187,7 +15208,10 @@ namespace CA4G {
 				if (textureIndices[i] != 0)
 					VerticesData[i].Coordinates = texcoords[textureIndices[i] - 1];
 				else
-					VerticesData[i].Coordinates = positions[positionIndices[i] - 1].getXY() / float2(scaleX, scaleY) - float2(0.5f, 0.5f);
+				{
+					float3 p = positions[positionIndices[i] - 1];
+					VerticesData[i].Coordinates = p.getXY() / float2(scaleX, scaleY) - float2(0.5f + p.z*0.0001, 0.5f - p.z*0.0003);
+				}
 
 #pragma region Compute Tangents
 			ComputeTangents();

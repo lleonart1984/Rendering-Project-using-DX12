@@ -1,15 +1,16 @@
-#ifndef DEFINITIONS.H
-#define DEFINITIONS.H
+#ifndef DEFINITIONS_H
+#define DEFINITIONS_H
 
 // Material definition info
 struct Material
 {
 	float3 Diffuse;
+	float RefractionIndex;
 	float3 Specular;
 	float SpecularSharpness;
 	int4 Texture_Index; // X - diffuse map, Y - Specular map, Z - Bump Map, W - Mask Map
 	float3 Emissive; // Emissive component for lights
-	float4 Roulette; // X - Diffuse ammount, Y - Mirror scattering, Z - Fresnell scattering, W - Refraction Index (if fresnel)
+	float4 Roulette; // X - Diffuse ammount, Y - Specular, Z - Mirror scattering, W - Fresnell scattering
 };
 
 // Vertex Data
@@ -37,4 +38,4 @@ static float inverseOfTwoPi = 0.15915494309189533576888376337251;
 
 static float two_pi = 6.283185307179586476925286766559;
 
-#endif // !DEFINITIONS.H
+#endif // !DEFINITIONS_H

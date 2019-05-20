@@ -12,6 +12,7 @@ struct PSInput
 struct Material
 {
 	float3 Diffuse;
+	float RefractionIndex;
 	float3 Specular;
 	float SpecularSharpness;
 	int4 Texture_Index;
@@ -39,7 +40,7 @@ void main(PSInput input, out float4 position : SV_TARGET0, out float4 normal : S
 
 	float3x3 tangentToWorld = { input.tangent, input.binormal, input.normal };
 
-	normal = float4(normalize(mul(BumpTex * 2 - 1, tangentToWorld)),1);
+	normal = float4(normalize(mul(BumpTex * 2 - 1, tangentToWorld)), 1);
 	position = float4(input.position,0);
 	coordinates = float4(input.uv, 0, 0);
 }

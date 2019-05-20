@@ -2,6 +2,7 @@
 struct Material
 {
 	float3 Diffuse;
+	float RefractionIndex;
 	float3 Specular;
 	float SpecularSharpness;
 	int4 Texture_Index; // X - diffuse map, Y - Specular map, Z - Bump Map, W - Mask Map
@@ -52,9 +53,9 @@ float4 main(float4 proj : SV_POSITION) : SV_TARGET
 	float3 V = normalize(-P);
 	float3 H = normalize(V + L);
 
-	float3 I = LightIntensity * L.y / (2*3.14159*d*d);
+	float3 I = LightIntensity / (6*4*3.14159*d*d);
 	float NdotL = dot(N, L);
-	float3 diff = max(0, NdotL)*D*I;
+	float3 diff = max(0, NdotL)*D/3.14159*I;
 	float3 spec = NdotL > 0 ? pow(max(0, dot(H, N)), S.w)*S.xyz*I : 0;
-	return float4((diff + spec)*R.x, 1);
+	return float4(diff*R.x + spec*R.y, 1);
 }

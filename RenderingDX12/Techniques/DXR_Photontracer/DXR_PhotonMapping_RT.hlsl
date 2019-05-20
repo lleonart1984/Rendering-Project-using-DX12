@@ -1,5 +1,4 @@
 #include "../CommonGI/Definitions.h"
-#include "../Randoms/RandomHLSL.h"
 
 // Photon Data
 struct Photon {
@@ -58,7 +57,7 @@ struct RayPayload
 	int bounce;
 };
 
-#include "../CommonGI/ScatteringHLSL.h"
+#include "../CommonGI/ScatteringTools.h"
 
 int3 FromPositionToCell(float3 P) {
 	return (int3)((P - MinimumPosition) / CellSize);
@@ -88,17 +87,18 @@ void PTMainRays() {
 
 	// Initialize random iterator using rays index as seed
 	initializeRandom(raysIndex.x + raysIndex.y*raysDimensions.x);
-	random();
 	// Trace the ray.
 	// Set the ray's extents.
 	RayDesc ray;
-	ray.Origin = LightPosition + float3(random() - 0.5, -0.5, random() - 0.5); // 1 unit quad light
-	ray.Direction = normalize(ray.Origin - LightPosition);
+	ray.Origin = LightPosition;
+	float3 exiting = float3(random() * 2 - 1, -1, random() * 2 - 1);
+	float fact = length(exiting);
+	ray.Direction = exiting / fact;
 	ray.TMin = 0.001;
 	ray.TMax = 10000.0;
 	// photons travel with a piece of intensity. This could produce numerical problems and it is better to add entire intensity
 	// and then divide by the number of photons.
-	RayPayload payload = { LightIntensity * 1000000 / (-ray.Direction.y * pi * raysDimensions.x * raysDimensions.y), 2 };
+	RayPayload payload = { LightIntensity * 1000000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), 3 };
 	TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload); // Will be used with Photon scattering function
 }
 
@@ -130,8 +130,7 @@ void RTMainRays()
 	RenderTarget[DispatchRaysIndex().xy] = float4(payload.color, 1);
 }
 
-[shader("closesthit")]
-void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
+void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)
 {
 	float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
@@ -141,7 +140,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 	Vertex v1 = vertices[triangleIndex * 3 + 0];
 	Vertex v2 = vertices[triangleIndex * 3 + 1];
 	Vertex v3 = vertices[triangleIndex * 3 + 2];
-	Vertex surfel = {
+	Vertex s = {
 		v1.P * barycentrics.x + v2.P * barycentrics.y + v3.P * barycentrics.z,
 		v1.N * barycentrics.x + v2.N * barycentrics.y + v3.N * barycentrics.z,
 		v1.C * barycentrics.x + v2.C * barycentrics.y + v3.C * barycentrics.z,
@@ -149,14 +148,22 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 		v1.B * barycentrics.x + v2.B * barycentrics.y + v3.B * barycentrics.z
 	};
 
-	surfel = Transform(surfel, ObjectToWorld4x3());
+	surfel = Transform(s, ObjectToWorld4x3());
 
-	Material material = materials[materialIndex];
-	float3 V = -normalize(WorldRayDirection());
+	material = materials[materialIndex];
 
-	float NdotV = dot(V, surfel.N);
-	bool exiting = NdotV < 0;
-	float3 fN = exiting ? -surfel.N : surfel.N;
+	AugmentHitInfoWithTextureMapping(surfel, material);
+}
+
+
+[shader("closesthit")]
+void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
+{
+	Vertex surfel;
+	Material material;
+	GetHitInfo(attr, surfel, material);
+
+	float3 V = -WorldRayDirection();
 
 	if (material.Roulette.x > 0) // Material has some diffuse component
 	{ // Store the photon in the photon map
@@ -178,52 +185,36 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 	//if (false)
 	if (payload.bounce > 0) // Photon can bounce one more time
 	{
-		//float3 ratio, direction;
-		//float pdf;
+		float3 ratio, direction;
+		RandomScatterRay(V, surfel, material, ratio, direction);
 
-		//RandomScatter(V, surfel, exiting, material, direction, ratio, pdf);
+		if (any(ratio))
+		{
+			RayDesc newPhotonRay;
+			newPhotonRay.Direction = direction;
+			newPhotonRay.Origin = surfel.P + sign(dot(direction, surfel.N))*0.001*surfel.N; // avoid self shadowing
+			newPhotonRay.TMin = 0.001;
+			newPhotonRay.TMax = 100000;
 
-		//if (any(ratio))
-		//{
-		//	RayDesc newPhotonRay;
-		//	newPhotonRay.Direction = direction;
-		//	newPhotonRay.Origin = surfel.P + sign(dot(newPhotonRay.Direction, surfel.N))*0.0001*surfel.N; // avoid self shadowing
-		//	newPhotonRay.TMin = 0.001;
-		//	newPhotonRay.TMax = 100000;
+			RayPayload newPhotonPayload = { payload.color * ratio, payload.bounce - 1 };
 
-		//	RayPayload newPhotonPayload = { payload.color * ratio / pdf, payload.bounce - 1 };
-
-		//	TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
-		//}
+			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
+		}
 	}
 }
 
 // Perform photon gathering
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
 
-	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
-	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0.001, 0.001) : material.Specular;
-	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, 0.001, 0.001) : float3(0.5, 0.5, 1);
-	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, 0.001, 0.001) : 1;
-
-	float3x3 worldToTangent = { surfel.T, surfel.B, surfel.N };
-
-	float3 normal = normalize(mul(BumpTex * 2 - 1, worldToTangent));
-
-	float radius = 0.01;// min(CellSize.x, min(CellSize.y, CellSize.z)) / 2;
+	float radius = 0.05;// 4 * max(CellSize.x, max(CellSize.y, CellSize.z));
 
 	int3 begCell = FromPositionToCell(surfel.P - radius);
 	int3 endCell = FromPositionToCell(surfel.P + radius);
 
 	float3 totalLighting = material.Emissive;
 
-	//radius *= 0.6;
-
-	//[unroll(2)]
 	for (int dz = begCell.z; dz <= endCell.z; dz++)
-	//	[unroll(2)]
 	for (int dy = begCell.y; dy <= endCell.y; dy++)
-	//	[unroll(2)]
 	for (int dx = begCell.x; dx <= endCell.x; dx++)
 	{
 		int cellIndexToQuery = FromCellToCellIndex(int3(dx, dy, dz));
@@ -236,14 +227,25 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 
 				Photon p = Photons[currentPhotonPtr];
 
+				float NdotL = dot(surfel.N, -p.Direction);
+				
+				float photonDistance = length(p.Position - surfel.P);
+
 				// Aggregate current Photon contribution if inside radius
-				if (length(p.Position - surfel.P) < radius)
+				if (photonDistance < radius && NdotL > 0)
 				{
-					float3 H = normalize(V - p.Direction);
+					// Lambert Diffuse component (normalized dividing by pi)
+					float3 DiffuseRatio = DiffuseBRDF(V, -p.Direction, surfel.N, NdotL, material);
+					// Blinn Specular component (normalized multiplying by (2+n)/(2pi)
+					float3 SpecularRatio = SpecularBRDF(V, -p.Direction, surfel.N, NdotL, material);
 
-					float3 BRDF = material.Diffuse * DiffTex + max(SpecularTex, material.Specular) * pow(saturate(dot(normal, H)), material.SpecularSharpness);
+					float kernel = 2 * (1 - photonDistance / radius);
 
-					totalLighting += p.Intensity * BRDF;
+					float3 BRDF =
+						material.Roulette.x * DiffuseRatio
+						+ material.Roulette.y * SpecularRatio;
+
+					totalLighting += kernel * p.Intensity * BRDF;
 				}
 
 				currentPhotonPtr = NextBuffer[currentPhotonPtr];
@@ -274,47 +276,45 @@ void RTScattering(inout RayPayload payload, in MyAttributes attr)
 	};
 
 	surfel = Transform(surfel, ObjectToWorld4x3());
-
 	Material material = materials[materialIndex];
+
+	AugmentHitInfoWithTextureMapping(surfel, material);
+
 	float3 V = -normalize(WorldRayDirection());
 
 	float3 totalLight = material.Emissive +
-		material.Roulette.x * ComputeDirectLightInWorldSpace(surfel, material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
+		ComputeDirectLightInWorldSpace(surfel, material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
 
 	if (payload.bounce > 0)
 	{
-		bool entering = dot(V, surfel.N) > 0;
-		float reflectionIndex, refractionIndex;
-		float3 reflectionDir, refractionDir;
-		float eta = entering ? 1 / material.Roulette.w : material.Roulette.w;
-		float3 fN = entering ? surfel.N : -surfel.N;
-		ComputeFresnel(-V, fN, eta,
-			reflectionIndex, refractionIndex, reflectionDir, refractionDir);
-
-		if (reflectionIndex > 0) {
+		float4 R, T;
+		float3 fN;
+		ComputeImpulses(V, surfel, material, fN, R, T);
+		
+		if (R.w > 0) {
 			// Trace the ray.
 			// Set the ray's extents.
 			RayDesc reflectionRay;
-			reflectionRay.Origin = surfel.P + fN * 0.0001;
-			reflectionRay.Direction = reflectionDir;
+			reflectionRay.Origin = surfel.P + fN * 0.001;
+			reflectionRay.Direction = R.xyz;
 			reflectionRay.TMin = 0.001;
 			reflectionRay.TMax = 10000.0;
 			RayPayload reflectionPayload = { float3(0, 0, 0), payload.bounce - 1 };
 			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, reflectionRay, reflectionPayload);
-			totalLight += (material.Roulette.y + material.Roulette.z * reflectionIndex)*reflectionPayload.color; /// Mirror and fresnel reflection
+			totalLight += R.w*material.Specular*reflectionPayload.color; /// Mirror and fresnel reflection
 		}
 
-		if (refractionIndex > 0) {
+		if (T.w > 0) {
 			// Trace the ray.
 			// Set the ray's extents.
 			RayDesc refractionRay;
 			refractionRay.Origin = surfel.P - fN * 0.0001;
-			refractionRay.Direction = refractionDir;
+			refractionRay.Direction = T.xyz;
 			refractionRay.TMin = 0.001;
 			refractionRay.TMax = 10000.0;
 			RayPayload refractionPayload = { float3(0, 0, 0), payload.bounce - 1 };
 			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, refractionRay, refractionPayload);
-			totalLight += material.Roulette.z * refractionIndex * refractionPayload.color;
+			totalLight += T.w * material.Specular * refractionPayload.color;
 		}
 	}
 	payload.color = totalLight;

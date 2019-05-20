@@ -9,7 +9,7 @@ public:
 	~HybridPhotonTracer() {
 	}
 #define RESOLUTION 128
-#define DISPATCH_RAYS_DIMENSION 2048
+#define DISPATCH_RAYS_DIMENSION 1024
 #define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*3)
 
 	// Scene loading process to retain scene on the GPU
