@@ -291,9 +291,9 @@ public:
 		D3D12_RAYTRACING_AABB* aabbs = new D3D12_RAYTRACING_AABB[MAX_NUMBER_OF_PHOTONS];
 		for (int i = 0; i < MAX_NUMBER_OF_PHOTONS; i++)
 		{
-			float x = 4*(rand() % 1000) / 1000.0f - 2;
-			float y = 4*(rand() % 1000) / 1000.0f - 2;
-			float z = 4*(rand() % 1000) / 1000.0f - 2;
+			float x = 2*(rand() % 1000) / 1000.0f - 1;
+			float y = 2*(rand() % 1000) / 1000.0f - 1;
+			float z = 2*(rand() % 1000) / 1000.0f - 1;
 			aabbs[i] = { x,y,z, x + 0.01f, y + 0.01f ,z + 0.01f };
 		}
 		manager gCopy PtrData(PhotonsAABBs, aabbs);

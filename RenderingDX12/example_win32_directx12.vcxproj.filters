@@ -47,6 +47,7 @@
     <ClInclude Include="Techniques\CommonGI\Definitions.h" />
     <ClInclude Include="Techniques\CommonGI\ScatteringTools.h" />
     <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
+    <ClInclude Include="Techniques\Tutorials\Tutorial12.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -90,6 +91,7 @@
     <FxCompile Include="Techniques\DXR_Photontracer\DXR_PhotonMapping_RT.hlsl" />
     <FxCompile Include="Techniques\RASTER_DXR_Photontracer\HPhotonTracer_RT.hlsl" />
     <FxCompile Include="Techniques\RASTER_DXR_Photontracer\HPhotonGrathering_RT.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\UpdateAABBs_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Techniques\Tutorials\Tutorials.rm" />

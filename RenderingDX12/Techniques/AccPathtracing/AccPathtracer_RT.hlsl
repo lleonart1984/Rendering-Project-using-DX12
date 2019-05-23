@@ -67,14 +67,17 @@ float ShadowCast(Vertex surfel)
 {
 	float3 pInLightViewSpace = mul(float4(surfel.P, 1), LightView).xyz;
 	float4 pInLightProjSpace = mul(float4(pInLightViewSpace, 1), LightProj);
-	float2 cToTest = 0.5 + 0.5 * pInLightProjSpace.xy / pInLightProjSpace.w;
+	if (pInLightProjSpace.z <= 0.01)
+		return 0;
+	pInLightProjSpace.xyz /= pInLightProjSpace.w;
+	float2 cToTest = 0.5 + 0.5 * pInLightProjSpace.xy;
 	cToTest.y = 1 - cToTest.y;
 	float3 lightSampleP = LightPositions.SampleGrad(shadowSmp, cToTest, 0, 0);
 	return pInLightViewSpace.z - lightSampleP.z < 0.001 ? 1 : 0;
 }
 
 float LightSphereRadius() {
-	return 0.5;
+	return 0.1;
 }
 
 float3 PathtracingScattering(float3 V, Vertex surfel, Material material, int bounces)
@@ -145,7 +148,7 @@ void PTMainRays()
 		Output[DispatchRaysIndex().xy] += float4(payload.color, 1);
 		return;
 	}
-	float3 V = normalize(-P); // In view spce "viewer" is positioned in (0,0,0) 
+	float3 V = normalize(-P); // In view space "viewer" is positioned in (0,0,0) 
 
 	// Move to world space
 	P = mul(float4(P, 1), ViewToWorld).xyz;

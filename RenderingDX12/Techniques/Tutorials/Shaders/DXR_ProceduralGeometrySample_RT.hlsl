@@ -40,12 +40,12 @@ void MyRaygenShader()
 [shader("anyhit")]
 void MyAnyHit(inout RayPayload payload, in MyAttributes attr) {
 	
-	if ((int)PrimitiveIndex() == -1)
+	//if ((int)PrimitiveIndex() == -1)
 		payload.color += float4(0.01, 1, 0.01, 0);
-	else {
-		int f = abs((int)PrimitiveIndex()) / (float)(128 * 128);
-		payload.color += float4(0.01, f, 0.01, 0);
-	}
+	//else {
+	//	int f = abs((int)PrimitiveIndex()) / (float)(128 * 128);
+	//	payload.color += float4(0.01, f, 0.01, 0);
+	//}
 	IgnoreHit();
 }
 

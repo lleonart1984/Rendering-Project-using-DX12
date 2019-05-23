@@ -1,59 +1,40 @@
-// Material info
-struct Material
-{
-	float3 Diffuse;
-	float3 Specular;
-	float SpecularSharpness;
-	int4 Texture_Index; // X - diffuse map, Y - Specular map, Z - Bump Map, W - Mask Map
-	float3 Emissive; // Emissive component for lights
-	float4 Roulette; // X - Diffuse ammount, Y - Mirror scattering, Z - Fresnell scattering, W - Refraction Index (if fresnel)
+#include "../CommonGI/Definitions.h"
+
+// Photon Data
+struct Photon {
+	float3 Direction;
+	float3 Intensity;
+	float3 Position;
+	float Radius;
 };
 
-// Vertex Data
-struct Vertex
-{
-	// Position
-	float3 P;
-	// Normal
-	float3 N;
-	// Texture coordinates
-	float2 C;
-	// Tangent Vector
-	float3 T;
-	// Binormal Vector
-	float3 B;
-};
-
-// Raytracing hit data collected (raytracing hit are collected for a defered photon gathering)
-struct RaytracingHit {
-	int TriangleIndex;
-	float2 Coordinates;
-	float3 V;
-	float3 Importance;
-};
+#define IS_TRIANGLE_MASK 1
+#define IS_PHOTON_MASK 2
 
 // Top level structure with the scene
 RaytracingAccelerationStructure Scene		: register(t0);
-StructuredBuffer<Vertex> vertices			: register(t1);
-StructuredBuffer<Material> materials		: register(t2);
+
+// > Photons buffer with photon information (position, direction, alpha and radius)
+StructuredBuffer<Photon> Photons			: register(t1);
+// > Number of photons (to discard intersections with unused AABBs)
+Texture2D<uint> PhotonCount					: register(t2);
+
+StructuredBuffer<Vertex> vertices			: register(t3);
+StructuredBuffer<Material> materials		: register(t4);
 
 // GBuffer Used for primary rays (from light in photon trace and from viewer in raytrace)
-Texture2D<float3> Positions					: register(t3);
-Texture2D<float3> Normals					: register(t4);
-Texture2D<float2> Coordinates				: register(t5);
-Texture2D<int> MaterialIndices				: register(t6);
+Texture2D<float3> Positions					: register(t5);
+Texture2D<float3> Normals					: register(t6);
+Texture2D<float2> Coordinates				: register(t7);
+Texture2D<int> MaterialIndices				: register(t8);
 // Used for direct light visibility test
-Texture2D<float3> LightPositions			: register(t7);
+Texture2D<float3> LightPositions			: register(t9);
 
 // Textures
-Texture2D<float4> Textures[500]				: register(t8);
+Texture2D<float4> Textures[500]				: register(t10);
 
 // Raytracing radiance (missing diffuse and specular interreflections)
 RWTexture2D<float3> Output					: register(u0);
-// Number of raytracing hits per screen pixel (up to 2^RaytracingDEEP - 1)
-RWTexture2D<int> HitCount					: register(u1);
-// Buffer with all raytracing hits. For each screen pixel a 2^RaytracingDEEP-1 block is allocated.
-RWStructuredBuffer<RaytracingHit> Hits		: register(u2);
 
 // Used for texture mapping
 SamplerState gSmp : register(s0);
@@ -86,142 +67,157 @@ ConstantBuffer<ObjInfo> objectInfo : register(b3);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
+struct PhotonHitAttributes {
+	// Photon Index
+	int PhotonIdx;
+};
+
 struct RayPayload
 {
-	float3 Importance;
-	float3 AccColor;
+	float3 color;
 	int bounce;
 };
 
-void ComputeFresnel(float3 dir, float3 faceNormal, float ratio, out float reflection, out float refraction)
+struct PhotonRayPayload
 {
-	float f = ((1.0 - ratio) * (1.0 - ratio)) / ((1.0 + ratio) * (1.0 + ratio));
+	float3 InNormal;
+	float InSpecularSharpness;
+	float3 OutDiffuseAccum;
+	float3 OutSpecularAccum;
+};
 
-	float Ratio = f + (1.0 - f) * pow((1.0 + dot(dir, faceNormal)), 5);
+#include "../CommonGI/ScatteringTools.h"
 
-	reflection = min(1, Ratio);
-	refraction = max(0, 1 - reflection);
+[shader("anyhit")]
+void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
+	Photon p = Photons[attr.PhotonIdx];
+	float3 V = WorldRayDirection();
+	float3 H = normalize(V - p.Direction);
+	float area = pi * p.Radius * p.Radius;
+	payload.OutDiffuseAccum += 0.1;// p.Intensity / area;
+	payload.OutSpecularAccum += p.Intensity*pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
+
+	IgnoreHit(); // Continue search to accumulate other photons
 }
 
-Vertex Transform(Vertex surfel, float4x3 transform) {
-	Vertex v = {
-		mul(float4(surfel.P, 1), transform),
-		mul(float4(surfel.N, 0), transform),
-		surfel.C,
-		mul(float4(surfel.T, 0), transform),
-		mul(float4(surfel.B, 0), transform) };
-	return v;
+[shader("intersection")]
+void PhotonGatheringIntersection() {
+	// use object info instead of PrimitiveIndex because
+	// fallback device has errors for this function with procedural geometries
+	int index = objectInfo.TriangleOffset;
+	//if (index < PhotonCount[uint2(0, 0)]) // It is a valid photon
+		ReportHit(0.1, 0, (PhotonHitAttributes)index);
 }
 
-void AugmentHitInfoWithTextureMapping(bool onlyMaterial, inout Vertex surfel, inout Material material) {
-	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
-	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0, 0) : material.Specular;
-	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, 0, 0) : float3(0.5, 0.5, 1);
-	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, 0, 0) : 1;
+[shader("miss")]
+void PhotonGatheringMiss(inout PhotonRayPayload payload)
+{
+}
 
-	if (!onlyMaterial) {
-		float3x3 TangentToWorld = { surfel.T, surfel.B, surfel.N };
-		// Change normal according to bump map
-		surfel.N = normalize(mul(BumpTex * 2 - 1, TangentToWorld));
-	}
+// Perform photon gathering using DXR API
+float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
 
-	material.Diffuse *= DiffTex * MaskTex.x; // set transparent if necessary.
-	material.Specular.xyz = max(material.Specular.xyz, SpecularTex);
+	PhotonRayPayload photonGatherPayload = {
+		/*InNormal*/				surfel.N,
+		/*InSpecularSharpness*/		material.SpecularSharpness,
+		/*OutDiffuseAccum*/			float3(0,0,0),
+		/*OutSpecularAccum*/		float3(0,0,0)
+	};
+	RayDesc ray;
+	ray.Origin = surfel.P - V * 0.1;
+	ray.Direction = V * 0.2;
+	ray.TMin = 0.0001;
+	ray.TMax = 1;
+	// Photon Map trace
+	// PhotonMap ADS
+	// RAY_FLAG_FORCE_NON_OPAQUE to produce any hit execution
+	// IS_PHOTON_MASK : only photons are considered
+	// 0 : Ray contribution to hitgroup index
+	// 1 : Multiplier (all geometries AABBs will use the a hit group entry with the index because the bug of PrimitiveIndex)
+	// 1 : Miss index for PhotonGatheringMiss shader
+	// ray
+	// raypayload
+	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, IS_PHOTON_MASK, 0, 1, 1, ray, photonGatherPayload);
+	return material.Diffuse * photonGatherPayload.OutDiffuseAccum;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+}
+
+float LightSphereRadius() {
+	return 0.1;
+}
+
+// Gets true if current surfel is lit by the light source
+// checking not with DXR but with classic shadow maps represented
+// by GBuffer obtained from light
+float ShadowCast(Vertex surfel)
+{
+	float3 pInLightViewSpace = mul(float4(surfel.P, 1), LightView).xyz;
+	float4 pInLightProjSpace = mul(float4(pInLightViewSpace, 1), LightProj);
+	if (pInLightProjSpace.z <= 0)
+		return 0;
+	float2 cToTest = 0.5 + 0.5 * pInLightProjSpace.xy / pInLightProjSpace.w;
+	cToTest.y = 1 - cToTest.y;
+	float3 lightSampleP = LightPositions.SampleGrad(shadowSmp, cToTest, 0, 0);
+	return pInLightViewSpace.z - lightSampleP.z < 0.001;
 }
 
 float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int bounces)
 {
 	float3 total = float3(0, 0, 0);
 
-	float3 L = LightPosition - surfel.P;
-	float d = length(L);
-	L /= d;
-	float3 H = normalize(V + L);
-	float3 I = LightIntensity / (2 * 3.14159*d*d);
-	float NdotL = dot(surfel.N, L);
-	float3 diff = max(0, NdotL)*material.Diffuse*I;
-	float3 spec = NdotL > 0 ? pow(max(0, dot(H, surfel.N)), material.SpecularSharpness)*material.Specular*I : 0;
+	// Adding Emissive
+	total += material.Emissive;
 
-	float3 pInLightViewSpace = mul(float4(surfel.P, 1), LightView).xyz;
-	float4 pInLightProjSpace = mul(float4(pInLightViewSpace, 1), LightProj);
+	// Adding direct lighting
+	float NdotV;
+	bool invertNormal;
+	float3 fN;
+	float4 R, T;
+	total += ComputeDirectLighting(
+		V,
+		surfel,
+		material,
+		LightPosition,
+		LightIntensity,
+		/*Out*/ NdotV, invertNormal, fN, R, T);
 
-	float2 cToTest = 0.5 + 0.5 * pInLightProjSpace.xy / pInLightProjSpace.w;
-	cToTest.y = 1 - cToTest.y;
-
-	float3 lightSampleP = LightPositions.SampleGrad(shadowSmp, cToTest, 0, 0);
-
-	float visibility = //cToTest.x < 0 || cToTest.y < 0 || cToTest.x > 1 || cToTest.y > 1 ? 0 :
-		((pInLightViewSpace.z) - (lightSampleP.z)) < 0.001;
-
-	total += material.Emissive +
-		material.Roulette.x * (diff + spec) * visibility;
+	// Get indirect diffuse light compute using photon map
+	total += ComputeDirectLightInWorldSpace(surfel, material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
 
 	if (bounces > 0)
 	{
-		bool entering = dot(V, surfel.N) > 0;
-		float reflectionIndex, refractionIndex;
-		float eta = entering ? 1 / material.Roulette.w : material.Roulette.w;
-		float3 fN = entering ? surfel.N : -surfel.N;
-		ComputeFresnel(-V, fN, eta,
-			reflectionIndex, refractionIndex);
-		float3 reflectionDir = reflect(-V, fN);
-		float3 refractionDir = refract(-V, fN, eta);
-		if (!any(refractionDir))
-		{
-			reflectionIndex = 1;
-			refractionIndex = 0; // total internal reflection
-		}
-
-		float reflectionFactor = material.Roulette.y + material.Roulette.z * reflectionIndex;
-		float refractionFactor = material.Roulette.z * refractionIndex;
-
-		if (reflectionFactor > 0.01) {
+		if (R.w > 0.01) {
 			// Trace the ray.
 			// Set the ray's extents.
 			RayDesc reflectionRay;
 			reflectionRay.Origin = surfel.P + fN * 0.0001;
-			reflectionRay.Direction = reflectionDir;
+			reflectionRay.Direction = R.xyz;
 			reflectionRay.TMin = 0.001;
 			reflectionRay.TMax = 10000.0;
-			RayPayload reflectionPayload = { float3(1,1,1), float3(0, 0, 0), bounces - 1 };
-			// Raytracing Trace for reflection
-			// Scene ADS
-			// RAY_FLAG_FORCE_OPAQUE : no anyhit shaders bound
-			// ~O : Consider all triangles
-			// 1 : Ray contribution to hitgroup index, starting in 1 because first slot is saved for a unique photon gathering hit group.
-			// 1 : Multiplier for geometry indices
-			// 0 : Miss shader index for Environment map
-			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, ~0, 1, 1, 0, reflectionRay, reflectionPayload);
-			total += reflectionFactor * reflectionPayload.AccColor; /// Mirror and fresnel reflection
+			RayPayload reflectionPayload = { float3(0, 0, 0), bounces - 1 };
+			TraceRay(Scene, RAY_FLAG_NONE, IS_TRIANGLE_MASK, 0, 1, 0, reflectionRay, reflectionPayload);
+			total += R.w * material.Specular * reflectionPayload.color; /// Mirror and fresnel reflection
 		}
 
-		if (refractionIndex > 0.01) {
+		if (T.w > 0.01) {
 			// Trace the ray.
 			// Set the ray's extents.
 			RayDesc refractionRay;
 			refractionRay.Origin = surfel.P - fN * 0.0001;
-			refractionRay.Direction = refractionDir;
+			refractionRay.Direction = T.xyz;
 			refractionRay.TMin = 0.001;
 			refractionRay.TMax = 10000.0;
-			RayPayload refractionPayload = { float3(1,1,1), float3(0, 0, 0), bounces - 1 };
-			// Raytracing Trace for refraction
-			// Scene ADS
-			// RAY_FLAG_FORCE_OPAQUE : no anyhit shaders bound
-			// ~O : Consider all triangles
-			// 1 : Ray contribution to hitgroup index, starting in 1 because first slot is saved for a unique photon gathering hit group.
-			// 1 : Multiplier for geometry indices
-			// 0 : Miss shader index for Environment map
-			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, ~0, 1, 1, 0, refractionRay, refractionPayload);
-			total += refractionFactor * refractionPayload.AccColor;
+			RayPayload refractionPayload = { float3(0, 0, 0), bounces - 1 };
+			TraceRay(Scene, RAY_FLAG_NONE, IS_TRIANGLE_MASK, 0, 1, 0, refractionRay, refractionPayload);
+			total += T.w * material.Specular * refractionPayload.color;
 		}
 	}
 	return total;
 }
 
+
 [shader("miss")]
 void EnvironmentMap(inout RayPayload payload)
 {
-	payload.AccColor = WorldRayDirection();
 }
 
 [shader("raygeneration")]
@@ -237,9 +233,7 @@ void RTMainRays()
 
 	if (!any(P)) // force miss execution
 	{
-		RayPayload payload = { float3(1,1,1), float3(0,0,0), 0 };
-		//EnvironmentMap(payload);
-		Output[DispatchRaysIndex().xy] = float4(payload.AccColor, 1);
+		Output[DispatchRaysIndex().xy] = float4(0, 0, 0, 1);
 		return;
 	}
 	float3 V = normalize(-P); // In view spce "viewer" is positioned in (0,0,0) 
@@ -258,7 +252,7 @@ void RTMainRays()
 	};
 
 	// only update material, Normal is affected with bump map from gbuffer construction
-	AugmentHitInfoWithTextureMapping(true, surfel, material);
+	AugmentMaterialWithTextureMapping(surfel, material);
 
 	// Write the raytraced color to the output texture.
 	Output[DispatchRaysIndex().xy] = RaytracingScattering(V, surfel, material, 2);
@@ -286,7 +280,7 @@ void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)
 
 	material = materials[materialIndex];
 
-	AugmentHitInfoWithTextureMapping(false, surfel, material);
+	AugmentHitInfoWithTextureMapping(surfel, material);
 }
 
 [shader("closesthit")]
@@ -296,7 +290,7 @@ void RTScattering(inout RayPayload payload, in MyAttributes attr)
 	Material material;
 	GetHitInfo(attr, surfel, material);
 
-	float3 V = -normalize(WorldRayDirection());
+	float3 V = -WorldRayDirection();
 
-	payload.AccColor = RaytracingScattering(V, surfel, material, payload.bounce);
+	payload.color = RaytracingScattering(V, surfel, material, payload.bounce);
 }

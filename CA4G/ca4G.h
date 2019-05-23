@@ -11,2757 +11,6 @@
 #include <dxgidebug.h>
 #endif
 
-#pragma region D3D12FallbackDevice.h
-
-struct EMULATED_GPU_POINTER
-{
-	UINT32 OffsetInBytes;
-	UINT32 DescriptorHeapIndex;
-};
-
-struct WRAPPED_GPU_POINTER
-{
-	union
-	{
-		EMULATED_GPU_POINTER EmulatedGpuPtr;
-		D3D12_GPU_VIRTUAL_ADDRESS GpuVA;
-	};
-
-	WRAPPED_GPU_POINTER operator+(UINT64 offset)
-	{
-		WRAPPED_GPU_POINTER pointer = *this;
-		pointer.GpuVA += offset;
-		return pointer;
-	}
-};
-
-typedef struct D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC
-{
-	FLOAT Transform[3][4];
-	UINT InstanceID : 24;
-	UINT InstanceMask : 8;
-	UINT InstanceContributionToHitGroupIndex : 24;
-	UINT Flags : 8;
-	WRAPPED_GPU_POINTER AccelerationStructure;
-}     D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC;
-
-class
-	_declspec(uuid("539e5c40-df25-4c7d-81d8-6537f54306ed"))
-	ID3D12RaytracingFallbackStateObject : public IUnknown
-{
-public:
-	virtual ~ID3D12RaytracingFallbackStateObject() {};
-
-	virtual void *STDMETHODCALLTYPE GetShaderIdentifier(
-		_In_  LPCWSTR pExportName) = 0;
-
-	virtual UINT64 STDMETHODCALLTYPE GetShaderStackSize(
-		_In_  LPCWSTR pExportName) = 0;
-
-	virtual UINT64 STDMETHODCALLTYPE GetPipelineStackSize(void) = 0;
-
-	virtual void STDMETHODCALLTYPE SetPipelineStackSize(
-		UINT64 PipelineStackSizeInBytes) = 0;
-
-	virtual ID3D12StateObject *GetStateObject() = 0;
-};
-
-class
-	_declspec(uuid("348a2a6b-6760-4b78-a9a7-1758b6f78d46"))
-	ID3D12RaytracingFallbackCommandList : public IUnknown
-{
-public:
-	virtual ~ID3D12RaytracingFallbackCommandList() {}
-
-	virtual void BuildRaytracingAccelerationStructure(
-		_In_  const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC *pDesc,
-		_In_  UINT NumPostbuildInfoDescs,
-		_In_reads_opt_(NumPostbuildInfoDescs)  const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC *pPostbuildInfoDescs) = 0;
-
-	virtual void STDMETHODCALLTYPE EmitRaytracingAccelerationStructurePostbuildInfo(
-		_In_  const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC *pDesc,
-		_In_  UINT NumSourceAccelerationStructures,
-		_In_reads_(NumSourceAccelerationStructures)  const D3D12_GPU_VIRTUAL_ADDRESS *pSourceAccelerationStructureData) = 0;
-
-	virtual void STDMETHODCALLTYPE CopyRaytracingAccelerationStructure(
-		_In_  D3D12_GPU_VIRTUAL_ADDRESS DestAccelerationStructureData,
-		_In_  D3D12_GPU_VIRTUAL_ADDRESS SourceAccelerationStructureData,
-		_In_  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE Mode) = 0;
-
-	virtual void STDMETHODCALLTYPE SetDescriptorHeaps(
-		_In_  UINT NumDescriptorHeaps,
-		_In_reads_(NumDescriptorHeaps)  ID3D12DescriptorHeap *const *ppDescriptorHeaps) = 0;
-
-	virtual void STDMETHODCALLTYPE SetTopLevelAccelerationStructure(
-		_In_  UINT RootParameterIndex,
-		_In_  WRAPPED_GPU_POINTER  BufferLocation) = 0;
-
-	virtual void STDMETHODCALLTYPE SetPipelineState1(
-		_In_  ID3D12RaytracingFallbackStateObject *pStateObject) = 0;
-
-	virtual void STDMETHODCALLTYPE DispatchRays(
-		_In_  const D3D12_DISPATCH_RAYS_DESC *pDesc) = 0;
-};
-
-class
-	_declspec(uuid("0a662ea0-ab43-423a-848f-4824ae4b25ba"))
-	ID3D12RaytracingFallbackDevice : public IUnknown
-{
-public:
-	virtual ~ID3D12RaytracingFallbackDevice() {};
-
-	virtual bool UsingRaytracingDriver() = 0;
-
-	// Automatically determine how to create WRAPPED_GPU_POINTER based on UsingRaytracingDriver()
-	virtual WRAPPED_GPU_POINTER GetWrappedPointerSimple(UINT32 DescriptorHeapIndex, D3D12_GPU_VIRTUAL_ADDRESS GpuVA) = 0;
-
-	// Pre-condition: UsingRaytracingDriver() must be false
-	virtual WRAPPED_GPU_POINTER GetWrappedPointerFromDescriptorHeapIndex(UINT32 DescriptorHeapIndex, UINT32 OffsetInBytes = 0) = 0;
-
-	// Pre-condition: UsingRaytracingDriver() must be true
-	virtual WRAPPED_GPU_POINTER GetWrappedPointerFromGpuVA(D3D12_GPU_VIRTUAL_ADDRESS gpuVA) = 0;
-
-	virtual D3D12_RESOURCE_STATES GetAccelerationStructureResourceState() = 0;
-
-	virtual UINT STDMETHODCALLTYPE GetShaderIdentifierSize(void) = 0;
-
-	virtual HRESULT STDMETHODCALLTYPE CreateStateObject(
-		const D3D12_STATE_OBJECT_DESC *pDesc,
-		REFIID riid,
-		_COM_Outptr_  void **ppStateObject) = 0;
-
-	virtual void STDMETHODCALLTYPE GetRaytracingAccelerationStructurePrebuildInfo(
-		_In_  const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS *pDesc,
-		_Out_  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO *pInfo) = 0;
-
-	virtual void QueryRaytracingCommandList(
-		ID3D12GraphicsCommandList *pCommandList,
-		REFIID riid,
-		_COM_Outptr_  void **ppRaytracingCommandList) = 0;
-
-	virtual HRESULT STDMETHODCALLTYPE CreateRootSignature(
-		_In_  UINT nodeMask,
-		_In_reads_(blobLengthInBytes)  const void *pBlobWithRootSignature,
-		_In_  SIZE_T blobLengthInBytes,
-		REFIID riid,
-		_COM_Outptr_  void **ppvRootSignature) = 0;
-
-	virtual HRESULT D3D12SerializeVersionedRootSignature(
-		_In_ const D3D12_VERSIONED_ROOT_SIGNATURE_DESC* pRootSignature,
-		_Out_ ID3DBlob** ppBlob,
-		_Always_(_Outptr_opt_result_maybenull_) ID3DBlob** ppErrorBlob) = 0;
-
-	virtual HRESULT WINAPI D3D12SerializeRootSignature(
-		_In_ const D3D12_ROOT_SIGNATURE_DESC* pRootSignature,
-		_In_ D3D_ROOT_SIGNATURE_VERSION Version,
-		_Out_ ID3DBlob** ppBlob,
-		_Always_(_Outptr_opt_result_maybenull_) ID3DBlob** ppErrorBlob) = 0;
-};
-
-enum CreateRaytracingFallbackDeviceFlags
-{
-	None = 0x0,
-	ForceComputeFallback = 0x1,
-	EnableRootDescriptorsInShaderRecords = 0x2
-};
-
-HRESULT D3D12CreateRaytracingFallbackDevice(
-	_In_ ID3D12Device *pDevice,
-	_In_ DWORD createRaytracingFallbackDeviceFlags,
-	_In_ UINT NodeMask,
-	_In_ REFIID riid,
-	_COM_Outptr_opt_ void** ppDevice);
-
-#pragma endregion
-
-namespace CA4G {
-#pragma region Class Definitions
-	class Bundle;
-	class Clearing;
-	class Creating;
-	class Loading;
-	class Copying;
-	class CommandListManager;
-	class CopyingManager;
-	class ComputeManager;
-	class GraphicsManager;
-	class DXRManager;
-	class Presenter;
-	class DeviceManager;
-	template<typename ...A> class PipelineBindings;
-	class ComputePipelineBindings;
-	class GraphicsPipelineBindings;
-	class ResourceWrapper;
-	class ResourceView;
-	class Buffer;
-	class Texture1D;
-	class Texture2D;
-	class CubeTexture;
-	class Texture2DMS;
-	class Texture3D;
-	struct Sampler;
-	class GPUScheduler;
-	class SceneBuilder;
-	class GeometryCollection;
-	class TriangleGeometryCollection;
-	class ProceduralGeometryCollection;
-	class InstanceCollection;
-	class HitGroupManager;
-	template<typename S, D3D12_STATE_SUBOBJECT_TYPE Type> class DynamicStateBindingOf;
-	class DXILManager;
-	template<typename C> class DXIL_Library;
-	class IRTProgram;
-	template<typename L> class RTProgram;
-	class RTPipelineManager;
-#pragma endregion
-}
-
-#pragma region DX COM OBJECTS
-
-typedef CComPtr<ID3D12DescriptorHeap> DX_DescriptorHeap;
-typedef CComPtr<ID3D12Device5> DX_Device;
-typedef CComPtr<ID3D12RaytracingFallbackDevice> DX_FallbackDevice;
-typedef CComPtr<ID3D12RaytracingFallbackCommandList> DX_FallbackCommandList;
-typedef CComPtr<ID3D12RaytracingFallbackStateObject> DX_FallbackStateObject;
-
-typedef CComPtr<ID3D12GraphicsCommandList4> DX_CommandList;
-typedef CComPtr<ID3D12CommandAllocator> DX_CommandAllocator;
-typedef CComPtr<ID3D12CommandQueue> DX_CommandQueue;
-typedef CComPtr<ID3D12Fence1> DX_Fence;
-typedef CComPtr<ID3D12Heap1> DX_Heap;
-typedef CComPtr<ID3D12PipelineState> DX_PipelineState;
-typedef CComPtr<ID3D12Resource1> DX_Resource;
-typedef CComPtr<ID3D12RootSignature> DX_RootSignature;
-typedef CComPtr<ID3D12RootSignatureDeserializer> DX_RootSignatureDeserializer;
-typedef CComPtr<ID3D12StateObject> DX_StateObject;
-typedef CComPtr<ID3D12StateObjectProperties> DX_StateObjectProperties;
-
-#pragma endregion
-
-#define CA4G_MAX_NUMBER_OF_WORKERS 8
-#define CA4G_SUPPORTED_ENGINES 4
-#define CA4G_SUPPORTED_BUFFERING 3
-
-#pragma region ca4GErrors.h
-
-#include <comdef.h>
-#include <stdexcept>
-
-namespace CA4G {
-
-	// Represents different error code this engine can report.
-	enum CA4G_Errors {
-		// Some error occurred.
-		CA4G_Errors_Any,
-		// The Pipeline State Object has a bad construction.
-		CA4G_Errors_BadPSOConstruction,
-		// The Signature has a bad construction
-		CA4G_Errors_BadSignatureConstruction,
-		// The image is in an unsupported format.
-		CA4G_Errors_UnsupportedFormat,
-		// Some shader were not found
-		CA4G_Errors_ShaderNotFound,
-		// Some initialization failed because memory was over
-		CA4G_Errors_RunOutOfMemory,
-		// Invalid Operation
-		CA4G_Errors_Invalid_Operation,
-		// Fallback raytracing device was not supported
-		CA4G_Errors_Unsupported_Fallback
-	};
-
-	class CA4GException : public std::exception {
-	public:
-		CA4GException(const char* const message) :std::exception(message) {}
-
-		static CA4GException FromError(CA4G_Errors error, const char* arg = nullptr, HRESULT hr = S_OK);
-
-	};
-}
-
-#pragma endregion
-
-#pragma region ca4GMemory.h
-
-namespace CA4G {
-
-	template<typename S>
-	class gObj {
-		friend S;
-		template<typename T> friend class list; // I dont like it... :(
-		template<typename T> friend class gObj;
-
-	private:
-		S *_this;
-		volatile long* counter;
-
-		void AddReference();
-
-		void RemoveReference();
-
-	public:
-		gObj() : _this(nullptr), counter(nullptr) {
-		}
-		gObj(S* self) : _this(self), counter(self ? new long(1) : nullptr) {
-		}
-
-		inline bool isNull() const { return _this == nullptr; }
-
-		// Copy constructor
-		gObj(const gObj<S>& other) {
-			this->counter = other.counter;
-			this->_this = other._this;
-			if (!isNull())
-				AddReference();
-		}
-
-		template <typename Subtype>
-		gObj(const gObj<Subtype>& other) {
-			this->counter = other.counter;
-			this->_this = (S*)other._this;
-			if (!isNull())
-				AddReference();
-		}
-
-		gObj<S>& operator = (const gObj<S>& other) {
-			if (!isNull())
-				RemoveReference();
-			this->counter = other.counter;
-			this->_this = other._this;
-			if (!isNull())
-				AddReference();
-			return *this;
-		}
-
-		bool operator == (const gObj<S> &other) {
-			return other._this == _this;
-		}
-
-		bool operator != (const gObj<S> &other) {
-			return other._this != _this;
-		}
-
-		template<typename A>
-		auto& operator[](A arg) {
-			return (*_this)[arg];
-		}
-
-		~gObj() {
-			if (!isNull())
-				RemoveReference();
-		}
-
-		//Dereference operator
-		S& operator*()
-		{
-			return *_this;
-		}
-		//Member Access operator
-		S* operator->()
-		{
-			return _this;
-		}
-
-		template<typename T>
-		gObj<T> Dynamic_Cast() {
-			gObj<T> obj;
-			obj._this = dynamic_cast<T*>(_this);
-			obj.counter = counter;
-			obj.AddReference();
-			return obj;
-		}
-
-		template<typename T>
-		gObj<T> Static_Cast() {
-			gObj<T> obj;
-			obj._this = static_cast<T*>(_this);
-			obj.counter = counter;
-			obj.AddReference();
-			return obj;
-		}
-
-		operator bool() const {
-			return !isNull();
-		}
-	};
-}
-
-#pragma endregion
-
-#pragma region ca4GShaders.h
-
-namespace CA4G {
-
-#define CompiledShader(s) (s),ARRAYSIZE(s) 
-
-	class ShaderLoader {
-	public:
-		// Use this method to load a bytecode
-		static D3D12_SHADER_BYTECODE FromFile(const char* bytecodeFilePath);
-
-		// Use this method to load a bytecode from a memory buffer
-		static D3D12_SHADER_BYTECODE FromMemory(const byte* bytecodeData, int count);
-
-		// Use this method to load a bytecode from a memory buffer
-		template<int count>
-		static D3D12_SHADER_BYTECODE FromMemory(const byte(&bytecodeData)[count]);
-	};
-
-}
-
-
-#pragma endregion
-
-#pragma region ca4GImaging.h
-
-namespace CA4G {
-
-	struct TextureData {
-		int const Width;
-		int const Height;
-		int const MipMaps;
-		union {
-			int const ArraySlices;
-			int const Depth;
-		};
-		DXGI_FORMAT const Format;
-		byte* const Data;
-
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT *footprints;
-
-		long long const DataSize;
-		bool const FlipY;
-		D3D12_RESOURCE_DIMENSION Dimension;
-
-		TextureData(int width, int height, int mipMaps, int slices, DXGI_FORMAT format, byte* data, long long dataSize, bool flipY = false);
-
-		TextureData(int width, int height, int depth, DXGI_FORMAT format, byte* data, long long dataSize, bool flipY = false);
-
-		~TextureData();
-
-		static gObj<TextureData> CreateEmpty(int width, int height, int mipMaps, int slices, DXGI_FORMAT format);
-
-		static gObj<TextureData> CreateEmpty(int width, int height, int depth, DXGI_FORMAT format);
-
-		static gObj<TextureData> LoadFromFile(const char * filename);
-
-	private:
-		int pixelStride;
-
-	};
-}
-
-#pragma endregion
-
-#pragma region ca4GSync.h
-
-namespace CA4G {
-
-	class Semaphore {
-		HANDLE handle;
-#ifdef _DEBUG
-		int currentCounter;
-		int maxCount;
-		bool waiting = false;
-#endif
-	public:
-
-		Semaphore(int initialCount, int maxCount)
-#ifdef _DEBUG
-			:currentCounter(initialCount), maxCount(maxCount)
-#endif
-		{
-			handle = CreateSemaphore(nullptr, initialCount, maxCount, nullptr);
-		}
-		~Semaphore() {
-			CloseHandle(handle);
-		}
-
-		inline bool Wait() {
-#ifdef _DEBUG
-			waiting = true;
-#endif
-			auto result = WaitForSingleObject(handle, INFINITE);
-#ifdef _DEBUG
-			waiting = false;
-			currentCounter--;
-#endif
-			return result == WAIT_OBJECT_0;
-		}
-
-		inline void Release() {
-			ReleaseSemaphore(handle, 1, nullptr);
-#ifdef _DEBUG
-			currentCounter++;
-#endif
-		}
-	};
-
-	class Mutex {
-		HANDLE handle;
-#ifdef _DEBUG
-		bool locked = false;
-#endif
-	public:
-		inline Mutex() {
-			handle = CreateMutex(nullptr, false, nullptr);
-		}
-		~Mutex() {
-			CloseHandle(handle);
-		}
-
-		inline bool Acquire() {
-#ifdef _DEBUG
-			locked = true;
-#endif
-			return WaitForSingleObject(handle, INFINITE) == WAIT_OBJECT_0;
-		}
-
-		inline void Release() {
-			ReleaseMutex(handle);
-#ifdef _DEBUG
-			locked = false;
-#endif
-		}
-	};
-
-	class CountEvent {
-		int count = 0;
-		Mutex mutex;
-		Semaphore goSemaphore;
-	public:
-		inline CountEvent() :mutex(Mutex()), goSemaphore(Semaphore(1, 1)) {
-		}
-
-		inline void Increment() {
-			mutex.Acquire();
-			if (this->count == 0)
-				goSemaphore.Wait();
-			this->count++;
-			mutex.Release();
-		}
-
-		inline void Wait() {
-			goSemaphore.Wait();
-			goSemaphore.Release();
-		}
-
-		inline void Signal() {
-			mutex.Acquire();
-			this->count--;
-			if (this->count == 0)
-				goSemaphore.Release();
-			mutex.Release();
-		}
-	};
-
-	template<typename T>
-	class ProducerConsumerQueue {
-		T* elements;
-		int elementsLength;
-		int start;
-		int count;
-		Semaphore productsSemaphore;
-		Semaphore spacesSemaphore;
-		Mutex mutex;
-		bool closed;
-	public:
-		ProducerConsumerQueue(int capacity) :
-			productsSemaphore(Semaphore(0, capacity)),
-			spacesSemaphore(Semaphore(capacity, capacity)),
-			mutex(Mutex()) {
-			elementsLength = capacity;
-			elements = new T[elementsLength];
-			start = 0;
-			count = 0;
-			closed = false;
-		}
-
-		~ProducerConsumerQueue() {
-			delete[] elements;
-		}
-		inline int getCount() { return count; }
-
-		bool TryConsume(T& element);
-
-		bool TryProduce(T element);
-	};
-
-}
-
-#pragma endregion
-
-#pragma region GMath.h
-
-#ifndef GMATH_H
-#define GMATH_H
-
-#include <cmath>
-
-#define PI (float)3.14159265358979323846
-
-#ifndef min
-#define min(a,b) ((a)<(b)?a:b)
-#define max(a,b) ((a)>(b)?a:b)
-#endif
-
-#define O_4x4 float4x4(0)
-#define I_4x4 float4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)
-
-#define xyz(v) float3(v.x,v.y,v.z)
-
-namespace CA4G {
-
-	typedef struct ARGB
-	{
-		unsigned int value;
-
-		int Alpha() { return value >> 24; }
-		int Red() { return (value & 0xFF0000) >> 16; }
-		int Green() { return (value & 0xFF00) >> 8; }
-		int Blue() { return (value & 0xFF); }
-
-		ARGB() { value = 0; }
-
-		ARGB(int alpha, int red, int green, int blue) {
-			value =
-				((unsigned int)alpha) << 24 |
-				((unsigned int)red) << 16 |
-				((unsigned int)green) << 8 |
-				((unsigned int)blue);
-		}
-	} ARGB;
-
-	typedef struct RGBA
-	{
-		unsigned int value;
-
-		int Alpha() { return value >> 24; }
-		int Blue() { return (value & 0xFF0000) >> 16; }
-		int Green() { return (value & 0xFF00) >> 8; }
-		int Red() { return (value & 0xFF); }
-
-		RGBA() { value = 0; }
-
-		RGBA(int alpha, int red, int green, int blue) {
-			value =
-				((unsigned int)alpha) << 24 |
-				((unsigned int)blue) << 16 |
-				((unsigned int)green) << 8 |
-				((unsigned int)red);
-		}
-	} RGBA;
-
-	typedef struct int2 {
-		int x, y;
-
-		int2(int x, int y) :x(x), y(y) {
-		}
-		int2(int v) : int2(v, v) {}
-		int2() :int2(0) {}
-	} int2;
-
-	typedef struct int3 {
-		int x, y, z;
-
-		int3(int x, int y, int z) :x(x), y(y), z(z) {
-		}
-		int3(int v) : int3(v, v, v) {}
-		int3() :int3(0) {}
-	} int3;
-
-	typedef struct int4 {
-		int x, y, z, w;
-
-		int4(int x, int y, int z, int w) :x(x), y(y), z(z), w(w) {
-		}
-		int4(int v) : int4(v, v, v, v) {}
-		int4() : int4(0) {}
-	} int4;
-
-	typedef struct uint2 {
-		unsigned int x, y;
-
-		uint2(unsigned int x, unsigned int y) :x(x), y(y) {
-		}
-		uint2(unsigned int v) :uint2(v, v) {}
-		uint2() :uint2(0) {}
-	} uint2;
-
-	typedef struct uint3 {
-		unsigned int x, y, z;
-
-		uint3(unsigned int x, unsigned int y, unsigned int z) :x(x), y(y), z(z) {
-		}
-		uint3(unsigned int v) :uint3(v, v, v) {}
-		uint3() :uint3(0) {}
-	} uint3;
-
-	typedef struct uint4 {
-		unsigned int x, y, z, w;
-
-		uint4(unsigned int x, unsigned int y, unsigned int z, unsigned int w) :x(x), y(y), z(z), w(w) {
-		}
-		uint4(unsigned int v) :uint4(v, v, v, v) {}
-		uint4() :uint4(0) {}
-	} uint4;
-
-	typedef struct float2
-	{
-		float x, y;
-		float2(float x, float y) :x(x), y(y) {}
-		float2(float v) :float2(v, v) {}
-		float2() :float2(0) {}
-	} float2;
-
-	typedef struct float3
-	{
-		float x, y, z;
-		float3(float x, float y, float z) :x(x), y(y), z(z) {}
-		float3(float v) :float3(v, v, v) {}
-		float3() :float3(0) {}
-		float3(float2 v, float z) :float3(v.x, v.y, z) {}
-
-		float2 getXY() { return float2(x, y); }
-	} float3;
-
-	typedef struct float4
-	{
-		float x, y, z, w;
-		float4(float x, float y, float z, float w) :x(x), y(y), z(z), w(w) {}
-		float4(float v) :float4(v, v, v, v) {}
-		float4() :float4(0) {}
-		float4(float3 v, float w) :float4(v.x, v.y, v.z, w) {}
-
-		float3 getXYZ() { return float3(x, y, z); }
-		float3 getXYZHomogenized() { return float3(x / w, y / w, z / w); }
-	} float4;
-
-	typedef struct float2x2
-	{
-		float M00;
-		float M01;
-		float M10;
-		float M11;
-
-		float2x2(float value)
-		{
-			M00 = value;
-			M01 = value;
-			M10 = value;
-			M11 = value;
-		}
-		float2x2() :float2x2(0) {}
-		float2x2(float M00, float M01, float M10, float M11)
-		{
-			this->M00 = M00;
-			this->M01 = M01;
-			this->M10 = M10;
-			this->M11 = M11;
-		}
-
-	} float2x2;
-
-	typedef struct float4x4
-	{
-		float M00;
-		float M01;
-		float M02;
-		float M03;
-		float M10;
-		float M11;
-		float M12;
-		float M13;
-		float M20;
-		float M21;
-		float M22;
-		float M23;
-		float M30;
-		float M31;
-		float M32;
-		float M33;
-		float4x4(float value)
-		{
-			M00 = value;
-			M01 = value;
-			M02 = value;
-			M03 = value;
-			M10 = value;
-			M11 = value;
-			M12 = value;
-			M13 = value;
-			M20 = value;
-			M21 = value;
-			M22 = value;
-			M23 = value;
-			M30 = value;
-			M31 = value;
-			M32 = value;
-			M33 = value;
-		}
-		float4x4() :float4x4(0) {}
-		float4x4(float M00, float M01, float M02, float M03, float M10, float M11, float M12, float M13, float M20, float M21, float M22, float M23, float M30, float M31, float M32, float M33)
-		{
-			this->M00 = M00;
-			this->M01 = M01;
-			this->M02 = M02;
-			this->M03 = M03;
-			this->M10 = M10;
-			this->M11 = M11;
-			this->M12 = M12;
-			this->M13 = M13;
-			this->M20 = M20;
-			this->M21 = M21;
-			this->M22 = M22;
-			this->M23 = M23;
-			this->M30 = M30;
-			this->M31 = M31;
-			this->M32 = M32;
-			this->M33 = M33;
-		}
-		float4x4 getInverse() const {
-			float Min00 = M11 * M22 * M33 + M12 * M23 * M31 + M13 * M21 * M32 - M11 * M23 * M32 - M12 * M21 * M33 - M13 * M22 * M31;
-			float Min01 = M10 * M22 * M33 + M12 * M23 * M30 + M13 * M20 * M32 - M10 * M23 * M32 - M12 * M20 * M33 - M13 * M22 * M30;
-			float Min02 = M10 * M21 * M33 + M11 * M23 * M30 + M13 * M20 * M31 - M10 * M23 * M31 - M11 * M20 * M33 - M13 * M21 * M30;
-			float Min03 = M10 * M21 * M32 + M11 * M22 * M30 + M12 * M20 * M31 - M10 * M22 * M31 - M11 * M20 * M32 - M12 * M21 * M30;
-
-			float det = Min00 * M00 - Min01 * M01 + Min02 * M02 - Min03 * M03;
-
-			if (det == 0)
-				return float4x4(0);
-
-			float Min10 = M01 * M22 * M33 + M02 * M23 * M31 + M03 * M21 * M32 - M01 * M23 * M32 - M02 * M21 * M33 - M03 * M22 * M31;
-			float Min11 = M00 * M22 * M33 + M02 * M23 * M30 + M03 * M20 * M32 - M00 * M23 * M32 - M02 * M20 * M33 - M03 * M22 * M30;
-			float Min12 = M00 * M21 * M33 + M01 * M23 * M30 + M03 * M20 * M31 - M00 * M23 * M31 - M01 * M20 * M33 - M03 * M21 * M30;
-			float Min13 = M00 * M21 * M32 + M01 * M22 * M30 + M02 * M20 * M31 - M00 * M22 * M31 - M01 * M20 * M32 - M02 * M21 * M30;
-
-			float Min20 = M01 * M12 * M33 + M02 * M13 * M31 + M03 * M11 * M32 - M01 * M13 * M32 - M02 * M11 * M33 - M03 * M12 * M31;
-			float Min21 = M00 * M12 * M33 + M02 * M13 * M30 + M03 * M10 * M32 - M00 * M13 * M32 - M02 * M10 * M33 - M03 * M12 * M30;
-			float Min22 = M00 * M11 * M33 + M01 * M13 * M30 + M03 * M10 * M31 - M00 * M13 * M31 - M01 * M10 * M33 - M03 * M11 * M30;
-			float Min23 = M00 * M11 * M32 + M01 * M12 * M30 + M02 * M10 * M31 - M00 * M12 * M31 - M01 * M10 * M32 - M02 * M11 * M30;
-
-			float Min30 = M01 * M12 * M23 + M02 * M13 * M21 + M03 * M11 * M22 - M01 * M13 * M22 - M02 * M11 * M23 - M03 * M12 * M21;
-			float Min31 = M00 * M12 * M23 + M02 * M13 * M20 + M03 * M10 * M22 - M00 * M13 * M22 - M02 * M10 * M23 - M03 * M12 * M20;
-			float Min32 = M00 * M11 * M23 + M01 * M13 * M20 + M03 * M10 * M21 - M00 * M13 * M21 - M01 * M10 * M23 - M03 * M11 * M20;
-			float Min33 = M00 * M11 * M22 + M01 * M12 * M20 + M02 * M10 * M21 - M00 * M12 * M21 - M01 * M10 * M22 - M02 * M11 * M20;
-
-			return float4x4(
-				(+Min00 / det), (-Min10 / det), (+Min20 / det), (-Min30 / det),
-				(-Min01 / det), (+Min11 / det), (-Min21 / det), (+Min31 / det),
-				(+Min02 / det), (-Min12 / det), (+Min22 / det), (-Min32 / det),
-				(-Min03 / det), (+Min13 / det), (-Min23 / det), (+Min33 / det));
-		}
-		float getDeterminant() const {
-			float Min00 = M11 * M22 * M33 + M12 * M23 * M31 + M13 * M21 * M32 - M11 * M23 * M32 - M12 * M21 * M33 - M13 * M22 * M31;
-			float Min01 = M10 * M22 * M33 + M12 * M23 * M30 + M13 * M20 * M32 - M10 * M23 * M32 - M12 * M20 * M33 - M13 * M22 * M30;
-			float Min02 = M10 * M21 * M33 + M11 * M23 * M30 + M13 * M20 * M31 - M10 * M23 * M31 - M11 * M20 * M33 - M13 * M21 * M30;
-			float Min03 = M10 * M21 * M32 + M11 * M22 * M30 + M12 * M20 * M31 - M10 * M22 * M31 - M11 * M20 * M32 - M12 * M21 * M30;
-
-			return Min00 * M00 - Min01 * M01 + Min02 * M02 - Min03 * M03;
-		}
-		bool IsSingular() const { return getDeterminant() == 0; }
-	} float4x4;
-
-	typedef struct float3x3
-	{
-		float M00;
-		float M01;
-		float M02;
-		float M10;
-		float M11;
-		float M12;
-		float M20;
-		float M21;
-		float M22;
-		float3x3(float value)
-		{
-			M00 = value;
-			M01 = value;
-			M02 = value;
-			M10 = value;
-			M11 = value;
-			M12 = value;
-			M20 = value;
-			M21 = value;
-			M22 = value;
-		}
-		float3x3() :float3x3(0) {}
-		float3x3(float M00, float M01, float M02, float M10, float M11, float M12, float M20, float M21, float M22)
-		{
-			this->M00 = M00;
-			this->M01 = M01;
-			this->M02 = M02;
-			this->M10 = M10;
-			this->M11 = M11;
-			this->M12 = M12;
-			this->M20 = M20;
-			this->M21 = M21;
-			this->M22 = M22;
-		}
-
-		float3x3(const float4x4 &m) :float3x3(m.M00, m.M01, m.M02, m.M10, m.M11, m.M12, m.M20, m.M21, m.M22) {
-		}
-
-		float3x3 getInverse() const
-		{
-			/// 00 01 02
-			/// 10 11 12
-			/// 20 21 22
-			float Min00 = M11 * M22 - M12 * M21;
-			float Min01 = M10 * M22 - M12 * M20;
-			float Min02 = M10 * M21 - M11 * M20;
-
-			float det = Min00 * M00 - Min01 * M01 + Min02 * M02;
-
-			if (det == 0)
-				return float3x3(0);
-
-			float Min10 = M01 * M22 - M02 * M21;
-			float Min11 = M00 * M22 - M02 * M20;
-			float Min12 = M00 * M21 - M01 * M20;
-
-			float Min20 = M01 * M12 - M02 * M11;
-			float Min21 = M00 * M12 - M02 * M10;
-			float Min22 = M00 * M11 - M01 * M10;
-
-			return float3x3(
-				(+Min00 / det), (-Min10 / det), (+Min20 / det),
-				(-Min01 / det), (+Min11 / det), (-Min21 / det),
-				(+Min02 / det), (-Min12 / det), (+Min22 / det));
-		}
-
-		float getDeterminant() const
-		{
-			float Min00 = M11 * M22 - M12 * M21;
-			float Min01 = M10 * M22 - M12 * M20;
-			float Min02 = M10 * M21 - M11 * M20;
-
-			return Min00 * M00 - Min01 * M01 + Min02 * M02;
-		}
-
-		bool IsSingular() const { return getDeterminant() == 0; }
-	} float3x3;
-
-	typedef struct float3x4
-	{
-		float M00;
-		float M01;
-		float M02;
-		float M03;
-		float M10;
-		float M11;
-		float M12;
-		float M13;
-		float M20;
-		float M21;
-		float M22;
-		float M23;
-		float3x4(float value)
-		{
-			M00 = value;
-			M01 = value;
-			M02 = value;
-			M03 = value;
-			M10 = value;
-			M11 = value;
-			M12 = value;
-			M13 = value;
-			M20 = value;
-			M21 = value;
-			M22 = value;
-			M23 = value;
-		}
-		float3x4() :float3x4(0) {}
-		float3x4(float M00, float M01, float M02, float M03, float M10, float M11, float M12, float M13, float M20, float M21, float M22, float M23)
-		{
-			this->M00 = M00;
-			this->M01 = M01;
-			this->M02 = M02;
-			this->M03 = M03;
-			this->M10 = M10;
-			this->M11 = M11;
-			this->M12 = M12;
-			this->M13 = M13;
-			this->M20 = M20;
-			this->M21 = M21;
-			this->M22 = M22;
-			this->M23 = M23;
-		}
-
-		float3x4(const float4x4 &m) :float3x4(m.M00, m.M01, m.M02, m.M03, m.M10, m.M11, m.M12, m.M13, m.M20, m.M21, m.M22, m.M23) {
-		}
-	} float3x4;
-
-	static float4 operator + (const float4 &v1, const float4 & v2)
-	{
-		return float4{ v1.x + v2.x, v1.y + v2.y, v1.z + v2.z, v1.w + v2.w };
-	}
-	static float4 operator - (const float4 & v1, const float4 & v2)
-	{
-		return float4{ v1.x - v2.x, v1.y - v2.y, v1.z - v2.z, v1.w - v2.w };
-	}
-	static float4 operator * (const float4 & v1, const float4 & v2)
-	{
-		return float4{ v1.x * v2.x, v1.y * v2.y, v1.z * v2.z, v1.w * v2.w };
-	}
-	static float4 operator / (const float4 & v1, const float4 & v2)
-	{
-		return float4{ v1.x / v2.x, v1.y / v2.y, v1.z / v2.z, v1.w / v2.w };
-	}
-	static float3 operator + (const float3 &v1, const float3 & v2)
-	{
-		return float3{ v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
-	}
-	static float3 operator - (const float3 & v1, const float3 & v2)
-	{
-		return float3{ v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
-	}
-	static float3 operator * (const float3 & v1, const float3 & v2)
-	{
-		return float3{ v1.x * v2.x, v1.y * v2.y, v1.z * v2.z };
-	}
-	static float3 operator / (const float3 & v1, const int3 & v2)
-	{
-		return float3{ v1.x / v2.x, v1.y / v2.y, v1.z / v2.z };
-	}
-	static float3 operator / (const float3 & v1, const float & alpha)
-	{
-		return float3{ v1.x / alpha, v1.y / alpha, v1.z / alpha };
-	}
-	static float3 operator / (const float3 & v1, const float3 & v2)
-	{
-		return float3{ v1.x / v2.x, v1.y / v2.y, v1.z / v2.z };
-	}
-	static float2 operator + (const float2 &v1, const float2 & v2)
-	{
-		return float2{ v1.x + v2.x, v1.y + v2.y };
-	}
-	static float2 operator - (const float2 & v1, const float2 & v2)
-	{
-		return float2{ v1.x - v2.x, v1.y - v2.y };
-	}
-	static float2 operator * (const float2 & v1, const float2 & v2)
-	{
-		return float2{ v1.x * v2.x, v1.y * v2.y };
-	}
-	static float2 operator / (const float2 & v1, const float2 & v2)
-	{
-		return float2{ v1.x / v2.x, v1.y / v2.y };
-	}
-	static float4x4 operator + (const float4x4 &m1, const float4x4 &m2)
-	{
-		return float4x4{
-			m1.M00 + m2.M00,m1.M01 + m2.M01,m1.M02 + m2.M02,m1.M03 + m2.M03,
-			m1.M10 + m2.M10,m1.M11 + m2.M11,m1.M12 + m2.M12,m1.M13 + m2.M13,
-			m1.M20 + m2.M20,m1.M21 + m2.M21,m1.M22 + m2.M22,m1.M23 + m2.M23,
-			m1.M30 + m2.M30,m1.M31 + m2.M31,m1.M32 + m2.M32,m1.M33 + m2.M33
-		};
-	}
-	static float4x4 operator - (const float4x4 &m1, const float4x4 &m2)
-	{
-		return float4x4{
-			m1.M00 - m2.M00,m1.M01 - m2.M01,m1.M02 - m2.M02,m1.M03 - m2.M03,
-			m1.M10 - m2.M10,m1.M11 - m2.M11,m1.M12 - m2.M12,m1.M13 - m2.M13,
-			m1.M20 - m2.M20,m1.M21 - m2.M21,m1.M22 - m2.M22,m1.M23 - m2.M23,
-			m1.M30 - m2.M30,m1.M31 - m2.M31,m1.M32 - m2.M32,m1.M33 - m2.M33
-		};
-	}
-	static float4x4 operator * (const float4x4 &m1, const float4x4 &m2)
-	{
-		return float4x4{
-			m1.M00 * m2.M00,m1.M01 * m2.M01,m1.M02 * m2.M02,m1.M03 * m2.M03,
-			m1.M10 * m2.M10,m1.M11 * m2.M11,m1.M12 * m2.M12,m1.M13 * m2.M13,
-			m1.M20 * m2.M20,m1.M21 * m2.M21,m1.M22 * m2.M22,m1.M23 * m2.M23,
-			m1.M30 * m2.M30,m1.M31 * m2.M31,m1.M32 * m2.M32,m1.M33 * m2.M33
-		};
-	}
-	static float4x4 operator / (const float4x4 &m1, const float4x4 &m2)
-	{
-		return float4x4{
-			m1.M00 / m2.M00,m1.M01 / m2.M01,m1.M02 / m2.M02,m1.M03 / m2.M03,
-			m1.M10 / m2.M10,m1.M11 / m2.M11,m1.M12 / m2.M12,m1.M13 / m2.M13,
-			m1.M20 / m2.M20,m1.M21 / m2.M21,m1.M22 / m2.M22,m1.M23 / m2.M23,
-			m1.M30 / m2.M30,m1.M31 / m2.M31,m1.M32 / m2.M32,m1.M33 / m2.M33
-		};
-	}
-
-	static float3x3 operator + (const float3x3 &m1, const float3x3 & m2)
-	{
-		return float3x3{
-			m1.M00 + m2.M00,m1.M01 + m2.M01,m1.M02 + m2.M02,
-			m1.M10 + m2.M10,m1.M11 + m2.M11,m1.M12 + m2.M12,
-			m1.M20 + m2.M20,m1.M21 + m2.M21,m1.M22 + m2.M22
-		};
-	}
-	static float3x3 operator - (const float3x3 & m1, const float3x3 & m2)
-	{
-		return float3x3{
-			m1.M00 - m2.M00,m1.M01 - m2.M01,m1.M02 - m2.M02,
-			m1.M10 - m2.M10,m1.M11 - m2.M11,m1.M12 - m2.M12,
-			m1.M20 - m2.M20,m1.M21 - m2.M21,m1.M22 - m2.M22
-		};
-	}
-	static float3x3 operator * (const float3x3 & m1, const float3x3 & m2)
-	{
-		return float3x3{
-			m1.M00 * m2.M00,m1.M01 * m2.M01,m1.M02 * m2.M02,
-			m1.M10 * m2.M10,m1.M11 * m2.M11,m1.M12 * m2.M12,
-			m1.M20 * m2.M20,m1.M21 * m2.M21,m1.M22 * m2.M22
-		};
-	}
-	static float3x3 operator / (const float3x3 & m1, const float3x3 & m2)
-	{
-		return float3x3{
-			m1.M00 / m2.M00,m1.M01 / m2.M01,m1.M02 / m2.M02,
-			m1.M10 / m2.M10,m1.M11 / m2.M11,m1.M12 / m2.M12,
-			m1.M20 / m2.M20,m1.M21 / m2.M21,m1.M22 / m2.M22
-		};
-	}
-
-	static float2x2 operator + (const float2x2 &m1, const float2x2 & m2)
-	{
-		return float2x2{
-			m1.M00 + m2.M00,m1.M01 + m2.M01,
-			m1.M10 + m2.M10,m1.M11 + m2.M11
-		};
-	}
-	static float2x2 operator - (const float2x2 & m1, const float2x2 & m2)
-	{
-		return float2x2{
-			m1.M00 - m2.M00,m1.M01 - m2.M01,
-			m1.M10 - m2.M10,m1.M11 - m2.M11
-		};
-	}
-	static float2x2 operator * (const float2x2 & m1, const float2x2 & m2)
-	{
-		return float2x2{
-			m1.M00 * m2.M00,m1.M01 * m2.M01,
-			m1.M10 * m2.M10,m1.M11 * m2.M11
-		};
-	}
-	static float2x2 operator / (const float2x2 & m1, const float2x2 & m2)
-	{
-		return float2x2{
-			m1.M00 / m2.M00,m1.M01 / m2.M01,
-			m1.M10 / m2.M10,m1.M11 / m2.M11
-		};
-	}
-
-	static bool any(const float3 &v) {
-		return v.x != 0 || v.y != 0 || v.z != 0;
-	}
-	static bool any(const float4 &v) {
-		return v.x != 0 || v.y != 0 || v.z != 0 || v.w != 0;
-	}
-
-	static float dot(const float4 &v1, const float4 &v2)
-	{
-		return v1.x *v2.x + v1.y* v2.y + v1.z *v2.z + v1.w*v2.w;
-	}
-	static float dot(const float3 &v1, const float3 &v2)
-	{
-		return v1.x *v2.x + v1.y* v2.y + v1.z *v2.z;
-	}
-	static float dot(const float2 &v1, const float2 &v2)
-	{
-		return v1.x *v2.x + v1.y* v2.y;
-	}
-
-	static float3 cross(const float3 &v1, const float3 &v2)
-	{
-		return float3(
-			v1.y * v2.z - v1.z * v2.y,
-			v1.z * v2.x - v1.x * v2.z,
-			v1.x * v2.y - v1.y * v2.x);
-	}
-
-	static float2 lerp(const float2 &v1, const float2 &v2, const float alpha)
-	{
-		return float2(
-			v1.x*(1 - alpha) + v2.x*alpha,
-			v1.y*(1 - alpha) + v2.y*alpha);
-	}
-	static float3 lerp(const float3 &v1, const float3 &v2, const float alpha)
-	{
-		return float3(
-			v1.x*(1 - alpha) + v2.x*alpha,
-			v1.y*(1 - alpha) + v2.y*alpha,
-			v1.z*(1 - alpha) + v2.z*alpha);
-	}
-	static float4 lerp(const float4 &v1, const float4 &v2, const float alpha)
-	{
-		return float4(
-			v1.x*(1 - alpha) + v2.x*alpha,
-			v1.y*(1 - alpha) + v2.y*alpha,
-			v1.z*(1 - alpha) + v2.z*alpha,
-			v1.w*(1 - alpha) + v2.w*alpha);
-	}
-
-	static float2x2 mul(const float2x2 &m1, const float2x2 &m2) {
-		return float2x2(m1.M00 * (m2.M00) + (m1.M01 * (m2.M10)), m1.M00 * (m2.M01) + (m1.M01 * (m2.M11)), m1.M10 * (m2.M00) + (m1.M11 * (m2.M10)), m1.M10 * (m2.M01) + (m1.M11 * (m2.M11)));
-	}
-	static float3x3 mul(const float3x3 &m1, const float3x3 &m2)
-	{
-		return float3x3(m1.M00 * (m2.M00) + (m1.M01 * (m2.M10)) + (m1.M02 * (m2.M20)), m1.M00 * (m2.M01) + (m1.M01 * (m2.M11)) + (m1.M02 * (m2.M21)), m1.M00 * (m2.M02) + (m1.M01 * (m2.M12)) + (m1.M02 * (m2.M22)), m1.M10 * (m2.M00) + (m1.M11 * (m2.M10)) + (m1.M12 * (m2.M20)), m1.M10 * (m2.M01) + (m1.M11 * (m2.M11)) + (m1.M12 * (m2.M21)), m1.M10 * (m2.M02) + (m1.M11 * (m2.M12)) + (m1.M12 * (m2.M22)), m1.M20 * (m2.M00) + (m1.M21 * (m2.M10)) + (m1.M22 * (m2.M20)), m1.M20 * (m2.M01) + (m1.M21 * (m2.M11)) + (m1.M22 * (m2.M21)), m1.M20 * (m2.M02) + (m1.M21 * (m2.M12)) + (m1.M22 * (m2.M22)));
-	}
-	static float4x4 mul(const float4x4 &m1, const float4x4 &m2)
-	{
-		return float4x4(m1.M00 * (m2.M00) + (m1.M01 * (m2.M10)) + (m1.M02 * (m2.M20)) + (m1.M03 * (m2.M30)), m1.M00 * (m2.M01) + (m1.M01 * (m2.M11)) + (m1.M02 * (m2.M21)) + (m1.M03 * (m2.M31)), m1.M00 * (m2.M02) + (m1.M01 * (m2.M12)) + (m1.M02 * (m2.M22)) + (m1.M03 * (m2.M32)), m1.M00 * (m2.M03) + (m1.M01 * (m2.M13)) + (m1.M02 * (m2.M23)) + (m1.M03 * (m2.M33)), m1.M10 * (m2.M00) + (m1.M11 * (m2.M10)) + (m1.M12 * (m2.M20)) + (m1.M13 * (m2.M30)), m1.M10 * (m2.M01) + (m1.M11 * (m2.M11)) + (m1.M12 * (m2.M21)) + (m1.M13 * (m2.M31)), m1.M10 * (m2.M02) + (m1.M11 * (m2.M12)) + (m1.M12 * (m2.M22)) + (m1.M13 * (m2.M32)), m1.M10 * (m2.M03) + (m1.M11 * (m2.M13)) + (m1.M12 * (m2.M23)) + (m1.M13 * (m2.M33)), m1.M20 * (m2.M00) + (m1.M21 * (m2.M10)) + (m1.M22 * (m2.M20)) + (m1.M23 * (m2.M30)), m1.M20 * (m2.M01) + (m1.M21 * (m2.M11)) + (m1.M22 * (m2.M21)) + (m1.M23 * (m2.M31)), m1.M20 * (m2.M02) + (m1.M21 * (m2.M12)) + (m1.M22 * (m2.M22)) + (m1.M23 * (m2.M32)), m1.M20 * (m2.M03) + (m1.M21 * (m2.M13)) + (m1.M22 * (m2.M23)) + (m1.M23 * (m2.M33)), m1.M30 * (m2.M00) + (m1.M31 * (m2.M10)) + (m1.M32 * (m2.M20)) + (m1.M33 * (m2.M30)), m1.M30 * (m2.M01) + (m1.M31 * (m2.M11)) + (m1.M32 * (m2.M21)) + (m1.M33 * (m2.M31)), m1.M30 * (m2.M02) + (m1.M31 * (m2.M12)) + (m1.M32 * (m2.M22)) + (m1.M33 * (m2.M32)), m1.M30 * (m2.M03) + (m1.M31 * (m2.M13)) + (m1.M32 * (m2.M23)) + (m1.M33 * (m2.M33)));
-	}
-	static float2 mul(const float2 &v, const float2x2 &m) {
-		return float2(v.x * m.M00 + v.y*m.M10, v.x*m.M01 + v.y*m.M11);
-	}
-	static float3 mul(const float3 &v, const float3x3 &m)
-	{
-		return float3(v.x * (m.M00) + (v.y * (m.M10)) + (v.z * (m.M20)), v.x * (m.M01) + (v.y * (m.M11)) + (v.z * (m.M21)), v.x * (m.M02) + (v.y * (m.M12)) + (v.z * (m.M22)));
-	}
-	static float4 mul(const float4 &v, const float4x4 &m)
-	{
-		return float4(v.x * (m.M00) + (v.y * (m.M10)) + (v.z * (m.M20)) + (v.w * (m.M30)), v.x * (m.M01) + (v.y * (m.M11)) + (v.z * (m.M21)) + (v.w * (m.M31)), v.x * (m.M02) + (v.y * (m.M12)) + (v.z * (m.M22)) + (v.w * (m.M32)), v.x * (m.M03) + (v.y * (m.M13)) + (v.z * (m.M23)) + (v.w * (m.M33)));
-	}
-
-	static float3 minf(float3 x, float3 y) {
-		return float3(min(x.x, y.x), min(x.y, y.y), min(x.z, y.z));
-	}
-
-	static float3 maxf(float3 x, float3 y) {
-		return float3(max(x.x, y.x), max(x.y, y.y), max(x.z, y.z));
-	}
-
-	static float2x2 transpose(const float2x2 &m)
-	{
-		return float2x2(m.M00, m.M10, m.M01, m.M11);
-	}
-	static float3x3 transpose(const float3x3 &m)
-	{
-		return float3x3(m.M00, m.M10, m.M20, m.M01, m.M11, m.M21, m.M02, m.M12, m.M22);
-	}
-	static float4x4 transpose(const float4x4 &m)
-	{
-		return float4x4(m.M00, m.M10, m.M20, m.M30, m.M01, m.M11, m.M21, m.M31, m.M02, m.M12, m.M22, m.M32, m.M03, m.M13, m.M23, m.M33);
-	}
-
-	static float length(const float2 &v)
-	{
-		return sqrtf(v.x*v.x + v.y*v.y);
-	}
-	static float length(const float3 &v)
-	{
-		return sqrtf(v.x*v.x + v.y*v.y + v.z*v.z);
-	}
-	static float length(const float4 &v)
-	{
-		return sqrtf(v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w);
-	}
-
-	static float2 normalize(const float2 &v)
-	{
-		float l = length(v);
-		return l == 0 ? v : v * (1 / l);
-	}
-	static float3 normalize(const float3 &v)
-	{
-		float l = length(v);
-		return l == 0 ? v : v * (1 / l);
-	}
-	static float4 normalize(const float4 &v)
-	{
-		float l = length(v);
-		return l == 0 ? v : v * (1 / l);
-	}
-
-
-	/// matrices
-	/// <summary>
-	/// Builds a mat using specified offsets.
-	/// </summary>
-	/// <param name="xslide">x offsets</param>
-	/// <param name="yslide">y offsets</param>
-	/// <param name="zslide">z offsets</param>
-	/// <returns>A mat structure that contains a translated transformation </returns>
-	static float4x4 Translate(float xoffset, float yoffset, float zoffset)
-	{
-		return float4x4(
-			1, 0, 0, 0,
-			0, 1, 0, 0,
-			0, 0, 1, 0,
-			xoffset, yoffset, zoffset, 1
-		);
-	}
-	/// <summary>
-	/// Builds a mat using specified offsets.
-	/// </summary>
-	/// <param name="vec">A Vector structure that contains the x-coordinate, y-coordinate, and z-coordinate offsets.</param>
-	/// <returns>A mat structure that contains a translated transformation </returns>
-	static float4x4 Translate(float3 vec)
-	{
-		return Translate(vec.x, vec.y, vec.z);
-	}
-	//
-
-	// Rotations
-	/// <summary>
-	/// Rotation mat around Z axis
-	/// </summary>
-	/// <param name="alpha">value in radian for rotation</param>
-	static float4x4 RotateZ(float alpha)
-	{
-		float cos = cosf(alpha);
-		float sin = sinf(alpha);
-		return float4x4(
-			cos, -sin, 0, 0,
-			sin, cos, 0, 0,
-			0, 0, 1, 0,
-			0, 0, 0, 1
-		);
-	}
-	/// <summary>
-	/// Rotation mat around Z axis
-	/// </summary>
-	/// <param name="alpha">value in grades for rotation</param>
-	static float4x4 RotateZGrad(float alpha)
-	{
-		return RotateZ(alpha * PI / 180);
-	}
-	/// <summary>
-	/// Rotation mat around Z axis
-	/// </summary>
-	/// <param name="alpha">value in radian for rotation</param>
-	static float4x4 RotateY(float alpha)
-	{
-		float cos = cosf(alpha);
-		float sin = sinf(alpha);
-		return float4x4(
-			cos, 0, -sin, 0,
-			0, 1, 0, 0,
-			sin, 0, cos, 0,
-			0, 0, 0, 1
-		);
-	}
-	/// <summary>
-	/// Rotation mat around Z axis
-	/// </summary>
-	/// <param name="alpha">value in grades for rotation</param>
-	static float4x4 RotateYGrad(float alpha)
-	{
-		return RotateY(alpha * PI / 180);
-	}
-	/// <summary>
-	/// Rotation mat around Z axis
-	/// </summary>
-	/// <param name="alpha">value in radian for rotation</param>
-	static float4x4 RotateX(float alpha)
-	{
-		float cos = cosf(alpha);
-		float sin = sinf(alpha);
-		return float4x4(
-			1, 0, 0, 0,
-			0, cos, -sin, 0,
-			0, sin, cos, 0,
-			0, 0, 0, 1
-		);
-	}
-	/// <summary>
-	/// Rotation mat around Z axis
-	/// </summary>
-	/// <param name="alpha">value in grades for rotation</param>
-	static float4x4 RotateXGrad(float alpha)
-	{
-		return RotateX(alpha * PI / 180);
-	}
-	static float4x4 Rotate(float angle, const float3 & dir)
-	{
-		float x = dir.x;
-		float y = dir.y;
-		float z = dir.z;
-		float cos = cosf(angle);
-		float sin = sinf(angle);
-
-		return float4x4(
-			x * x * (1 - cos) + cos, y * x * (1 - cos) + z * sin, z * x * (1 - cos) - y * sin, 0,
-			x * y * (1 - cos) - z * sin, y * y * (1 - cos) + cos, z * y * (1 - cos) + x * sin, 0,
-			x * z * (1 - cos) + y * sin, y * z * (1 - cos) - x * sin, z * z * (1 - cos) + cos, 0,
-			0, 0, 0, 1
-		);
-	}
-	static float4x4 RotateRespectTo(const float3 &center, const float3 &direction, float angle)
-	{
-		return mul(Translate(center), mul(Rotate(angle, direction), Translate(center * -1.0f)));
-	}
-	static float4x4 RotateGrad(float angle, const float3 & dir)
-	{
-		return Rotate(PI * angle / 180, dir);
-	}
-
-	//
-
-	// Scale
-
-	static float4x4 Scale(float xscale, float yscale, float zscale)
-	{
-		return float4x4(
-			xscale, 0, 0, 0,
-			0, yscale, 0, 0,
-			0, 0, zscale, 0,
-			0, 0, 0, 1);
-	}
-	static float4x4 Scale(const float3 & size)
-	{
-		return Scale(size.x, size.y, size.z);
-	}
-
-	static float4x4 ScaleRespectTo(const float3 & center, const float3 & size)
-	{
-		return mul(mul(Translate(center), Scale(size)), Translate(center * -1));
-	}
-	static float4x4 ScaleRespectTo(const float3 & center, float sx, float sy, float sz)
-	{
-		return ScaleRespectTo(center, float3(sx, sy, sz));
-	}
-
-	//
-
-	// Viewing
-
-	static float4x4 LookAtLH(const float3 & camera, const float3 & target, const float3 & upVector)
-	{
-		float3 zaxis = normalize(target - camera);
-		float3 xaxis = normalize(cross(upVector, zaxis));
-		float3 yaxis = cross(zaxis, xaxis);
-
-		return float4x4(
-			xaxis.x, yaxis.x, zaxis.x, 0,
-			xaxis.y, yaxis.y, zaxis.y, 0,
-			xaxis.z, yaxis.z, zaxis.z, 0,
-			-dot(xaxis, camera), -dot(yaxis, camera), -dot(zaxis, camera), 1);
-	}
-
-	static float4x4 LookAtRH(const float3 & camera, const float3 & target, const float3 & upVector)
-	{
-		float3 zaxis = normalize(camera - target);
-		float3 xaxis = normalize(cross(upVector, zaxis));
-		float3 yaxis = cross(zaxis, xaxis);
-
-		return float4x4(
-			xaxis.x, yaxis.x, zaxis.x, 0,
-			xaxis.y, yaxis.y, zaxis.y, 0,
-			xaxis.z, yaxis.z, zaxis.z, 0,
-			-dot(xaxis, camera), -dot(yaxis, camera), -dot(zaxis, camera), 1);
-	}
-
-	//
-
-	// Projection Methods
-
-	/// <summary>
-	/// Returns the near plane distance to a given projection
-	/// </summary>
-	/// <param name="proj">A mat structure containing the projection</param>
-	/// <returns>A float value representing the distance.</returns>
-	static float ZnearPlane(const float4x4 &proj)
-	{
-		float4 pos = mul(float4(0, 0, 0, 1), proj.getInverse());
-		return pos.z / pos.w;
-	}
-
-	/// <summary>
-	/// Returns the far plane distance to a given projection
-	/// </summary>
-	/// <param name="proj">A mat structure containing the projection</param>
-	/// <returns>A float value representing the distance.</returns>
-	static float ZfarPlane(const float4x4 &proj)
-	{
-		float4 targetPos = mul(float4(0, 0, 1, 1), proj.getInverse());
-		return targetPos.z / targetPos.w;
-	}
-
-	static float4x4 PerspectiveFovLH(float fieldOfView, float aspectRatio, float znearPlane, float zfarPlane)
-	{
-		float h = 1.0f / tanf(fieldOfView / 2);
-		float w = h * aspectRatio;
-
-		return float4x4(
-			w, 0, 0, 0,
-			0, h, 0, 0,
-			0, 0, zfarPlane / (zfarPlane - znearPlane), 1,
-			0, 0, -znearPlane * zfarPlane / (zfarPlane - znearPlane), 0);
-	}
-
-	static float4x4 PerspectiveFovRH(float fieldOfView, float aspectRatio, float znearPlane, float zfarPlane)
-	{
-		float h = 1.0f / tanf(fieldOfView / 2);
-		float w = h * aspectRatio;
-
-		return float4x4(
-			w, 0, 0, 0,
-			0, h, 0, 0,
-			0, 0, zfarPlane / (znearPlane - zfarPlane), -1,
-			0, 0, znearPlane * zfarPlane / (znearPlane - zfarPlane), 0);
-	}
-
-	static float4x4 PerspectiveLH(float width, float height, float znearPlane, float zfarPlane)
-	{
-		return float4x4(
-			2 * znearPlane / width, 0, 0, 0,
-			0, 2 * znearPlane / height, 0, 0,
-			0, 0, zfarPlane / (zfarPlane - znearPlane), 1,
-			0, 0, znearPlane * zfarPlane / (znearPlane - zfarPlane), 0);
-	}
-
-	static float4x4 PerspectiveRH(float width, float height, float znearPlane, float zfarPlane)
-	{
-		return float4x4(
-			2 * znearPlane / width, 0, 0, 0,
-			0, 2 * znearPlane / height, 0, 0,
-			0, 0, zfarPlane / (znearPlane - zfarPlane), -1,
-			0, 0, znearPlane * zfarPlane / (znearPlane - zfarPlane), 0);
-	}
-
-	static float4x4 OrthoLH(float width, float height, float znearPlane, float zfarPlane)
-	{
-		return float4x4(
-			2 / width, 0, 0, 0,
-			0, 2 / height, 0, 0,
-			0, 0, 1 / (zfarPlane - znearPlane), 0,
-			0, 0, znearPlane / (znearPlane - zfarPlane), 1);
-	}
-
-	static float4x4 OrthoRH(float width, float height, float znearPlane, float zfarPlane)
-	{
-		return float4x4(
-			2 / width, 0, 0, 0,
-			0, 2 / height, 0, 0,
-			0, 0, 1 / (znearPlane - zfarPlane), 0,
-			0, 0, znearPlane / (znearPlane - zfarPlane), 1);
-	}
-
-	//
-}
-
-#endif // !GMATH_H
-
-
-#pragma endregion
-
-#pragma region List.h
-
-namespace CA4G {
-
-	template<typename T>
-	class list
-	{
-		T* elements;
-		int count;
-		int capacity;
-	public:
-		list() {
-			capacity = 32;
-			count = 0;
-			elements = new T[capacity];
-		}
-		list(const list<T> &other) {
-			this->count = other.count;
-			this->elements = new T[other.capacity];
-			for (int i = 0; i < this->count; i++)
-				this->elements[i] = other.elements[i];
-			this->capacity = other.capacity;
-		}
-	public:
-
-		/*list<T>* clone() {
-			list<T>* result = new list<T>();
-			result->elements = new T[count];
-			result->capacity = result->count = count;
-			for (int i = 0; i < count; i++)
-				result->elements[i] = elements[i];
-			return result;
-		}*/
-
-		gObj<list<T>> clone() {
-			gObj<list<T>> result = new list<T>();
-			for (int i = 0; i < count; i++)
-				result->add(elements[i]);
-			return result;
-		}
-
-		void reset() {
-			count = 0;
-		}
-
-		list(std::initializer_list<T> initialElements) {
-			capacity = max(32, initialElements.size());
-			count = initialElements.size();
-			elements = new T[capacity];
-			for (int i = 0; i < initialElements.size(); i++)
-				elements[i] = initialElements[i];
-		}
-
-		~list() {
-			delete[] elements;
-		}
-
-		void add(T item) {
-			if (count == capacity)
-			{
-				capacity = (int)(capacity*1.3);
-				T* newelements = new T[capacity];
-				for (int i = 0; i < count; i++)
-					newelements[i] = elements[i];
-				delete[] elements;
-				elements = newelements;
-			}
-			elements[count++] = item;
-		}
-
-		inline T& operator[](int index) const {
-			return elements[index];
-		}
-
-		inline T& first() const {
-			return elements[0];
-		}
-
-		inline T& last() const {
-			return elements[count - 1];
-		}
-
-		inline int size() const {
-			return count;
-		}
-	};
-}
-
-#pragma endregion
-
-#pragma region ca4GFormats.h
-
-namespace CA4G {
-
-#pragma region Formats
-	template<typename T>
-	struct Formats {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_UNKNOWN;
-		static const int Size = 1;
-	};
-	template<>
-	struct Formats<char> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R8_SINT;
-		static const int Size = 1;
-	};
-	template<>
-	struct Formats<float> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32_FLOAT;
-		static const int Size = 4;
-	};
-	template<>
-	struct Formats <int> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32_SINT;
-		static const int Size = 4;
-	};
-
-	template<>
-	struct Formats <ARGB> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_B8G8R8A8_UNORM;
-		static const int Size = 4;
-	};
-
-	template<>
-	struct Formats <RGBA> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R8G8B8A8_UNORM;
-		static const int Size = 4;
-	};
-
-	template<>
-	struct Formats <unsigned int> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32_UINT;
-		static const int Size = 4;
-	};
-	template<>
-	struct Formats <float2> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32_FLOAT;
-		static const int Size = 8;
-	};
-	template<>
-	struct Formats <float3> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32_FLOAT;
-		static const int Size = 12;
-	};
-	template<>
-	struct Formats <float4> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		static const int Size = 16;
-	};
-
-	template<>
-	struct Formats <int2> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32_SINT;
-		static const int Size = 8;
-	};
-	template<>
-	struct Formats <int3> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32_SINT;
-		static const int Size = 12;
-	};
-	template<>
-	struct Formats <int4> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32A32_SINT;
-		static const int Size = 16;
-	};
-
-	template<>
-	struct Formats <uint2> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32_UINT;
-		static const int Size = 8;
-	};
-	template<>
-	struct Formats <uint3> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32_UINT;
-		static const int Size = 12;
-	};
-	template<>
-	struct Formats <uint4> {
-		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32A32_UINT;
-		static const int Size = 16;
-	};
-#pragma endregion
-
-}
-
-
-#pragma endregion
-
-#pragma region ca4GDescriptors.h
-
-namespace CA4G
-{
-	// Represents a CPU free descriptor heap manager
-	// Can be used to create descriptors on CPU and the allocate arranged on the GPU descriptor when resources are bound to the pipeline
-	class CPUDescriptorHeapManager {
-		friend Presenter;
-		DX_DescriptorHeap heap;
-		unsigned int size;
-		int allocated = 0;
-		// Linked list to reuse free slots
-		struct Node {
-			int index;
-			Node* next;
-		} *free = nullptr;
-		size_t startCPU;
-		Mutex mutex;
-	public:
-		CPUDescriptorHeapManager(DX_Device device, D3D12_DESCRIPTOR_HEAP_TYPE type, int capacity);
-		~CPUDescriptorHeapManager() {
-			while (free != nullptr)
-			{
-				Node *toDelete = free;
-				free = free->next;
-				delete toDelete;
-			}
-		}
-		// Allocates a new index for a resource descriptor
-		int AllocateNewHandle();
-		// Releases a specific index of a resource is being released.
-		inline void Release(int index) { free = new Node{ index, free }; }
-		inline D3D12_CPU_DESCRIPTOR_HANDLE getCPUVersion(int index) { return D3D12_CPU_DESCRIPTOR_HANDLE{ startCPU + index * size }; }
-		inline DX_DescriptorHeap getInnerHeap() { return heap; }
-	};
-
-	// Represents a GPU descriptor heap manager
-	// Is used to allocate descriptors on GPU sequentially when resources are bound to the pipeline
-	class GPUDescriptorHeapManager {
-		friend Presenter;
-		DX_DescriptorHeap heap;
-		unsigned int size;
-		size_t startCPU;
-		UINT64 startGPU;
-
-		volatile long mallocOffset = 0;
-		int capacity;
-		int blockCapacity;
-
-		struct Node {
-			int index;
-			Node* next;
-		} *free = nullptr;
-
-	public:
-		Mutex mutex;
-
-		inline void Reset(int frameIndex) {
-			mallocOffset = frameIndex * capacity / 3;
-			blockCapacity = (frameIndex + 1)*capacity / 3;
-		}
-
-		long Malloc(int descriptors) {
-			auto result = InterlockedExchangeAdd(&mallocOffset, descriptors);
-			if (mallocOffset >= blockCapacity)
-				throw CA4GException::FromError(CA4G_Errors_RunOutOfMemory, "Descriptor heap");
-			return result;
-		}
-
-		long MallocPersistent() {
-			int index;
-			mutex.Acquire();
-			if (free != nullptr) {
-				index = free->index;
-				Node *toDelete = free;
-				free = free->next;
-				delete toDelete;
-			}
-			else
-				index = --capacity;
-			mutex.Release();
-			return index;
-		}
-
-		void ReleasePersistent(long index) {
-			mutex.Acquire();
-			free = new Node{ index, free };
-			mutex.Release();
-		}
-
-		GPUDescriptorHeapManager(DX_Device device, D3D12_DESCRIPTOR_HEAP_TYPE type, int capacity);
-
-		~GPUDescriptorHeapManager() {
-			while (free != nullptr)
-			{
-				Node *toDelete = free;
-				free = free->next;
-				delete toDelete;
-			}
-		}
-		// Gets the cpu descriptor handle to access to a specific index slot of this descriptor heap
-		inline D3D12_GPU_DESCRIPTOR_HANDLE getGPUVersion(int index) { return D3D12_GPU_DESCRIPTOR_HANDLE{ startGPU + index * size }; }
-		// Gets the gpu descriptor handle to access to a specific index slot of this descriptor heap
-		inline D3D12_CPU_DESCRIPTOR_HANDLE getCPUVersion(int index) { return D3D12_CPU_DESCRIPTOR_HANDLE{ startCPU + index * size }; }
-
-		inline DX_DescriptorHeap getInnerHeap() { return heap; }
-	};
-
-	// Represents a global manager of all static descriptor heaps needed.
-	// Static descriptors will be accessed by the application and any threaded command list manager
-	// Each trheaded command list manager will have their own gpu descriptors for csu and samplers.
-	class DescriptorsManager
-	{
-	public:
-		// -- Shader visible heaps --
-
-		// Descriptor heap for gui windows and fonts
-		gObj<GPUDescriptorHeapManager> gui_csu;
-
-		// -- GPU heaps --
-		// Descriptor heap for CBV, SRV and UAV
-		gObj<GPUDescriptorHeapManager> gpu_csu;
-		// Descriptor heap for sampler objects
-		gObj<GPUDescriptorHeapManager> gpu_smp;
-
-		// -- CPU heaps --
-
-		// Descriptor heap for render targets views
-		gObj<CPUDescriptorHeapManager> cpu_rt;
-		// Descriptor heap for depth stencil views
-		gObj<CPUDescriptorHeapManager> cpu_ds;
-		// Descriptor heap for cbs, srvs and uavs in CPU memory
-		gObj<CPUDescriptorHeapManager> cpu_csu;
-		// Descriptor heap for sampler objects in CPU memory
-		gObj<CPUDescriptorHeapManager> cpu_smp;
-
-		DescriptorsManager(DX_Device device) :
-			gui_csu(new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 100)),
-			gpu_csu(new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 900000)),
-			gpu_smp(new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2000)),
-			cpu_rt(new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1000)),
-			cpu_ds(new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1000)),
-			cpu_csu(new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1000000)),
-			cpu_smp(new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2000))
-		{
-		}
-	};
-}
-
-#pragma endregion
-
-#pragma region ca4GScheduler
-
-#define process(methodName) Process(this, &decltype(dr(this))::methodName)
-
-#define processPtr(methodName, tagID) ProcessPtr(this, &decltype(dr(this))::methodName)
-
-namespace CA4G
-{
-#define ENGINE_MASK_ALL ((1 << CA4G_SUPPORTED_ENGINES) - 1)
-
-#define ENGINE_MASK_DIRECT 1
-#define ENGINE_MASK_BUNDLE 2
-#define ENGINE_MASK_COMPUTE 4
-#define ENGINE_MASK_COPY 8
-
-	template<typename T>
-	T dr(T* a) { return &a; }
-
-	template<typename A>
-	struct EngineType {
-		static const D3D12_COMMAND_LIST_TYPE Type;
-	};
-	template<>
-	struct EngineType<GraphicsManager> {
-		static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	};
-	template<>
-	struct EngineType<DXRManager> {
-		static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	};
-	template<>
-	struct EngineType<ComputeManager> {
-		static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-	};
-	template<>
-	struct EngineType<CopyingManager> {
-		static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_COPY;
-	};
-
-#pragma region Managing Graphics Process
-
-	// Represents a signal for the end of executing queues of some engines
-	// Pass this object to execute pendings method in order to wait for GPU completition
-	class Signal {
-		friend DeviceManager;
-		friend Presenter;
-		friend GPUScheduler;
-		long fences[CA4G_SUPPORTED_ENGINES];
-		int mask = 0;
-	public:
-		// No signal at all
-		// Only GPUScheduler may change internal data of a signal
-		Signal() {}
-	};
-
-	// Represents an abstract callable member to be used as a graphics process
-	struct ICallableMember
-	{
-		friend DeviceManager;
-		friend GPUScheduler;
-
-		virtual D3D12_COMMAND_LIST_TYPE getType() = 0;
-		virtual void Call(gObj<CommandListManager> manager) = 0;
-	private:
-		int TagID = 0;
-	};
-
-	// Represents a callable member used as a process of a specific command list manager type (copy, compute or graphics)
-	template<typename T, typename A>
-	struct CallableMember : public ICallableMember {
-		T* instance;
-		typedef void(T::*Member)(gObj<A>);
-		Member function;
-		CallableMember(T* instance, Member function) : instance(instance), function(function) {
-		}
-		void Call(gObj<CommandListManager> manager) {
-			(instance->*function)(manager.Dynamic_Cast<A>());
-		}
-
-		D3D12_COMMAND_LIST_TYPE getType() {
-			return EngineType<A>::Type;
-		}
-	};
-
-	// Creates a callable member for a specific instance and RTX process method
-	template<typename T>
-	CallableMember<T, DXRManager> Process(T* instance, typename CallableMember<T, DXRManager>::Member f) {
-		return CallableMember<T, DXRManager>(instance, f);
-	}
-
-	// Creates a callable member for a specific instance and graphics process method
-	template<typename T>
-	CallableMember<T, GraphicsManager> Process(T* instance, typename CallableMember<T, GraphicsManager>::Member f) {
-		return CallableMember<T, GraphicsManager>(instance, f);
-	}
-
-	// Creates a callable member for a specific instance and compute process method
-	template<typename T>
-	CallableMember<T, ComputeManager> Process(T* instance, typename CallableMember<T, ComputeManager>::Member f) {
-		return  CallableMember<T, ComputeManager>(instance, f);
-	}
-
-	// Creates a callable member for a specific instance and copy process method
-	template<typename T>
-	CallableMember<T, CopyingManager> Process(T* instance, typename CallableMember<T, CopyingManager>::Member f) {
-		return CallableMember<T, CopyingManager>(instance, f);
-	}
-
-	// Creates a pointer to a callable member for a specific instance and graphics process method
-	template<typename T>
-	CallableMember<T, DXRManager>* ProcessPtr(T* instance, typename CallableMember<T, DXRManager>::Member f) {
-		return new CallableMember<T, DXRManager>(instance, f);
-	}
-
-	// Creates a pointer to a callable member for a specific instance and graphics process method
-	template<typename T>
-	CallableMember<T, GraphicsManager>* ProcessPtr(T* instance, typename CallableMember<T, GraphicsManager>::Member f) {
-		return new CallableMember<T, GraphicsManager>(instance, f);
-	}
-
-	// Creates a pointer to a callable member for a specific instance and compute process method
-	template<typename T>
-	CallableMember<T, ComputeManager>* ProcessPtr(T* instance, typename CallableMember<T, ComputeManager>::Member f) {
-		return new CallableMember<T, ComputeManager>(instance, f);
-	}
-
-	// Creates a pointer to a callable member for a specific instance and copy process method
-	template<typename T>
-	CallableMember<T, CopyingManager>* ProcessPtr(T* instance, typename CallableMember<T, CopyingManager>::Member f) {
-		return new CallableMember<T, CopyingManager>(instance, f);
-	}
-
-	// Next macros are used for creating a process using simply the method name.
-	// Instance is assumed to be this reference
-
-
-#pragma endregion
-
-#pragma region GPU Scheduler
-
-	class GPUScheduler {
-		friend DeviceManager;
-		friend Presenter;
-
-		// Struct for threading parameters
-		struct GPUWorkerInfo {
-			int Index;
-			GPUScheduler* Scheduler;
-		} *workers;
-
-		// Represents a wrapper for command queue functionalities
-		class CommandQueueManager {
-			friend GPUScheduler;
-			friend Presenter;
-
-			DX_CommandQueue dxQueue;
-			long fenceValue;
-			DX_Fence fence;
-			HANDLE fenceEvent;
-			D3D12_COMMAND_LIST_TYPE type;
-		public:
-			CommandQueueManager(DX_Device device, D3D12_COMMAND_LIST_TYPE type);
-
-			// Executes a command list set in this engine
-			inline void Commit(DX_CommandList* cmdLists, int count) {
-				dxQueue->ExecuteCommandLists(count, (ID3D12CommandList**)cmdLists);
-			}
-
-			// Send a signals through this queue
-			inline long Signal() {
-				dxQueue->Signal(fence, fenceValue);
-				return fenceValue++;
-			}
-
-			// Triggers the event of reaching some fence value.
-			inline HANDLE TriggerEvent(long rallyPoint) {
-				fence->SetEventOnCompletion(rallyPoint, fenceEvent);
-				return fenceEvent;
-			}
-
-		} *queues[CA4G_SUPPORTED_ENGINES];
-
-		// Info per engine (common to all frames)
-		struct PerEngineInfo {
-			CommandQueueManager *queue;
-
-			// Info per thread
-			struct PerThreadInfo {
-				gObj<CommandListManager> manager;
-				DX_CommandList cmdList;
-				bool isActive;
-				// Prepares this command list for recording. This method resets the command list to use the desiredAllocator.
-				void Activate(DX_CommandAllocator desiredAllocator);
-
-				// Prepares this cmd list for flushing to the GPU
-				void Close() {
-					if (!isActive)
-						return;
-					isActive = false;
-					cmdList->Close();
-				}
-			} *threadInfos;
-
-			// Info per frame and per engine
-			struct PerFrameInfo {
-				DX_CommandAllocator* allocatorSet;
-				bool* allocatorsUsed;
-
-				inline DX_CommandAllocator RequireAllocator(int index) {
-					allocatorsUsed[index] = true;
-					return allocatorSet[index];
-				}
-
-				void ResetUsedAllocators(int threads);
-			} *frames;
-
-		} engines[CA4G_SUPPORTED_ENGINES];
-
-		// Used by flush method to call execute command list for each engine
-		DX_CommandList* __activeCmdLists;
-
-		gObj<DeviceManager> manager;
-		HANDLE* threads;
-		ProducerConsumerQueue<ICallableMember*>* workToDo;
-		CountEvent *counting;
-		int threadsCount;
-		int currentFrameIndex;
-		// Gets whenever the user wants to synchronize frame rendering using frame buffering
-		bool useFrameBuffer;
-
-		Signal* perFrameFinishedSignal;
-
-		static DWORD WINAPI __WORKER_TODO(LPVOID param);
-
-		GPUScheduler(gObj<DeviceManager> manager, bool useFrameBuffer, int max_threads = CA4G_MAX_NUMBER_OF_WORKERS, int buffers = CA4G_SUPPORTED_BUFFERING);
-
-		void PopulateCommandsBy(ICallableMember *process, int workerIndex);
-
-		bool _closed = false;
-
-		void Terminate() {
-			_closed = true;
-		}
-
-		// Gets when this scheduler is terminated
-		inline bool isClosed() {
-			return _closed;
-		}
-
-		// Commit all pending works at specific engines and returns a mask with the active engines.
-		int Flush(int mask);
-
-		// Sends a signal throught the specific engines and returns the Signal object with all fence values
-		Signal SendSignal(int mask) {
-			Signal s;
-			for (int e = 0; e < CA4G_SUPPORTED_ENGINES; e++)
-				if (!((1 << e) & ENGINE_MASK_BUNDLE))
-					if (mask & (1 << e))
-						s.fences[e] = queues[e]->Signal();
-			s.mask = mask;
-			return s;
-		}
-
-		HANDLE __fencesForWaiting[CA4G_SUPPORTED_ENGINES];
-
-		// Waits for the gpu notification of certain signal
-		void WaitFor(const Signal &signal) {
-			int fencesForWaiting = 0;
-			for (int e = 0; e < CA4G_SUPPORTED_ENGINES; e++)
-				if (!((1 << e) & ENGINE_MASK_BUNDLE))
-					if (signal.mask & (1 << e))
-						__fencesForWaiting[fencesForWaiting++] = queues[e]->TriggerEvent(signal.fences[e]);
-			WaitForMultipleObjects(fencesForWaiting, __fencesForWaiting, true, INFINITE);
-		}
-
-		void SetupFrame(int frame) {
-			if (useFrameBuffer)
-				WaitFor(perFrameFinishedSignal[frame]); // Grants the GPU finished working this frame in a previous stage
-
-			currentFrameIndex = frame;
-
-			for (int e = 0; e < CA4G_SUPPORTED_ENGINES; e++)
-				engines[e].frames[frame].ResetUsedAllocators(threadsCount);
-		}
-
-		void FinishFrame() {
-			perFrameFinishedSignal[currentFrameIndex] = SendSignal(ENGINE_MASK_ALL);
-
-			if (!useFrameBuffer)
-				// Grants the GPU finished working this frame before finishing this frame
-				WaitFor(perFrameFinishedSignal[currentFrameIndex]);
-		}
-
-		void Enqueue(ICallableMember* process) {
-			PopulateCommandsBy(process, 0); // worker 0 is the synchronous worker (main thread)
-		}
-
-		void EnqueueAsync(ICallableMember *process) {
-			counting->Increment();
-			workToDo->TryProduce(process);
-		}
-	};
-
-#pragma endregion
-}
-
-#pragma endregion
-
-#pragma region ca4GResources_Private.h
-
-namespace CA4G {
-	// Represents the accessibility optimization of a resource by the cpu
-	typedef enum CPU_ACCESS {
-		// The CPU can not read or write
-		CPU_ACCESS_NONE = 0,
-		// The CPU can write and GPU can access frequently efficiently
-		CPU_WRITE_GPU_READ = 1,
-		// The GPU can write once and CPU can access frequently efficiently
-		CPU_READ_GPU_WRITE = 2
-	} CPU_ACCESS;
-
-	// Gets the total number of bytes required by a resource with this description
-	inline UINT64 GetRequiredIntermediateSize(DX_Device device, const D3D12_RESOURCE_DESC &desc)
-	{
-		UINT64 RequiredSize = 0;
-		device->GetCopyableFootprints(&desc, 0, desc.DepthOrArraySize*desc.MipLevels, 0, nullptr, nullptr, nullptr, &RequiredSize);
-		return RequiredSize;
-	}
-
-	// Represents a wrapper to a DX12 resource. This class is for internal purpose only. Users access directly always via a resource view.
-	class ResourceWrapper {
-		friend Creating; //allow to access to resource wrapper private constructor for resource creation
-		friend Presenter; // allow to access to resource wrapper private constructor for presented render targets
-		friend ResourceView; // allow to reference counting
-
-	private:
-
-		// Creates a wrapper to a resource with a description and an initial state
-		ResourceWrapper(gObj<DeviceManager> manager, D3D12_RESOURCE_DESC description, DX_Resource resource, D3D12_RESOURCE_STATES initialState);
-
-		int subresources;
-
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT *pLayouts;
-		unsigned int* pNumRows;
-		UINT64 *pRowSizesInBytes;
-		UINT64 pTotalSizes;
-		Mutex mutex;
-		// How many resource views are referencing this resource. This resource is automatically released when no view is referencing it.
-		int references = 0;
-
-
-	public:
-		~ResourceWrapper() {
-			delete[] pLayouts;
-			delete[] pNumRows;
-			delete[] pRowSizesInBytes;
-		}
-
-		D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() {
-			return internalResource->GetGPUVirtualAddress();
-		}
-		// Device Manager to manage this resource
-		gObj<DeviceManager> manager;
-		// Resource
-		DX_Resource internalResource;
-		// Abstract resource description
-		D3D12_RESOURCE_DESC desc;
-		// Last used state of this resource on the GPU
-		D3D12_RESOURCE_STATES LastUsageState;
-
-		// Gets the cpu accessibility of this resource wrapper.
-		CPU_ACCESS cpu_access;
-
-		// Cached version of this resource for uploading (CPU-to-GPU) purposes.
-		gObj<ResourceWrapper> uploadingResourceCache = nullptr; //cache for copying to GPU
-		// Cached version of this resource for downloading (GPU-to-CPU) purposes.
-		gObj<ResourceWrapper> downloadingResourceCache = nullptr; //cache for copying from GPU
-
-		// If this resource is in upload heap, this is a ptr to the mapped data (to prevent map/unmap overhead)
-		void* mappedData = nullptr;
-
-		void UpdateMappedData(int position, void* data, int size);
-
-		byte* GetMappedDataAddress();
-
-		// Prepares this resource wrapper to have an uploading version
-		void CreateForUploading();
-
-		//---Copied from d3d12x.hs----------------------------------------------------------------------------
-		// Row-by-row memcpy
-		inline void MemcpySubresource(
-			_In_ const D3D12_MEMCPY_DEST* pDest,
-			_In_ const D3D12_SUBRESOURCE_DATA* pSrc,
-			SIZE_T RowSizeInBytes,
-			UINT NumRows,
-			UINT NumSlices,
-			bool flipRows = false
-		)
-		{
-			for (UINT z = 0; z < NumSlices; ++z)
-			{
-				BYTE* pDestSlice = reinterpret_cast<BYTE*>(pDest->pData) + pDest->SlicePitch * z;
-				const BYTE* pSrcSlice = reinterpret_cast<const BYTE*>(pSrc->pData) + pSrc->SlicePitch * z;
-				for (UINT y = 0; y < NumRows; ++y)
-				{
-					memcpy(pDestSlice + pDest->RowPitch * y,
-						pSrcSlice + pSrc->RowPitch * (flipRows ? NumRows - y - 1 : y),
-						RowSizeInBytes);
-				}
-			}
-		}
-
-		// Uploads a full data mapped of this resource.
-		// All data (for all subresources if any) appears sequentially in ptr buffer.
-		void UploadFullData(byte* data, long long dataSize, bool flipRows = false);
-
-		// Uploads the data of a region of a single subresource.
-		template<typename T>
-		void Upload(T* data, int subresource = 0, const D3D12_BOX *box = nullptr);
-	};
-
-
-}
-
-#pragma endregion
-
-#pragma region ca4GResources.h
-
-namespace CA4G {
-
-	// Represents a sampler object
-	struct Sampler {
-		D3D12_FILTER Filter;
-		D3D12_TEXTURE_ADDRESS_MODE AddressU;
-		D3D12_TEXTURE_ADDRESS_MODE AddressV;
-		D3D12_TEXTURE_ADDRESS_MODE AddressW;
-		FLOAT MipLODBias;
-		UINT MaxAnisotropy;
-		D3D12_COMPARISON_FUNC ComparisonFunc;
-		float4 BorderColor;
-		FLOAT MinLOD;
-		FLOAT MaxLOD;
-
-		// Creates a default point sampling object.
-		static Sampler Point(
-			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP
-		)
-		{
-			return Create(D3D12_FILTER_MIN_MAG_MIP_POINT,
-				AddressU,
-				AddressV,
-				AddressW);
-		}
-
-		// Creates a default point sampling object.
-		static Sampler PointWithoutMipMaps(
-			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP
-		)
-		{
-			return Create(D3D12_FILTER_MIN_MAG_MIP_POINT,
-				AddressU,
-				AddressV,
-				AddressW, 0, 0, D3D12_COMPARISON_FUNC_ALWAYS, float4(0,0,0,0), 0, 0);
-		}
-
-		// Creates a default linear sampling object
-		static Sampler Linear(
-			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP
-		)
-		{
-			return Create(D3D12_FILTER_MIN_MAG_MIP_LINEAR,
-				AddressU,
-				AddressV,
-				AddressW);
-		}
-
-		static Sampler LinearWithoutMipMaps(
-			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER,
-			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER,
-			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER
-		)
-		{
-			return Create(D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT,
-				AddressU,
-				AddressV,
-				AddressW, 0, 0, D3D12_COMPARISON_FUNC_ALWAYS, float4(0, 0, 0, 0), 0, 0);
-		}
-
-		// Creates a default anisotropic sampling object
-		static Sampler Anisotropic(
-			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP
-		)
-		{
-			return Create(D3D12_FILTER_ANISOTROPIC,
-				AddressU,
-				AddressV,
-				AddressW);
-		}
-	private:
-		static Sampler Create(
-			D3D12_FILTER filter = D3D12_FILTER_MIN_MAG_MIP_POINT,
-			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			float mipLODBias = 0.0f,
-			UINT maxAnisotropy = 16,
-			D3D12_COMPARISON_FUNC comparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS,
-			float4 borderColor = float4(0, 0, 0, 0),
-			float minLOD = 0,
-			float maxLOD = D3D12_FLOAT32_MAX
-		) {
-			return Sampler{
-				filter,
-				AddressU,
-				AddressV,
-				AddressW,
-				mipLODBias,
-				maxAnisotropy,
-				comparisonFunc,
-				borderColor,
-				minLOD,
-				maxLOD
-			};
-		}
-	};
-
-	// Represents a resource view. In this engine resources are treated always through some view.
-	// Although, views can be cast from one type to another.
-	class ResourceView {
-		friend Presenter;
-		friend CommandListManager;
-		friend Creating;
-		friend Copying;
-		template <typename ...A> friend class PipelineBindings;
-		friend GraphicsManager;
-		friend DeviceManager;
-		friend GeometryCollection;
-		friend TriangleGeometryCollection;
-		friend InstanceCollection;
-		friend IRTProgram;
-
-		// Used for binding and other scenarios to synchronize the usage of the resource
-		// barriering the states changes.
-		void ChangeStateTo(DX_CommandList cmdList, D3D12_RESOURCE_STATES dst) {
-			if (resource->LastUsageState == dst)
-				return;
-
-			D3D12_RESOURCE_BARRIER barrier = { };
-			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-			barrier.Transition.pResource = resource->internalResource;
-			barrier.Transition.StateAfter = dst;
-			barrier.Transition.StateBefore = resource->LastUsageState;
-			barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-			cmdList->ResourceBarrier(1, &barrier);
-			resource->LastUsageState = dst;
-		}
-
-		void ChangeStateToUAV(DX_CommandList cmdList) {
-			D3D12_RESOURCE_BARRIER barrier = { };
-			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-			barrier.UAV.pResource = this->resource->internalResource;
-			cmdList->ResourceBarrier(1, &barrier);
-			resource->LastUsageState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-		}
-
-		void ChangeStateFromTo(DX_CommandList cmdList, D3D12_RESOURCE_STATES src, D3D12_RESOURCE_STATES dst) {
-			if (resource->LastUsageState == dst)
-				return;
-
-			D3D12_RESOURCE_BARRIER barrier = { };
-			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-			barrier.Transition.pResource = resource->internalResource;
-			barrier.Transition.StateAfter = dst;
-			barrier.Transition.StateBefore = resource->LastUsageState;
-			barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-			cmdList->ResourceBarrier(1, &barrier);
-			resource->LastUsageState = dst;
-		}
-
-		// This is a special ResourceView instance representing the creation of a null descriptor.
-		// This instancing is using only for binding null purposes.
-		static gObj<ResourceView> getNullView(gObj<DeviceManager> manager, D3D12_RESOURCE_DIMENSION dimension);
-
-
-	protected:
-		// Gets the internal resource this view is representing to.
-		gObj<ResourceWrapper> resource = nullptr;
-		gObj<DeviceManager> manager;
-
-		// Slice that represents the subresources this view refers to
-		int mipSliceStart = 0;
-		int mipSliceCount = 1;
-		int arraySliceStart = 0;
-		int arraySliceCount = 1;
-
-		// Cached CPU descriptor handles (each descriptor for view is stored in a single CPU slot)
-		int srv; // 1
-		int uav; // 2
-		int cbv; // 4
-		int rtv; // 8
-		int dsv; // 16
-		// Mask representing the slots of the cpu descriptor this resource has a descriptor view built at.
-		unsigned int handleMask = 0;
-
-		Mutex mutex;
-
-		virtual void CreateUAVDesc(D3D12_UNORDERED_ACCESS_VIEW_DESC &d) = 0;
-		virtual void CreateSRVDesc(D3D12_SHADER_RESOURCE_VIEW_DESC &d) = 0;
-		virtual void CreateCBVDesc(D3D12_CONSTANT_BUFFER_VIEW_DESC &d) = 0;
-		virtual void CreateRTVDesc(D3D12_RENDER_TARGET_VIEW_DESC &d) = 0;
-		virtual void CreateDSVDesc(D3D12_DEPTH_STENCIL_VIEW_DESC &d) = 0;
-
-		ResourceView(gObj<ResourceWrapper> resource, int arrayStart = 0, int arrayCount = INT_MAX, int mipStart = 0, int mipsCount = INT_MAX)
-			: resource(resource), manager(resource->manager)
-		{
-			resource->references++;
-
-			if (resource->desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER) {
-				this->mipSliceStart = mipStart;
-				this->mipSliceCount = min(resource->desc.MipLevels, mipsCount);
-				this->arraySliceStart = arrayStart;
-				this->arraySliceCount = min(resource->desc.DepthOrArraySize, arrayCount);
-			}
-		}
-
-		// Creates a NULL RESOURCE VIEW
-		ResourceView(gObj<DeviceManager> manager) :manager(manager) {
-
-		}
-
-		int getSRV();
-
-		D3D12_CPU_DESCRIPTOR_HANDLE getSRVHandle();
-
-		int getUAV();
-
-		D3D12_CPU_DESCRIPTOR_HANDLE getUAVHandle();
-
-		int getCBV();
-
-		D3D12_CPU_DESCRIPTOR_HANDLE getCBVHandle();
-
-		int getRTV();
-
-		D3D12_CPU_DESCRIPTOR_HANDLE getRTVHandle();
-
-		int getDSV();
-
-		D3D12_CPU_DESCRIPTOR_HANDLE getDSVHandle();
-
-		void getCPUHandleFor(D3D12_DESCRIPTOR_RANGE_TYPE type, D3D12_CPU_DESCRIPTOR_HANDLE &handle) {
-			switch (type) {
-			case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
-				handle = getCBVHandle();
-				break;
-			case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-				handle = getSRVHandle();
-				break;
-			case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
-				handle = getUAVHandle();
-				break;
-			}
-		}
-
-		void getCPUHandleFor(D3D12_ROOT_PARAMETER_TYPE type, D3D12_CPU_DESCRIPTOR_HANDLE &handle) {
-			switch (type) {
-			case D3D12_ROOT_PARAMETER_TYPE_CBV:
-				handle = getCBVHandle();
-				break;
-			case D3D12_ROOT_PARAMETER_TYPE_SRV:
-				handle = getSRVHandle();
-				break;
-			case D3D12_ROOT_PARAMETER_TYPE_UAV:
-				handle = getUAVHandle();
-				break;
-			}
-		}
-
-
-	public:
-
-		~ResourceView();
-
-		// Cast this resource to a different view type.
-		template<typename V>
-		V* CreateCastView()
-		{
-			return new V(this->resource, this->arraySliceStart, this->arraySliceCount, this->mipSliceStart, this->mipSliceCount);
-		}
-	};
-
-	// Represents a buffer view of a resource.
-	class Buffer : public ResourceView {
-		friend Creating;
-		friend Presenter;
-		friend GraphicsManager;
-		friend ResourceView;
-		friend DXRManager;
-		friend SceneBuilder;
-		friend RTPipelineManager;
-		friend IRTProgram;
-		friend TriangleGeometryCollection;
-		friend ProceduralGeometryCollection;
-		friend GeometryCollection;
-		friend InstanceCollection;
-
-		byte* GetShaderRecordStartAddress(int index) {
-			return ((byte*)resource->GetMappedDataAddress()) + index * Stride;
-		}
-
-	protected:
-		// Inherited via Resource
-		void CreateUAVDesc(D3D12_UNORDERED_ACCESS_VIEW_DESC & d)
-		{
-			d.Buffer.CounterOffsetInBytes = 0;
-			d.Buffer.FirstElement = 0;
-			d.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
-			d.Buffer.NumElements = ElementCount;
-			d.Buffer.StructureByteStride = Stride;
-			d.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-			d.Format = DXGI_FORMAT_UNKNOWN;// !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
-		}
-
-		void CreateSRVDesc(D3D12_SHADER_RESOURCE_VIEW_DESC & d)
-		{
-			d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			d.Buffer.FirstElement = 0;
-			d.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-			d.Buffer.NumElements = ElementCount;
-			d.Buffer.StructureByteStride = Stride;
-			d.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
-		}
-
-		void CreateCBVDesc(D3D12_CONSTANT_BUFFER_VIEW_DESC & d)
-		{
-			d.BufferLocation = !resource ? 0 : resource->internalResource->GetGPUVirtualAddress();
-			d.SizeInBytes = (Stride * ElementCount + 255)&~255;
-		}
-
-		void CreateRTVDesc(D3D12_RENDER_TARGET_VIEW_DESC & d)
-		{
-			throw "Not supported a buffer as render target";
-		}
-
-		void CreateDSVDesc(D3D12_DEPTH_STENCIL_VIEW_DESC & d)
-		{
-			throw "Not supported a buffer as depth stencil view";
-		}
-
-		void CreateVBV(D3D12_VERTEX_BUFFER_VIEW &v) {
-			v.BufferLocation = !resource ? 0 : resource->internalResource->GetGPUVirtualAddress();
-			v.SizeInBytes = ElementCount * Stride;
-			v.StrideInBytes = Stride;
-		}
-
-		void CreateIBV(D3D12_INDEX_BUFFER_VIEW &i) {
-			i.BufferLocation = !resource ? 0 : resource->internalResource->GetGPUVirtualAddress();
-			i.Format = !resource ? DXGI_FORMAT_UNKNOWN : Stride == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
-			i.SizeInBytes = ElementCount * Stride;
-		}
-
-		Buffer(gObj<ResourceWrapper> resource, int stride)
-			: ResourceView(resource), ElementCount(resource->desc.Width / stride), Stride(stride)
-		{
-		}
-
-		Buffer(gObj<DeviceManager> manager) : ResourceView(manager), ElementCount(1), Stride(256)
-		{
-		}
-
-	public:
-		// Number of elements of this buffer
-		unsigned int const
-			ElementCount;
-		// Number of bytes of each element in this buffer
-		unsigned int const
-			Stride;
-	};
-
-	// Represents a 2D view of a resource. This view includes texture arrays, mipmaps and planes.
-	class Texture2D : public ResourceView {
-		friend Creating;
-		friend Presenter;
-		friend ResourceView;
-		friend CommandListManager;
-
-	protected:
-		// Inherited via Resource
-		void CreateUAVDesc(D3D12_UNORDERED_ACCESS_VIEW_DESC & d)
-		{
-			d.Texture2DArray.ArraySize = arraySliceCount;
-			d.Texture2DArray.FirstArraySlice = arraySliceStart;
-			d.Texture2DArray.MipSlice = mipSliceStart;
-			d.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
-		}
-
-		void CreateSRVDesc(D3D12_SHADER_RESOURCE_VIEW_DESC & d)
-		{
-			d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			d.Texture2DArray.ArraySize = arraySliceCount;
-			d.Texture2DArray.FirstArraySlice = arraySliceStart;
-			d.Texture2DArray.MipLevels = mipSliceCount;
-			d.Texture2DArray.MostDetailedMip = mipSliceStart;
-			d.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-			d.Format = !resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
-		}
-
-		void CreateCBVDesc(D3D12_CONSTANT_BUFFER_VIEW_DESC & d)
-		{
-			throw "Not supported convert a texture 2D into a constant buffer";
-		}
-
-		void CreateRTVDesc(D3D12_RENDER_TARGET_VIEW_DESC & d)
-		{
-			d.Texture2DArray.ArraySize = arraySliceCount;
-			d.Texture2DArray.FirstArraySlice = arraySliceStart;
-			d.Texture2DArray.MipSlice = mipSliceStart;
-			d.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
-			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
-		}
-
-		void CreateDSVDesc(D3D12_DEPTH_STENCIL_VIEW_DESC & d)
-		{
-			d.Texture2DArray.ArraySize = arraySliceCount;
-			d.Texture2DArray.FirstArraySlice = arraySliceStart;
-			d.Texture2DArray.MipSlice = mipSliceStart;
-			d.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
-			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
-		}
-
-		Texture2D(gObj<ResourceWrapper> resource, int arrayStart = 0, int arrayCount = INT_MAX, int mipStart = 0, int mipsCount = INT_MAX)
-			: ResourceView(resource, arrayStart, arrayCount, mipStart, mipsCount)
-			, Width(max(1, resource->desc.Width >> mipStart)), Height(max(1, resource->desc.Height >> mipStart))
-		{
-		}
-
-		Texture2D(gObj<DeviceManager> manager) : ResourceView(manager), Width(1), Height(1) {
-		}
-	public:
-		// Width of this Texture2D
-		int const Width;
-		// Height of this Texture2D
-		int const Height;
-
-		inline int getMipsCount() {
-			return mipSliceCount;
-		}
-		inline int getSlicesCount() {
-			return arraySliceCount;
-		}
-		gObj<Texture2D> CreateSlice(int sliceStart = 0, int sliceCount = INT_MAX, int mipStart = 0, int mipCount = INT_MAX) {
-			return new Texture2D(this->resource, this->arraySliceStart + sliceStart, sliceCount, this->mipSliceStart + mipStart, mipCount);
-		}
-		gObj<Texture2D> CreateSubresource(int sliceStart = 0, int mipStart = 0) {
-			return CreateSlice(sliceStart, 1, mipStart, 1);
-		}
-		gObj<Texture2D> CreateArraySlice(int slice) {
-			return CreateSlice(slice, 1);
-		}
-		gObj<Texture2D> CreateMipSlice(int slice) {
-			return CreateSlice(arraySliceStart, arraySliceCount, slice, 1);
-		}
-	};
-
-}
-
-#pragma endregion
-
-#pragma region ca4GPipelineBindings.h
-
 #pragma region Compiled Shaders
 
 #if 0
@@ -10938,6 +8187,2780 @@ const BYTE cso_DrawScreen_PS[] =
 
 #pragma endregion
 
+#pragma region D3D12FallbackDevice.h
+
+struct EMULATED_GPU_POINTER
+{
+	UINT32 OffsetInBytes;
+	UINT32 DescriptorHeapIndex;
+};
+
+struct WRAPPED_GPU_POINTER
+{
+	union
+	{
+		EMULATED_GPU_POINTER EmulatedGpuPtr;
+		D3D12_GPU_VIRTUAL_ADDRESS GpuVA;
+	};
+
+	WRAPPED_GPU_POINTER operator+(UINT64 offset)
+	{
+		WRAPPED_GPU_POINTER pointer = *this;
+		pointer.GpuVA += offset;
+		return pointer;
+	}
+};
+
+typedef struct D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC
+{
+	FLOAT Transform[3][4];
+	UINT InstanceID : 24;
+	UINT InstanceMask : 8;
+	UINT InstanceContributionToHitGroupIndex : 24;
+	UINT Flags : 8;
+	WRAPPED_GPU_POINTER AccelerationStructure;
+}     D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC;
+
+class
+	_declspec(uuid("539e5c40-df25-4c7d-81d8-6537f54306ed"))
+	ID3D12RaytracingFallbackStateObject : public IUnknown
+{
+public:
+	virtual ~ID3D12RaytracingFallbackStateObject() {};
+
+	virtual void *STDMETHODCALLTYPE GetShaderIdentifier(
+		_In_  LPCWSTR pExportName) = 0;
+
+	virtual UINT64 STDMETHODCALLTYPE GetShaderStackSize(
+		_In_  LPCWSTR pExportName) = 0;
+
+	virtual UINT64 STDMETHODCALLTYPE GetPipelineStackSize(void) = 0;
+
+	virtual void STDMETHODCALLTYPE SetPipelineStackSize(
+		UINT64 PipelineStackSizeInBytes) = 0;
+
+	virtual ID3D12StateObject *GetStateObject() = 0;
+};
+
+class
+	_declspec(uuid("348a2a6b-6760-4b78-a9a7-1758b6f78d46"))
+	ID3D12RaytracingFallbackCommandList : public IUnknown
+{
+public:
+	virtual ~ID3D12RaytracingFallbackCommandList() {}
+
+	virtual void BuildRaytracingAccelerationStructure(
+		_In_  const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC *pDesc,
+		_In_  UINT NumPostbuildInfoDescs,
+		_In_reads_opt_(NumPostbuildInfoDescs)  const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC *pPostbuildInfoDescs) = 0;
+
+	virtual void STDMETHODCALLTYPE EmitRaytracingAccelerationStructurePostbuildInfo(
+		_In_  const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC *pDesc,
+		_In_  UINT NumSourceAccelerationStructures,
+		_In_reads_(NumSourceAccelerationStructures)  const D3D12_GPU_VIRTUAL_ADDRESS *pSourceAccelerationStructureData) = 0;
+
+	virtual void STDMETHODCALLTYPE CopyRaytracingAccelerationStructure(
+		_In_  D3D12_GPU_VIRTUAL_ADDRESS DestAccelerationStructureData,
+		_In_  D3D12_GPU_VIRTUAL_ADDRESS SourceAccelerationStructureData,
+		_In_  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE Mode) = 0;
+
+	virtual void STDMETHODCALLTYPE SetDescriptorHeaps(
+		_In_  UINT NumDescriptorHeaps,
+		_In_reads_(NumDescriptorHeaps)  ID3D12DescriptorHeap *const *ppDescriptorHeaps) = 0;
+
+	virtual void STDMETHODCALLTYPE SetTopLevelAccelerationStructure(
+		_In_  UINT RootParameterIndex,
+		_In_  WRAPPED_GPU_POINTER  BufferLocation) = 0;
+
+	virtual void STDMETHODCALLTYPE SetPipelineState1(
+		_In_  ID3D12RaytracingFallbackStateObject *pStateObject) = 0;
+
+	virtual void STDMETHODCALLTYPE DispatchRays(
+		_In_  const D3D12_DISPATCH_RAYS_DESC *pDesc) = 0;
+};
+
+class
+	_declspec(uuid("0a662ea0-ab43-423a-848f-4824ae4b25ba"))
+	ID3D12RaytracingFallbackDevice : public IUnknown
+{
+public:
+	virtual ~ID3D12RaytracingFallbackDevice() {};
+
+	virtual bool UsingRaytracingDriver() = 0;
+
+	// Automatically determine how to create WRAPPED_GPU_POINTER based on UsingRaytracingDriver()
+	virtual WRAPPED_GPU_POINTER GetWrappedPointerSimple(UINT32 DescriptorHeapIndex, D3D12_GPU_VIRTUAL_ADDRESS GpuVA) = 0;
+
+	// Pre-condition: UsingRaytracingDriver() must be false
+	virtual WRAPPED_GPU_POINTER GetWrappedPointerFromDescriptorHeapIndex(UINT32 DescriptorHeapIndex, UINT32 OffsetInBytes = 0) = 0;
+
+	// Pre-condition: UsingRaytracingDriver() must be true
+	virtual WRAPPED_GPU_POINTER GetWrappedPointerFromGpuVA(D3D12_GPU_VIRTUAL_ADDRESS gpuVA) = 0;
+
+	virtual D3D12_RESOURCE_STATES GetAccelerationStructureResourceState() = 0;
+
+	virtual UINT STDMETHODCALLTYPE GetShaderIdentifierSize(void) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE CreateStateObject(
+		const D3D12_STATE_OBJECT_DESC *pDesc,
+		REFIID riid,
+		_COM_Outptr_  void **ppStateObject) = 0;
+
+	virtual void STDMETHODCALLTYPE GetRaytracingAccelerationStructurePrebuildInfo(
+		_In_  const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS *pDesc,
+		_Out_  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO *pInfo) = 0;
+
+	virtual void QueryRaytracingCommandList(
+		ID3D12GraphicsCommandList *pCommandList,
+		REFIID riid,
+		_COM_Outptr_  void **ppRaytracingCommandList) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE CreateRootSignature(
+		_In_  UINT nodeMask,
+		_In_reads_(blobLengthInBytes)  const void *pBlobWithRootSignature,
+		_In_  SIZE_T blobLengthInBytes,
+		REFIID riid,
+		_COM_Outptr_  void **ppvRootSignature) = 0;
+
+	virtual HRESULT D3D12SerializeVersionedRootSignature(
+		_In_ const D3D12_VERSIONED_ROOT_SIGNATURE_DESC* pRootSignature,
+		_Out_ ID3DBlob** ppBlob,
+		_Always_(_Outptr_opt_result_maybenull_) ID3DBlob** ppErrorBlob) = 0;
+
+	virtual HRESULT WINAPI D3D12SerializeRootSignature(
+		_In_ const D3D12_ROOT_SIGNATURE_DESC* pRootSignature,
+		_In_ D3D_ROOT_SIGNATURE_VERSION Version,
+		_Out_ ID3DBlob** ppBlob,
+		_Always_(_Outptr_opt_result_maybenull_) ID3DBlob** ppErrorBlob) = 0;
+};
+
+enum CreateRaytracingFallbackDeviceFlags
+{
+	None = 0x0,
+	ForceComputeFallback = 0x1,
+	EnableRootDescriptorsInShaderRecords = 0x2
+};
+
+HRESULT D3D12CreateRaytracingFallbackDevice(
+	_In_ ID3D12Device *pDevice,
+	_In_ DWORD createRaytracingFallbackDeviceFlags,
+	_In_ UINT NodeMask,
+	_In_ REFIID riid,
+	_COM_Outptr_opt_ void** ppDevice);
+
+#pragma endregion
+
+namespace CA4G {
+#pragma region Class Definitions
+	class Bundle;
+	class Clearing;
+	class Creating;
+	class Loading;
+	class Copying;
+	class CommandListManager;
+	class CopyingManager;
+	class ComputeManager;
+	class GraphicsManager;
+	class DXRManager;
+	class Presenter;
+	class DeviceManager;
+	template<typename ...A> class PipelineBindings;
+	class ComputePipelineBindings;
+	class GraphicsPipelineBindings;
+	class ResourceWrapper;
+	class ResourceView;
+	class Buffer;
+	class Texture1D;
+	class Texture2D;
+	class CubeTexture;
+	class Texture2DMS;
+	class Texture3D;
+	struct Sampler;
+	class GPUScheduler;
+	class SceneBuilder;
+	class GeometryCollection;
+	class TriangleGeometryCollection;
+	class ProceduralGeometryCollection;
+	class InstanceCollection;
+	class HitGroupManager;
+	template<typename S, D3D12_STATE_SUBOBJECT_TYPE Type> class DynamicStateBindingOf;
+	class DXILManager;
+	template<typename C> class DXIL_Library;
+	class IRTProgram;
+	template<typename L> class RTProgram;
+	class RTPipelineManager;
+#pragma endregion
+}
+
+#pragma region DX COM OBJECTS
+
+typedef CComPtr<ID3D12DescriptorHeap> DX_DescriptorHeap;
+typedef CComPtr<ID3D12Device5> DX_Device;
+typedef CComPtr<ID3D12RaytracingFallbackDevice> DX_FallbackDevice;
+typedef CComPtr<ID3D12RaytracingFallbackCommandList> DX_FallbackCommandList;
+typedef CComPtr<ID3D12RaytracingFallbackStateObject> DX_FallbackStateObject;
+
+typedef CComPtr<ID3D12GraphicsCommandList4> DX_CommandList;
+typedef CComPtr<ID3D12CommandAllocator> DX_CommandAllocator;
+typedef CComPtr<ID3D12CommandQueue> DX_CommandQueue;
+typedef CComPtr<ID3D12Fence1> DX_Fence;
+typedef CComPtr<ID3D12Heap1> DX_Heap;
+typedef CComPtr<ID3D12PipelineState> DX_PipelineState;
+typedef CComPtr<ID3D12Resource1> DX_Resource;
+typedef CComPtr<ID3D12RootSignature> DX_RootSignature;
+typedef CComPtr<ID3D12RootSignatureDeserializer> DX_RootSignatureDeserializer;
+typedef CComPtr<ID3D12StateObject> DX_StateObject;
+typedef CComPtr<ID3D12StateObjectProperties> DX_StateObjectProperties;
+
+#pragma endregion
+
+#define CA4G_MAX_NUMBER_OF_WORKERS 8
+#define CA4G_SUPPORTED_ENGINES 4
+#define CA4G_SUPPORTED_BUFFERING 3
+
+#pragma region ca4GErrors.h
+
+#include <comdef.h>
+#include <stdexcept>
+
+namespace CA4G {
+
+	// Represents different error code this engine can report.
+	enum CA4G_Errors {
+		// Some error occurred.
+		CA4G_Errors_Any,
+		// The Pipeline State Object has a bad construction.
+		CA4G_Errors_BadPSOConstruction,
+		// The Signature has a bad construction
+		CA4G_Errors_BadSignatureConstruction,
+		// The image is in an unsupported format.
+		CA4G_Errors_UnsupportedFormat,
+		// Some shader were not found
+		CA4G_Errors_ShaderNotFound,
+		// Some initialization failed because memory was over
+		CA4G_Errors_RunOutOfMemory,
+		// Invalid Operation
+		CA4G_Errors_Invalid_Operation,
+		// Fallback raytracing device was not supported
+		CA4G_Errors_Unsupported_Fallback
+	};
+
+	class CA4GException : public std::exception {
+	public:
+		CA4GException(const char* const message) :std::exception(message) {}
+
+		static CA4GException FromError(CA4G_Errors error, const char* arg = nullptr, HRESULT hr = S_OK);
+
+	};
+}
+
+#pragma endregion
+
+#pragma region ca4GMemory.h
+
+namespace CA4G {
+
+	template<typename S>
+	class gObj {
+		friend S;
+		template<typename T> friend class list; // I dont like it... :(
+		template<typename T> friend class gObj;
+
+	private:
+		S *_this;
+		volatile long* counter;
+
+		void AddReference();
+
+		void RemoveReference();
+
+	public:
+		gObj() : _this(nullptr), counter(nullptr) {
+		}
+		gObj(S* self) : _this(self), counter(self ? new long(1) : nullptr) {
+		}
+
+		inline bool isNull() const { return _this == nullptr; }
+
+		// Copy constructor
+		gObj(const gObj<S>& other) {
+			this->counter = other.counter;
+			this->_this = other._this;
+			if (!isNull())
+				AddReference();
+		}
+
+		template <typename Subtype>
+		gObj(const gObj<Subtype>& other) {
+			this->counter = other.counter;
+			this->_this = (S*)other._this;
+			if (!isNull())
+				AddReference();
+		}
+
+		gObj<S>& operator = (const gObj<S>& other) {
+			if (!isNull())
+				RemoveReference();
+			this->counter = other.counter;
+			this->_this = other._this;
+			if (!isNull())
+				AddReference();
+			return *this;
+		}
+
+		bool operator == (const gObj<S> &other) {
+			return other._this == _this;
+		}
+
+		bool operator != (const gObj<S> &other) {
+			return other._this != _this;
+		}
+
+		template<typename A>
+		auto& operator[](A arg) {
+			return (*_this)[arg];
+		}
+
+		~gObj() {
+			if (!isNull())
+				RemoveReference();
+		}
+
+		//Dereference operator
+		S& operator*()
+		{
+			return *_this;
+		}
+		//Member Access operator
+		S* operator->()
+		{
+			return _this;
+		}
+
+		template<typename T>
+		gObj<T> Dynamic_Cast() {
+			gObj<T> obj;
+			obj._this = dynamic_cast<T*>(_this);
+			obj.counter = counter;
+			obj.AddReference();
+			return obj;
+		}
+
+		template<typename T>
+		gObj<T> Static_Cast() {
+			gObj<T> obj;
+			obj._this = static_cast<T*>(_this);
+			obj.counter = counter;
+			obj.AddReference();
+			return obj;
+		}
+
+		operator bool() const {
+			return !isNull();
+		}
+	};
+}
+
+#pragma endregion
+
+#pragma region ca4GShaders.h
+
+namespace CA4G {
+
+#define CompiledShader(s) (s),ARRAYSIZE(s) 
+
+	class ShaderLoader {
+	public:
+
+		static D3D12_SHADER_BYTECODE DrawScreenVS() {
+			return FromMemory(cso_DrawScreen_VS);
+		}
+		
+		static D3D12_SHADER_BYTECODE DrawTexturePS() {
+			return FromMemory(cso_DrawScreen_PS);
+		}
+
+		static D3D12_SHADER_BYTECODE DrawComplexityPS() {
+			return FromMemory(cso_DrawScreen_PS);
+		}
+
+		// Use this method to load a bytecode
+		static D3D12_SHADER_BYTECODE FromFile(const char* bytecodeFilePath);
+
+		// Use this method to load a bytecode from a memory buffer
+		static D3D12_SHADER_BYTECODE FromMemory(const byte* bytecodeData, int count);
+
+		// Use this method to load a bytecode from a memory buffer
+		template<int count>
+		static D3D12_SHADER_BYTECODE FromMemory(const byte(&bytecodeData)[count]);
+	};
+
+}
+
+
+#pragma endregion
+
+#pragma region ca4GImaging.h
+
+namespace CA4G {
+
+	struct TextureData {
+		int const Width;
+		int const Height;
+		int const MipMaps;
+		union {
+			int const ArraySlices;
+			int const Depth;
+		};
+		DXGI_FORMAT const Format;
+		byte* const Data;
+
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT *footprints;
+
+		long long const DataSize;
+		bool const FlipY;
+		D3D12_RESOURCE_DIMENSION Dimension;
+
+		TextureData(int width, int height, int mipMaps, int slices, DXGI_FORMAT format, byte* data, long long dataSize, bool flipY = false);
+
+		TextureData(int width, int height, int depth, DXGI_FORMAT format, byte* data, long long dataSize, bool flipY = false);
+
+		~TextureData();
+
+		static gObj<TextureData> CreateEmpty(int width, int height, int mipMaps, int slices, DXGI_FORMAT format);
+
+		static gObj<TextureData> CreateEmpty(int width, int height, int depth, DXGI_FORMAT format);
+
+		static gObj<TextureData> LoadFromFile(const char * filename);
+
+	private:
+		int pixelStride;
+
+	};
+}
+
+#pragma endregion
+
+#pragma region ca4GSync.h
+
+namespace CA4G {
+
+	class Semaphore {
+		HANDLE handle;
+#ifdef _DEBUG
+		int currentCounter;
+		int maxCount;
+		bool waiting = false;
+#endif
+	public:
+
+		Semaphore(int initialCount, int maxCount)
+#ifdef _DEBUG
+			:currentCounter(initialCount), maxCount(maxCount)
+#endif
+		{
+			handle = CreateSemaphore(nullptr, initialCount, maxCount, nullptr);
+		}
+		~Semaphore() {
+			CloseHandle(handle);
+		}
+
+		inline bool Wait() {
+#ifdef _DEBUG
+			waiting = true;
+#endif
+			auto result = WaitForSingleObject(handle, INFINITE);
+#ifdef _DEBUG
+			waiting = false;
+			currentCounter--;
+#endif
+			return result == WAIT_OBJECT_0;
+		}
+
+		inline void Release() {
+			ReleaseSemaphore(handle, 1, nullptr);
+#ifdef _DEBUG
+			currentCounter++;
+#endif
+		}
+	};
+
+	class Mutex {
+		HANDLE handle;
+#ifdef _DEBUG
+		bool locked = false;
+#endif
+	public:
+		inline Mutex() {
+			handle = CreateMutex(nullptr, false, nullptr);
+		}
+		~Mutex() {
+			CloseHandle(handle);
+		}
+
+		inline bool Acquire() {
+#ifdef _DEBUG
+			locked = true;
+#endif
+			return WaitForSingleObject(handle, INFINITE) == WAIT_OBJECT_0;
+		}
+
+		inline void Release() {
+			ReleaseMutex(handle);
+#ifdef _DEBUG
+			locked = false;
+#endif
+		}
+	};
+
+	class CountEvent {
+		int count = 0;
+		Mutex mutex;
+		Semaphore goSemaphore;
+	public:
+		inline CountEvent() :mutex(Mutex()), goSemaphore(Semaphore(1, 1)) {
+		}
+
+		inline void Increment() {
+			mutex.Acquire();
+			if (this->count == 0)
+				goSemaphore.Wait();
+			this->count++;
+			mutex.Release();
+		}
+
+		inline void Wait() {
+			goSemaphore.Wait();
+			goSemaphore.Release();
+		}
+
+		inline void Signal() {
+			mutex.Acquire();
+			this->count--;
+			if (this->count == 0)
+				goSemaphore.Release();
+			mutex.Release();
+		}
+	};
+
+	template<typename T>
+	class ProducerConsumerQueue {
+		T* elements;
+		int elementsLength;
+		int start;
+		int count;
+		Semaphore productsSemaphore;
+		Semaphore spacesSemaphore;
+		Mutex mutex;
+		bool closed;
+	public:
+		ProducerConsumerQueue(int capacity) :
+			productsSemaphore(Semaphore(0, capacity)),
+			spacesSemaphore(Semaphore(capacity, capacity)),
+			mutex(Mutex()) {
+			elementsLength = capacity;
+			elements = new T[elementsLength];
+			start = 0;
+			count = 0;
+			closed = false;
+		}
+
+		~ProducerConsumerQueue() {
+			delete[] elements;
+		}
+		inline int getCount() { return count; }
+
+		bool TryConsume(T& element);
+
+		bool TryProduce(T element);
+	};
+
+}
+
+#pragma endregion
+
+#pragma region GMath.h
+
+#ifndef GMATH_H
+#define GMATH_H
+
+#include <cmath>
+
+#define PI (float)3.14159265358979323846
+
+#ifndef min
+#define min(a,b) ((a)<(b)?a:b)
+#define max(a,b) ((a)>(b)?a:b)
+#endif
+
+#define O_4x4 float4x4(0)
+#define I_4x4 float4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)
+
+#define xyz(v) float3(v.x,v.y,v.z)
+
+namespace CA4G {
+
+	typedef struct ARGB
+	{
+		unsigned int value;
+
+		int Alpha() { return value >> 24; }
+		int Red() { return (value & 0xFF0000) >> 16; }
+		int Green() { return (value & 0xFF00) >> 8; }
+		int Blue() { return (value & 0xFF); }
+
+		ARGB() { value = 0; }
+
+		ARGB(int alpha, int red, int green, int blue) {
+			value =
+				((unsigned int)alpha) << 24 |
+				((unsigned int)red) << 16 |
+				((unsigned int)green) << 8 |
+				((unsigned int)blue);
+		}
+	} ARGB;
+
+	typedef struct RGBA
+	{
+		unsigned int value;
+
+		int Alpha() { return value >> 24; }
+		int Blue() { return (value & 0xFF0000) >> 16; }
+		int Green() { return (value & 0xFF00) >> 8; }
+		int Red() { return (value & 0xFF); }
+
+		RGBA() { value = 0; }
+
+		RGBA(int alpha, int red, int green, int blue) {
+			value =
+				((unsigned int)alpha) << 24 |
+				((unsigned int)blue) << 16 |
+				((unsigned int)green) << 8 |
+				((unsigned int)red);
+		}
+	} RGBA;
+
+	typedef struct int2 {
+		int x, y;
+
+		int2(int x, int y) :x(x), y(y) {
+		}
+		int2(int v) : int2(v, v) {}
+		int2() :int2(0) {}
+	} int2;
+
+	typedef struct int3 {
+		int x, y, z;
+
+		int3(int x, int y, int z) :x(x), y(y), z(z) {
+		}
+		int3(int v) : int3(v, v, v) {}
+		int3() :int3(0) {}
+	} int3;
+
+	typedef struct int4 {
+		int x, y, z, w;
+
+		int4(int x, int y, int z, int w) :x(x), y(y), z(z), w(w) {
+		}
+		int4(int v) : int4(v, v, v, v) {}
+		int4() : int4(0) {}
+	} int4;
+
+	typedef struct uint2 {
+		unsigned int x, y;
+
+		uint2(unsigned int x, unsigned int y) :x(x), y(y) {
+		}
+		uint2(unsigned int v) :uint2(v, v) {}
+		uint2() :uint2(0) {}
+	} uint2;
+
+	typedef struct uint3 {
+		unsigned int x, y, z;
+
+		uint3(unsigned int x, unsigned int y, unsigned int z) :x(x), y(y), z(z) {
+		}
+		uint3(unsigned int v) :uint3(v, v, v) {}
+		uint3() :uint3(0) {}
+	} uint3;
+
+	typedef struct uint4 {
+		unsigned int x, y, z, w;
+
+		uint4(unsigned int x, unsigned int y, unsigned int z, unsigned int w) :x(x), y(y), z(z), w(w) {
+		}
+		uint4(unsigned int v) :uint4(v, v, v, v) {}
+		uint4() :uint4(0) {}
+	} uint4;
+
+	typedef struct float2
+	{
+		float x, y;
+		float2(float x, float y) :x(x), y(y) {}
+		float2(float v) :float2(v, v) {}
+		float2() :float2(0) {}
+	} float2;
+
+	typedef struct float3
+	{
+		float x, y, z;
+		float3(float x, float y, float z) :x(x), y(y), z(z) {}
+		float3(float v) :float3(v, v, v) {}
+		float3() :float3(0) {}
+		float3(float2 v, float z) :float3(v.x, v.y, z) {}
+
+		float2 getXY() { return float2(x, y); }
+	} float3;
+
+	typedef struct float4
+	{
+		float x, y, z, w;
+		float4(float x, float y, float z, float w) :x(x), y(y), z(z), w(w) {}
+		float4(float v) :float4(v, v, v, v) {}
+		float4() :float4(0) {}
+		float4(float3 v, float w) :float4(v.x, v.y, v.z, w) {}
+
+		float3 getXYZ() { return float3(x, y, z); }
+		float3 getXYZHomogenized() { return float3(x / w, y / w, z / w); }
+	} float4;
+
+	typedef struct float2x2
+	{
+		float M00;
+		float M01;
+		float M10;
+		float M11;
+
+		float2x2(float value)
+		{
+			M00 = value;
+			M01 = value;
+			M10 = value;
+			M11 = value;
+		}
+		float2x2() :float2x2(0) {}
+		float2x2(float M00, float M01, float M10, float M11)
+		{
+			this->M00 = M00;
+			this->M01 = M01;
+			this->M10 = M10;
+			this->M11 = M11;
+		}
+
+	} float2x2;
+
+	typedef struct float4x4
+	{
+		float M00;
+		float M01;
+		float M02;
+		float M03;
+		float M10;
+		float M11;
+		float M12;
+		float M13;
+		float M20;
+		float M21;
+		float M22;
+		float M23;
+		float M30;
+		float M31;
+		float M32;
+		float M33;
+		float4x4(float value)
+		{
+			M00 = value;
+			M01 = value;
+			M02 = value;
+			M03 = value;
+			M10 = value;
+			M11 = value;
+			M12 = value;
+			M13 = value;
+			M20 = value;
+			M21 = value;
+			M22 = value;
+			M23 = value;
+			M30 = value;
+			M31 = value;
+			M32 = value;
+			M33 = value;
+		}
+		float4x4() :float4x4(0) {}
+		float4x4(float M00, float M01, float M02, float M03, float M10, float M11, float M12, float M13, float M20, float M21, float M22, float M23, float M30, float M31, float M32, float M33)
+		{
+			this->M00 = M00;
+			this->M01 = M01;
+			this->M02 = M02;
+			this->M03 = M03;
+			this->M10 = M10;
+			this->M11 = M11;
+			this->M12 = M12;
+			this->M13 = M13;
+			this->M20 = M20;
+			this->M21 = M21;
+			this->M22 = M22;
+			this->M23 = M23;
+			this->M30 = M30;
+			this->M31 = M31;
+			this->M32 = M32;
+			this->M33 = M33;
+		}
+		float4x4 getInverse() const {
+			float Min00 = M11 * M22 * M33 + M12 * M23 * M31 + M13 * M21 * M32 - M11 * M23 * M32 - M12 * M21 * M33 - M13 * M22 * M31;
+			float Min01 = M10 * M22 * M33 + M12 * M23 * M30 + M13 * M20 * M32 - M10 * M23 * M32 - M12 * M20 * M33 - M13 * M22 * M30;
+			float Min02 = M10 * M21 * M33 + M11 * M23 * M30 + M13 * M20 * M31 - M10 * M23 * M31 - M11 * M20 * M33 - M13 * M21 * M30;
+			float Min03 = M10 * M21 * M32 + M11 * M22 * M30 + M12 * M20 * M31 - M10 * M22 * M31 - M11 * M20 * M32 - M12 * M21 * M30;
+
+			float det = Min00 * M00 - Min01 * M01 + Min02 * M02 - Min03 * M03;
+
+			if (det == 0)
+				return float4x4(0);
+
+			float Min10 = M01 * M22 * M33 + M02 * M23 * M31 + M03 * M21 * M32 - M01 * M23 * M32 - M02 * M21 * M33 - M03 * M22 * M31;
+			float Min11 = M00 * M22 * M33 + M02 * M23 * M30 + M03 * M20 * M32 - M00 * M23 * M32 - M02 * M20 * M33 - M03 * M22 * M30;
+			float Min12 = M00 * M21 * M33 + M01 * M23 * M30 + M03 * M20 * M31 - M00 * M23 * M31 - M01 * M20 * M33 - M03 * M21 * M30;
+			float Min13 = M00 * M21 * M32 + M01 * M22 * M30 + M02 * M20 * M31 - M00 * M22 * M31 - M01 * M20 * M32 - M02 * M21 * M30;
+
+			float Min20 = M01 * M12 * M33 + M02 * M13 * M31 + M03 * M11 * M32 - M01 * M13 * M32 - M02 * M11 * M33 - M03 * M12 * M31;
+			float Min21 = M00 * M12 * M33 + M02 * M13 * M30 + M03 * M10 * M32 - M00 * M13 * M32 - M02 * M10 * M33 - M03 * M12 * M30;
+			float Min22 = M00 * M11 * M33 + M01 * M13 * M30 + M03 * M10 * M31 - M00 * M13 * M31 - M01 * M10 * M33 - M03 * M11 * M30;
+			float Min23 = M00 * M11 * M32 + M01 * M12 * M30 + M02 * M10 * M31 - M00 * M12 * M31 - M01 * M10 * M32 - M02 * M11 * M30;
+
+			float Min30 = M01 * M12 * M23 + M02 * M13 * M21 + M03 * M11 * M22 - M01 * M13 * M22 - M02 * M11 * M23 - M03 * M12 * M21;
+			float Min31 = M00 * M12 * M23 + M02 * M13 * M20 + M03 * M10 * M22 - M00 * M13 * M22 - M02 * M10 * M23 - M03 * M12 * M20;
+			float Min32 = M00 * M11 * M23 + M01 * M13 * M20 + M03 * M10 * M21 - M00 * M13 * M21 - M01 * M10 * M23 - M03 * M11 * M20;
+			float Min33 = M00 * M11 * M22 + M01 * M12 * M20 + M02 * M10 * M21 - M00 * M12 * M21 - M01 * M10 * M22 - M02 * M11 * M20;
+
+			return float4x4(
+				(+Min00 / det), (-Min10 / det), (+Min20 / det), (-Min30 / det),
+				(-Min01 / det), (+Min11 / det), (-Min21 / det), (+Min31 / det),
+				(+Min02 / det), (-Min12 / det), (+Min22 / det), (-Min32 / det),
+				(-Min03 / det), (+Min13 / det), (-Min23 / det), (+Min33 / det));
+		}
+		float getDeterminant() const {
+			float Min00 = M11 * M22 * M33 + M12 * M23 * M31 + M13 * M21 * M32 - M11 * M23 * M32 - M12 * M21 * M33 - M13 * M22 * M31;
+			float Min01 = M10 * M22 * M33 + M12 * M23 * M30 + M13 * M20 * M32 - M10 * M23 * M32 - M12 * M20 * M33 - M13 * M22 * M30;
+			float Min02 = M10 * M21 * M33 + M11 * M23 * M30 + M13 * M20 * M31 - M10 * M23 * M31 - M11 * M20 * M33 - M13 * M21 * M30;
+			float Min03 = M10 * M21 * M32 + M11 * M22 * M30 + M12 * M20 * M31 - M10 * M22 * M31 - M11 * M20 * M32 - M12 * M21 * M30;
+
+			return Min00 * M00 - Min01 * M01 + Min02 * M02 - Min03 * M03;
+		}
+		bool IsSingular() const { return getDeterminant() == 0; }
+	} float4x4;
+
+	typedef struct float3x3
+	{
+		float M00;
+		float M01;
+		float M02;
+		float M10;
+		float M11;
+		float M12;
+		float M20;
+		float M21;
+		float M22;
+		float3x3(float value)
+		{
+			M00 = value;
+			M01 = value;
+			M02 = value;
+			M10 = value;
+			M11 = value;
+			M12 = value;
+			M20 = value;
+			M21 = value;
+			M22 = value;
+		}
+		float3x3() :float3x3(0) {}
+		float3x3(float M00, float M01, float M02, float M10, float M11, float M12, float M20, float M21, float M22)
+		{
+			this->M00 = M00;
+			this->M01 = M01;
+			this->M02 = M02;
+			this->M10 = M10;
+			this->M11 = M11;
+			this->M12 = M12;
+			this->M20 = M20;
+			this->M21 = M21;
+			this->M22 = M22;
+		}
+
+		float3x3(const float4x4 &m) :float3x3(m.M00, m.M01, m.M02, m.M10, m.M11, m.M12, m.M20, m.M21, m.M22) {
+		}
+
+		float3x3 getInverse() const
+		{
+			/// 00 01 02
+			/// 10 11 12
+			/// 20 21 22
+			float Min00 = M11 * M22 - M12 * M21;
+			float Min01 = M10 * M22 - M12 * M20;
+			float Min02 = M10 * M21 - M11 * M20;
+
+			float det = Min00 * M00 - Min01 * M01 + Min02 * M02;
+
+			if (det == 0)
+				return float3x3(0);
+
+			float Min10 = M01 * M22 - M02 * M21;
+			float Min11 = M00 * M22 - M02 * M20;
+			float Min12 = M00 * M21 - M01 * M20;
+
+			float Min20 = M01 * M12 - M02 * M11;
+			float Min21 = M00 * M12 - M02 * M10;
+			float Min22 = M00 * M11 - M01 * M10;
+
+			return float3x3(
+				(+Min00 / det), (-Min10 / det), (+Min20 / det),
+				(-Min01 / det), (+Min11 / det), (-Min21 / det),
+				(+Min02 / det), (-Min12 / det), (+Min22 / det));
+		}
+
+		float getDeterminant() const
+		{
+			float Min00 = M11 * M22 - M12 * M21;
+			float Min01 = M10 * M22 - M12 * M20;
+			float Min02 = M10 * M21 - M11 * M20;
+
+			return Min00 * M00 - Min01 * M01 + Min02 * M02;
+		}
+
+		bool IsSingular() const { return getDeterminant() == 0; }
+	} float3x3;
+
+	typedef struct float3x4
+	{
+		float M00;
+		float M01;
+		float M02;
+		float M03;
+		float M10;
+		float M11;
+		float M12;
+		float M13;
+		float M20;
+		float M21;
+		float M22;
+		float M23;
+		float3x4(float value)
+		{
+			M00 = value;
+			M01 = value;
+			M02 = value;
+			M03 = value;
+			M10 = value;
+			M11 = value;
+			M12 = value;
+			M13 = value;
+			M20 = value;
+			M21 = value;
+			M22 = value;
+			M23 = value;
+		}
+		float3x4() :float3x4(0) {}
+		float3x4(float M00, float M01, float M02, float M03, float M10, float M11, float M12, float M13, float M20, float M21, float M22, float M23)
+		{
+			this->M00 = M00;
+			this->M01 = M01;
+			this->M02 = M02;
+			this->M03 = M03;
+			this->M10 = M10;
+			this->M11 = M11;
+			this->M12 = M12;
+			this->M13 = M13;
+			this->M20 = M20;
+			this->M21 = M21;
+			this->M22 = M22;
+			this->M23 = M23;
+		}
+
+		float3x4(const float4x4 &m) :float3x4(m.M00, m.M01, m.M02, m.M03, m.M10, m.M11, m.M12, m.M13, m.M20, m.M21, m.M22, m.M23) {
+		}
+	} float3x4;
+
+	static float4 operator + (const float4 &v1, const float4 & v2)
+	{
+		return float4{ v1.x + v2.x, v1.y + v2.y, v1.z + v2.z, v1.w + v2.w };
+	}
+	static float4 operator - (const float4 & v1, const float4 & v2)
+	{
+		return float4{ v1.x - v2.x, v1.y - v2.y, v1.z - v2.z, v1.w - v2.w };
+	}
+	static float4 operator * (const float4 & v1, const float4 & v2)
+	{
+		return float4{ v1.x * v2.x, v1.y * v2.y, v1.z * v2.z, v1.w * v2.w };
+	}
+	static float4 operator / (const float4 & v1, const float4 & v2)
+	{
+		return float4{ v1.x / v2.x, v1.y / v2.y, v1.z / v2.z, v1.w / v2.w };
+	}
+	static float3 operator + (const float3 &v1, const float3 & v2)
+	{
+		return float3{ v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
+	}
+	static float3 operator - (const float3 & v1, const float3 & v2)
+	{
+		return float3{ v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
+	}
+	static float3 operator * (const float3 & v1, const float3 & v2)
+	{
+		return float3{ v1.x * v2.x, v1.y * v2.y, v1.z * v2.z };
+	}
+	static float3 operator / (const float3 & v1, const int3 & v2)
+	{
+		return float3{ v1.x / v2.x, v1.y / v2.y, v1.z / v2.z };
+	}
+	static float3 operator / (const float3 & v1, const float & alpha)
+	{
+		return float3{ v1.x / alpha, v1.y / alpha, v1.z / alpha };
+	}
+	static float3 operator / (const float3 & v1, const float3 & v2)
+	{
+		return float3{ v1.x / v2.x, v1.y / v2.y, v1.z / v2.z };
+	}
+	static float2 operator + (const float2 &v1, const float2 & v2)
+	{
+		return float2{ v1.x + v2.x, v1.y + v2.y };
+	}
+	static float2 operator - (const float2 & v1, const float2 & v2)
+	{
+		return float2{ v1.x - v2.x, v1.y - v2.y };
+	}
+	static float2 operator * (const float2 & v1, const float2 & v2)
+	{
+		return float2{ v1.x * v2.x, v1.y * v2.y };
+	}
+	static float2 operator / (const float2 & v1, const float2 & v2)
+	{
+		return float2{ v1.x / v2.x, v1.y / v2.y };
+	}
+	static float4x4 operator + (const float4x4 &m1, const float4x4 &m2)
+	{
+		return float4x4{
+			m1.M00 + m2.M00,m1.M01 + m2.M01,m1.M02 + m2.M02,m1.M03 + m2.M03,
+			m1.M10 + m2.M10,m1.M11 + m2.M11,m1.M12 + m2.M12,m1.M13 + m2.M13,
+			m1.M20 + m2.M20,m1.M21 + m2.M21,m1.M22 + m2.M22,m1.M23 + m2.M23,
+			m1.M30 + m2.M30,m1.M31 + m2.M31,m1.M32 + m2.M32,m1.M33 + m2.M33
+		};
+	}
+	static float4x4 operator - (const float4x4 &m1, const float4x4 &m2)
+	{
+		return float4x4{
+			m1.M00 - m2.M00,m1.M01 - m2.M01,m1.M02 - m2.M02,m1.M03 - m2.M03,
+			m1.M10 - m2.M10,m1.M11 - m2.M11,m1.M12 - m2.M12,m1.M13 - m2.M13,
+			m1.M20 - m2.M20,m1.M21 - m2.M21,m1.M22 - m2.M22,m1.M23 - m2.M23,
+			m1.M30 - m2.M30,m1.M31 - m2.M31,m1.M32 - m2.M32,m1.M33 - m2.M33
+		};
+	}
+	static float4x4 operator * (const float4x4 &m1, const float4x4 &m2)
+	{
+		return float4x4{
+			m1.M00 * m2.M00,m1.M01 * m2.M01,m1.M02 * m2.M02,m1.M03 * m2.M03,
+			m1.M10 * m2.M10,m1.M11 * m2.M11,m1.M12 * m2.M12,m1.M13 * m2.M13,
+			m1.M20 * m2.M20,m1.M21 * m2.M21,m1.M22 * m2.M22,m1.M23 * m2.M23,
+			m1.M30 * m2.M30,m1.M31 * m2.M31,m1.M32 * m2.M32,m1.M33 * m2.M33
+		};
+	}
+	static float4x4 operator / (const float4x4 &m1, const float4x4 &m2)
+	{
+		return float4x4{
+			m1.M00 / m2.M00,m1.M01 / m2.M01,m1.M02 / m2.M02,m1.M03 / m2.M03,
+			m1.M10 / m2.M10,m1.M11 / m2.M11,m1.M12 / m2.M12,m1.M13 / m2.M13,
+			m1.M20 / m2.M20,m1.M21 / m2.M21,m1.M22 / m2.M22,m1.M23 / m2.M23,
+			m1.M30 / m2.M30,m1.M31 / m2.M31,m1.M32 / m2.M32,m1.M33 / m2.M33
+		};
+	}
+
+	static float3x3 operator + (const float3x3 &m1, const float3x3 & m2)
+	{
+		return float3x3{
+			m1.M00 + m2.M00,m1.M01 + m2.M01,m1.M02 + m2.M02,
+			m1.M10 + m2.M10,m1.M11 + m2.M11,m1.M12 + m2.M12,
+			m1.M20 + m2.M20,m1.M21 + m2.M21,m1.M22 + m2.M22
+		};
+	}
+	static float3x3 operator - (const float3x3 & m1, const float3x3 & m2)
+	{
+		return float3x3{
+			m1.M00 - m2.M00,m1.M01 - m2.M01,m1.M02 - m2.M02,
+			m1.M10 - m2.M10,m1.M11 - m2.M11,m1.M12 - m2.M12,
+			m1.M20 - m2.M20,m1.M21 - m2.M21,m1.M22 - m2.M22
+		};
+	}
+	static float3x3 operator * (const float3x3 & m1, const float3x3 & m2)
+	{
+		return float3x3{
+			m1.M00 * m2.M00,m1.M01 * m2.M01,m1.M02 * m2.M02,
+			m1.M10 * m2.M10,m1.M11 * m2.M11,m1.M12 * m2.M12,
+			m1.M20 * m2.M20,m1.M21 * m2.M21,m1.M22 * m2.M22
+		};
+	}
+	static float3x3 operator / (const float3x3 & m1, const float3x3 & m2)
+	{
+		return float3x3{
+			m1.M00 / m2.M00,m1.M01 / m2.M01,m1.M02 / m2.M02,
+			m1.M10 / m2.M10,m1.M11 / m2.M11,m1.M12 / m2.M12,
+			m1.M20 / m2.M20,m1.M21 / m2.M21,m1.M22 / m2.M22
+		};
+	}
+
+	static float2x2 operator + (const float2x2 &m1, const float2x2 & m2)
+	{
+		return float2x2{
+			m1.M00 + m2.M00,m1.M01 + m2.M01,
+			m1.M10 + m2.M10,m1.M11 + m2.M11
+		};
+	}
+	static float2x2 operator - (const float2x2 & m1, const float2x2 & m2)
+	{
+		return float2x2{
+			m1.M00 - m2.M00,m1.M01 - m2.M01,
+			m1.M10 - m2.M10,m1.M11 - m2.M11
+		};
+	}
+	static float2x2 operator * (const float2x2 & m1, const float2x2 & m2)
+	{
+		return float2x2{
+			m1.M00 * m2.M00,m1.M01 * m2.M01,
+			m1.M10 * m2.M10,m1.M11 * m2.M11
+		};
+	}
+	static float2x2 operator / (const float2x2 & m1, const float2x2 & m2)
+	{
+		return float2x2{
+			m1.M00 / m2.M00,m1.M01 / m2.M01,
+			m1.M10 / m2.M10,m1.M11 / m2.M11
+		};
+	}
+
+	static bool any(const float3 &v) {
+		return v.x != 0 || v.y != 0 || v.z != 0;
+	}
+	static bool any(const float4 &v) {
+		return v.x != 0 || v.y != 0 || v.z != 0 || v.w != 0;
+	}
+
+	static float dot(const float4 &v1, const float4 &v2)
+	{
+		return v1.x *v2.x + v1.y* v2.y + v1.z *v2.z + v1.w*v2.w;
+	}
+	static float dot(const float3 &v1, const float3 &v2)
+	{
+		return v1.x *v2.x + v1.y* v2.y + v1.z *v2.z;
+	}
+	static float dot(const float2 &v1, const float2 &v2)
+	{
+		return v1.x *v2.x + v1.y* v2.y;
+	}
+
+	static float3 cross(const float3 &v1, const float3 &v2)
+	{
+		return float3(
+			v1.y * v2.z - v1.z * v2.y,
+			v1.z * v2.x - v1.x * v2.z,
+			v1.x * v2.y - v1.y * v2.x);
+	}
+
+	static float2 lerp(const float2 &v1, const float2 &v2, const float alpha)
+	{
+		return float2(
+			v1.x*(1 - alpha) + v2.x*alpha,
+			v1.y*(1 - alpha) + v2.y*alpha);
+	}
+	static float3 lerp(const float3 &v1, const float3 &v2, const float alpha)
+	{
+		return float3(
+			v1.x*(1 - alpha) + v2.x*alpha,
+			v1.y*(1 - alpha) + v2.y*alpha,
+			v1.z*(1 - alpha) + v2.z*alpha);
+	}
+	static float4 lerp(const float4 &v1, const float4 &v2, const float alpha)
+	{
+		return float4(
+			v1.x*(1 - alpha) + v2.x*alpha,
+			v1.y*(1 - alpha) + v2.y*alpha,
+			v1.z*(1 - alpha) + v2.z*alpha,
+			v1.w*(1 - alpha) + v2.w*alpha);
+	}
+
+	static float2x2 mul(const float2x2 &m1, const float2x2 &m2) {
+		return float2x2(m1.M00 * (m2.M00) + (m1.M01 * (m2.M10)), m1.M00 * (m2.M01) + (m1.M01 * (m2.M11)), m1.M10 * (m2.M00) + (m1.M11 * (m2.M10)), m1.M10 * (m2.M01) + (m1.M11 * (m2.M11)));
+	}
+	static float3x3 mul(const float3x3 &m1, const float3x3 &m2)
+	{
+		return float3x3(m1.M00 * (m2.M00) + (m1.M01 * (m2.M10)) + (m1.M02 * (m2.M20)), m1.M00 * (m2.M01) + (m1.M01 * (m2.M11)) + (m1.M02 * (m2.M21)), m1.M00 * (m2.M02) + (m1.M01 * (m2.M12)) + (m1.M02 * (m2.M22)), m1.M10 * (m2.M00) + (m1.M11 * (m2.M10)) + (m1.M12 * (m2.M20)), m1.M10 * (m2.M01) + (m1.M11 * (m2.M11)) + (m1.M12 * (m2.M21)), m1.M10 * (m2.M02) + (m1.M11 * (m2.M12)) + (m1.M12 * (m2.M22)), m1.M20 * (m2.M00) + (m1.M21 * (m2.M10)) + (m1.M22 * (m2.M20)), m1.M20 * (m2.M01) + (m1.M21 * (m2.M11)) + (m1.M22 * (m2.M21)), m1.M20 * (m2.M02) + (m1.M21 * (m2.M12)) + (m1.M22 * (m2.M22)));
+	}
+	static float4x4 mul(const float4x4 &m1, const float4x4 &m2)
+	{
+		return float4x4(m1.M00 * (m2.M00) + (m1.M01 * (m2.M10)) + (m1.M02 * (m2.M20)) + (m1.M03 * (m2.M30)), m1.M00 * (m2.M01) + (m1.M01 * (m2.M11)) + (m1.M02 * (m2.M21)) + (m1.M03 * (m2.M31)), m1.M00 * (m2.M02) + (m1.M01 * (m2.M12)) + (m1.M02 * (m2.M22)) + (m1.M03 * (m2.M32)), m1.M00 * (m2.M03) + (m1.M01 * (m2.M13)) + (m1.M02 * (m2.M23)) + (m1.M03 * (m2.M33)), m1.M10 * (m2.M00) + (m1.M11 * (m2.M10)) + (m1.M12 * (m2.M20)) + (m1.M13 * (m2.M30)), m1.M10 * (m2.M01) + (m1.M11 * (m2.M11)) + (m1.M12 * (m2.M21)) + (m1.M13 * (m2.M31)), m1.M10 * (m2.M02) + (m1.M11 * (m2.M12)) + (m1.M12 * (m2.M22)) + (m1.M13 * (m2.M32)), m1.M10 * (m2.M03) + (m1.M11 * (m2.M13)) + (m1.M12 * (m2.M23)) + (m1.M13 * (m2.M33)), m1.M20 * (m2.M00) + (m1.M21 * (m2.M10)) + (m1.M22 * (m2.M20)) + (m1.M23 * (m2.M30)), m1.M20 * (m2.M01) + (m1.M21 * (m2.M11)) + (m1.M22 * (m2.M21)) + (m1.M23 * (m2.M31)), m1.M20 * (m2.M02) + (m1.M21 * (m2.M12)) + (m1.M22 * (m2.M22)) + (m1.M23 * (m2.M32)), m1.M20 * (m2.M03) + (m1.M21 * (m2.M13)) + (m1.M22 * (m2.M23)) + (m1.M23 * (m2.M33)), m1.M30 * (m2.M00) + (m1.M31 * (m2.M10)) + (m1.M32 * (m2.M20)) + (m1.M33 * (m2.M30)), m1.M30 * (m2.M01) + (m1.M31 * (m2.M11)) + (m1.M32 * (m2.M21)) + (m1.M33 * (m2.M31)), m1.M30 * (m2.M02) + (m1.M31 * (m2.M12)) + (m1.M32 * (m2.M22)) + (m1.M33 * (m2.M32)), m1.M30 * (m2.M03) + (m1.M31 * (m2.M13)) + (m1.M32 * (m2.M23)) + (m1.M33 * (m2.M33)));
+	}
+	static float2 mul(const float2 &v, const float2x2 &m) {
+		return float2(v.x * m.M00 + v.y*m.M10, v.x*m.M01 + v.y*m.M11);
+	}
+	static float3 mul(const float3 &v, const float3x3 &m)
+	{
+		return float3(v.x * (m.M00) + (v.y * (m.M10)) + (v.z * (m.M20)), v.x * (m.M01) + (v.y * (m.M11)) + (v.z * (m.M21)), v.x * (m.M02) + (v.y * (m.M12)) + (v.z * (m.M22)));
+	}
+	static float4 mul(const float4 &v, const float4x4 &m)
+	{
+		return float4(v.x * (m.M00) + (v.y * (m.M10)) + (v.z * (m.M20)) + (v.w * (m.M30)), v.x * (m.M01) + (v.y * (m.M11)) + (v.z * (m.M21)) + (v.w * (m.M31)), v.x * (m.M02) + (v.y * (m.M12)) + (v.z * (m.M22)) + (v.w * (m.M32)), v.x * (m.M03) + (v.y * (m.M13)) + (v.z * (m.M23)) + (v.w * (m.M33)));
+	}
+
+	static float3 minf(float3 x, float3 y) {
+		return float3(min(x.x, y.x), min(x.y, y.y), min(x.z, y.z));
+	}
+
+	static float3 maxf(float3 x, float3 y) {
+		return float3(max(x.x, y.x), max(x.y, y.y), max(x.z, y.z));
+	}
+
+	static float2x2 transpose(const float2x2 &m)
+	{
+		return float2x2(m.M00, m.M10, m.M01, m.M11);
+	}
+	static float3x3 transpose(const float3x3 &m)
+	{
+		return float3x3(m.M00, m.M10, m.M20, m.M01, m.M11, m.M21, m.M02, m.M12, m.M22);
+	}
+	static float4x4 transpose(const float4x4 &m)
+	{
+		return float4x4(m.M00, m.M10, m.M20, m.M30, m.M01, m.M11, m.M21, m.M31, m.M02, m.M12, m.M22, m.M32, m.M03, m.M13, m.M23, m.M33);
+	}
+
+	static float length(const float2 &v)
+	{
+		return sqrtf(v.x*v.x + v.y*v.y);
+	}
+	static float length(const float3 &v)
+	{
+		return sqrtf(v.x*v.x + v.y*v.y + v.z*v.z);
+	}
+	static float length(const float4 &v)
+	{
+		return sqrtf(v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w);
+	}
+
+	static float2 normalize(const float2 &v)
+	{
+		float l = length(v);
+		return l == 0 ? v : v * (1 / l);
+	}
+	static float3 normalize(const float3 &v)
+	{
+		float l = length(v);
+		return l == 0 ? v : v * (1 / l);
+	}
+	static float4 normalize(const float4 &v)
+	{
+		float l = length(v);
+		return l == 0 ? v : v * (1 / l);
+	}
+
+
+	/// matrices
+	/// <summary>
+	/// Builds a mat using specified offsets.
+	/// </summary>
+	/// <param name="xslide">x offsets</param>
+	/// <param name="yslide">y offsets</param>
+	/// <param name="zslide">z offsets</param>
+	/// <returns>A mat structure that contains a translated transformation </returns>
+	static float4x4 Translate(float xoffset, float yoffset, float zoffset)
+	{
+		return float4x4(
+			1, 0, 0, 0,
+			0, 1, 0, 0,
+			0, 0, 1, 0,
+			xoffset, yoffset, zoffset, 1
+		);
+	}
+	/// <summary>
+	/// Builds a mat using specified offsets.
+	/// </summary>
+	/// <param name="vec">A Vector structure that contains the x-coordinate, y-coordinate, and z-coordinate offsets.</param>
+	/// <returns>A mat structure that contains a translated transformation </returns>
+	static float4x4 Translate(float3 vec)
+	{
+		return Translate(vec.x, vec.y, vec.z);
+	}
+	//
+
+	// Rotations
+	/// <summary>
+	/// Rotation mat around Z axis
+	/// </summary>
+	/// <param name="alpha">value in radian for rotation</param>
+	static float4x4 RotateZ(float alpha)
+	{
+		float cos = cosf(alpha);
+		float sin = sinf(alpha);
+		return float4x4(
+			cos, -sin, 0, 0,
+			sin, cos, 0, 0,
+			0, 0, 1, 0,
+			0, 0, 0, 1
+		);
+	}
+	/// <summary>
+	/// Rotation mat around Z axis
+	/// </summary>
+	/// <param name="alpha">value in grades for rotation</param>
+	static float4x4 RotateZGrad(float alpha)
+	{
+		return RotateZ(alpha * PI / 180);
+	}
+	/// <summary>
+	/// Rotation mat around Z axis
+	/// </summary>
+	/// <param name="alpha">value in radian for rotation</param>
+	static float4x4 RotateY(float alpha)
+	{
+		float cos = cosf(alpha);
+		float sin = sinf(alpha);
+		return float4x4(
+			cos, 0, -sin, 0,
+			0, 1, 0, 0,
+			sin, 0, cos, 0,
+			0, 0, 0, 1
+		);
+	}
+	/// <summary>
+	/// Rotation mat around Z axis
+	/// </summary>
+	/// <param name="alpha">value in grades for rotation</param>
+	static float4x4 RotateYGrad(float alpha)
+	{
+		return RotateY(alpha * PI / 180);
+	}
+	/// <summary>
+	/// Rotation mat around Z axis
+	/// </summary>
+	/// <param name="alpha">value in radian for rotation</param>
+	static float4x4 RotateX(float alpha)
+	{
+		float cos = cosf(alpha);
+		float sin = sinf(alpha);
+		return float4x4(
+			1, 0, 0, 0,
+			0, cos, -sin, 0,
+			0, sin, cos, 0,
+			0, 0, 0, 1
+		);
+	}
+	/// <summary>
+	/// Rotation mat around Z axis
+	/// </summary>
+	/// <param name="alpha">value in grades for rotation</param>
+	static float4x4 RotateXGrad(float alpha)
+	{
+		return RotateX(alpha * PI / 180);
+	}
+	static float4x4 Rotate(float angle, const float3 & dir)
+	{
+		float x = dir.x;
+		float y = dir.y;
+		float z = dir.z;
+		float cos = cosf(angle);
+		float sin = sinf(angle);
+
+		return float4x4(
+			x * x * (1 - cos) + cos, y * x * (1 - cos) + z * sin, z * x * (1 - cos) - y * sin, 0,
+			x * y * (1 - cos) - z * sin, y * y * (1 - cos) + cos, z * y * (1 - cos) + x * sin, 0,
+			x * z * (1 - cos) + y * sin, y * z * (1 - cos) - x * sin, z * z * (1 - cos) + cos, 0,
+			0, 0, 0, 1
+		);
+	}
+	static float4x4 RotateRespectTo(const float3 &center, const float3 &direction, float angle)
+	{
+		return mul(Translate(center), mul(Rotate(angle, direction), Translate(center * -1.0f)));
+	}
+	static float4x4 RotateGrad(float angle, const float3 & dir)
+	{
+		return Rotate(PI * angle / 180, dir);
+	}
+
+	//
+
+	// Scale
+
+	static float4x4 Scale(float xscale, float yscale, float zscale)
+	{
+		return float4x4(
+			xscale, 0, 0, 0,
+			0, yscale, 0, 0,
+			0, 0, zscale, 0,
+			0, 0, 0, 1);
+	}
+	static float4x4 Scale(const float3 & size)
+	{
+		return Scale(size.x, size.y, size.z);
+	}
+
+	static float4x4 ScaleRespectTo(const float3 & center, const float3 & size)
+	{
+		return mul(mul(Translate(center), Scale(size)), Translate(center * -1));
+	}
+	static float4x4 ScaleRespectTo(const float3 & center, float sx, float sy, float sz)
+	{
+		return ScaleRespectTo(center, float3(sx, sy, sz));
+	}
+
+	//
+
+	// Viewing
+
+	static float4x4 LookAtLH(const float3 & camera, const float3 & target, const float3 & upVector)
+	{
+		float3 zaxis = normalize(target - camera);
+		float3 xaxis = normalize(cross(upVector, zaxis));
+		float3 yaxis = cross(zaxis, xaxis);
+
+		return float4x4(
+			xaxis.x, yaxis.x, zaxis.x, 0,
+			xaxis.y, yaxis.y, zaxis.y, 0,
+			xaxis.z, yaxis.z, zaxis.z, 0,
+			-dot(xaxis, camera), -dot(yaxis, camera), -dot(zaxis, camera), 1);
+	}
+
+	static float4x4 LookAtRH(const float3 & camera, const float3 & target, const float3 & upVector)
+	{
+		float3 zaxis = normalize(camera - target);
+		float3 xaxis = normalize(cross(upVector, zaxis));
+		float3 yaxis = cross(zaxis, xaxis);
+
+		return float4x4(
+			xaxis.x, yaxis.x, zaxis.x, 0,
+			xaxis.y, yaxis.y, zaxis.y, 0,
+			xaxis.z, yaxis.z, zaxis.z, 0,
+			-dot(xaxis, camera), -dot(yaxis, camera), -dot(zaxis, camera), 1);
+	}
+
+	//
+
+	// Projection Methods
+
+	/// <summary>
+	/// Returns the near plane distance to a given projection
+	/// </summary>
+	/// <param name="proj">A mat structure containing the projection</param>
+	/// <returns>A float value representing the distance.</returns>
+	static float ZnearPlane(const float4x4 &proj)
+	{
+		float4 pos = mul(float4(0, 0, 0, 1), proj.getInverse());
+		return pos.z / pos.w;
+	}
+
+	/// <summary>
+	/// Returns the far plane distance to a given projection
+	/// </summary>
+	/// <param name="proj">A mat structure containing the projection</param>
+	/// <returns>A float value representing the distance.</returns>
+	static float ZfarPlane(const float4x4 &proj)
+	{
+		float4 targetPos = mul(float4(0, 0, 1, 1), proj.getInverse());
+		return targetPos.z / targetPos.w;
+	}
+
+	static float4x4 PerspectiveFovLH(float fieldOfView, float aspectRatio, float znearPlane, float zfarPlane)
+	{
+		float h = 1.0f / tanf(fieldOfView / 2);
+		float w = h * aspectRatio;
+
+		return float4x4(
+			w, 0, 0, 0,
+			0, h, 0, 0,
+			0, 0, zfarPlane / (zfarPlane - znearPlane), 1,
+			0, 0, -znearPlane * zfarPlane / (zfarPlane - znearPlane), 0);
+	}
+
+	static float4x4 PerspectiveFovRH(float fieldOfView, float aspectRatio, float znearPlane, float zfarPlane)
+	{
+		float h = 1.0f / tanf(fieldOfView / 2);
+		float w = h * aspectRatio;
+
+		return float4x4(
+			w, 0, 0, 0,
+			0, h, 0, 0,
+			0, 0, zfarPlane / (znearPlane - zfarPlane), -1,
+			0, 0, znearPlane * zfarPlane / (znearPlane - zfarPlane), 0);
+	}
+
+	static float4x4 PerspectiveLH(float width, float height, float znearPlane, float zfarPlane)
+	{
+		return float4x4(
+			2 * znearPlane / width, 0, 0, 0,
+			0, 2 * znearPlane / height, 0, 0,
+			0, 0, zfarPlane / (zfarPlane - znearPlane), 1,
+			0, 0, znearPlane * zfarPlane / (znearPlane - zfarPlane), 0);
+	}
+
+	static float4x4 PerspectiveRH(float width, float height, float znearPlane, float zfarPlane)
+	{
+		return float4x4(
+			2 * znearPlane / width, 0, 0, 0,
+			0, 2 * znearPlane / height, 0, 0,
+			0, 0, zfarPlane / (znearPlane - zfarPlane), -1,
+			0, 0, znearPlane * zfarPlane / (znearPlane - zfarPlane), 0);
+	}
+
+	static float4x4 OrthoLH(float width, float height, float znearPlane, float zfarPlane)
+	{
+		return float4x4(
+			2 / width, 0, 0, 0,
+			0, 2 / height, 0, 0,
+			0, 0, 1 / (zfarPlane - znearPlane), 0,
+			0, 0, znearPlane / (znearPlane - zfarPlane), 1);
+	}
+
+	static float4x4 OrthoRH(float width, float height, float znearPlane, float zfarPlane)
+	{
+		return float4x4(
+			2 / width, 0, 0, 0,
+			0, 2 / height, 0, 0,
+			0, 0, 1 / (znearPlane - zfarPlane), 0,
+			0, 0, znearPlane / (znearPlane - zfarPlane), 1);
+	}
+
+	//
+}
+
+#endif // !GMATH_H
+
+
+#pragma endregion
+
+#pragma region List.h
+
+namespace CA4G {
+
+	template<typename T>
+	class list
+	{
+		T* elements;
+		int count;
+		int capacity;
+	public:
+		list() {
+			capacity = 32;
+			count = 0;
+			elements = new T[capacity];
+		}
+		list(const list<T> &other) {
+			this->count = other.count;
+			this->elements = new T[other.capacity];
+			for (int i = 0; i < this->count; i++)
+				this->elements[i] = other.elements[i];
+			this->capacity = other.capacity;
+		}
+	public:
+
+		/*list<T>* clone() {
+			list<T>* result = new list<T>();
+			result->elements = new T[count];
+			result->capacity = result->count = count;
+			for (int i = 0; i < count; i++)
+				result->elements[i] = elements[i];
+			return result;
+		}*/
+
+		gObj<list<T>> clone() {
+			gObj<list<T>> result = new list<T>();
+			for (int i = 0; i < count; i++)
+				result->add(elements[i]);
+			return result;
+		}
+
+		void reset() {
+			count = 0;
+		}
+
+		list(std::initializer_list<T> initialElements) {
+			capacity = max(32, initialElements.size());
+			count = initialElements.size();
+			elements = new T[capacity];
+			for (int i = 0; i < initialElements.size(); i++)
+				elements[i] = initialElements[i];
+		}
+
+		~list() {
+			delete[] elements;
+		}
+
+		void add(T item) {
+			if (count == capacity)
+			{
+				capacity = (int)(capacity*1.3);
+				T* newelements = new T[capacity];
+				for (int i = 0; i < count; i++)
+					newelements[i] = elements[i];
+				delete[] elements;
+				elements = newelements;
+			}
+			elements[count++] = item;
+		}
+
+		inline T& operator[](int index) const {
+			return elements[index];
+		}
+
+		inline T& first() const {
+			return elements[0];
+		}
+
+		inline T& last() const {
+			return elements[count - 1];
+		}
+
+		inline int size() const {
+			return count;
+		}
+	};
+}
+
+#pragma endregion
+
+#pragma region ca4GFormats.h
+
+namespace CA4G {
+
+#pragma region Formats
+	template<typename T>
+	struct Formats {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_UNKNOWN;
+		static const int Size = 1;
+	};
+	template<>
+	struct Formats<char> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R8_SINT;
+		static const int Size = 1;
+	};
+	template<>
+	struct Formats<float> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32_FLOAT;
+		static const int Size = 4;
+	};
+	template<>
+	struct Formats <int> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32_SINT;
+		static const int Size = 4;
+	};
+
+	template<>
+	struct Formats <ARGB> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_B8G8R8A8_UNORM;
+		static const int Size = 4;
+	};
+
+	template<>
+	struct Formats <RGBA> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R8G8B8A8_UNORM;
+		static const int Size = 4;
+	};
+
+	template<>
+	struct Formats <unsigned int> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32_UINT;
+		static const int Size = 4;
+	};
+	template<>
+	struct Formats <float2> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32_FLOAT;
+		static const int Size = 8;
+	};
+	template<>
+	struct Formats <float3> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32_FLOAT;
+		static const int Size = 12;
+	};
+	template<>
+	struct Formats <float4> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		static const int Size = 16;
+	};
+
+	template<>
+	struct Formats <int2> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32_SINT;
+		static const int Size = 8;
+	};
+	template<>
+	struct Formats <int3> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32_SINT;
+		static const int Size = 12;
+	};
+	template<>
+	struct Formats <int4> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32A32_SINT;
+		static const int Size = 16;
+	};
+
+	template<>
+	struct Formats <uint2> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32_UINT;
+		static const int Size = 8;
+	};
+	template<>
+	struct Formats <uint3> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32_UINT;
+		static const int Size = 12;
+	};
+	template<>
+	struct Formats <uint4> {
+		static const DXGI_FORMAT Value = DXGI_FORMAT_R32G32B32A32_UINT;
+		static const int Size = 16;
+	};
+#pragma endregion
+
+}
+
+
+#pragma endregion
+
+#pragma region ca4GDescriptors.h
+
+namespace CA4G
+{
+	// Represents a CPU free descriptor heap manager
+	// Can be used to create descriptors on CPU and the allocate arranged on the GPU descriptor when resources are bound to the pipeline
+	class CPUDescriptorHeapManager {
+		friend Presenter;
+		DX_DescriptorHeap heap;
+		unsigned int size;
+		int allocated = 0;
+		// Linked list to reuse free slots
+		struct Node {
+			int index;
+			Node* next;
+		} *free = nullptr;
+		size_t startCPU;
+		Mutex mutex;
+	public:
+		CPUDescriptorHeapManager(DX_Device device, D3D12_DESCRIPTOR_HEAP_TYPE type, int capacity);
+		~CPUDescriptorHeapManager() {
+			while (free != nullptr)
+			{
+				Node *toDelete = free;
+				free = free->next;
+				delete toDelete;
+			}
+		}
+		// Allocates a new index for a resource descriptor
+		int AllocateNewHandle();
+		// Releases a specific index of a resource is being released.
+		inline void Release(int index) { free = new Node{ index, free }; }
+		inline D3D12_CPU_DESCRIPTOR_HANDLE getCPUVersion(int index) { return D3D12_CPU_DESCRIPTOR_HANDLE{ startCPU + index * size }; }
+		inline DX_DescriptorHeap getInnerHeap() { return heap; }
+	};
+
+	// Represents a GPU descriptor heap manager
+	// Is used to allocate descriptors on GPU sequentially when resources are bound to the pipeline
+	class GPUDescriptorHeapManager {
+		friend Presenter;
+		DX_DescriptorHeap heap;
+		unsigned int size;
+		size_t startCPU;
+		UINT64 startGPU;
+
+		volatile long mallocOffset = 0;
+		int capacity;
+		int blockCapacity;
+
+		struct Node {
+			int index;
+			Node* next;
+		} *free = nullptr;
+
+	public:
+		Mutex mutex;
+
+		inline void Reset(int frameIndex) {
+			mallocOffset = frameIndex * capacity / 3;
+			blockCapacity = (frameIndex + 1)*capacity / 3;
+		}
+
+		long Malloc(int descriptors) {
+			auto result = InterlockedExchangeAdd(&mallocOffset, descriptors);
+			if (mallocOffset >= blockCapacity)
+				throw CA4GException::FromError(CA4G_Errors_RunOutOfMemory, "Descriptor heap");
+			return result;
+		}
+
+		long MallocPersistent() {
+			int index;
+			mutex.Acquire();
+			if (free != nullptr) {
+				index = free->index;
+				Node *toDelete = free;
+				free = free->next;
+				delete toDelete;
+			}
+			else
+				index = --capacity;
+			mutex.Release();
+			return index;
+		}
+
+		void ReleasePersistent(long index) {
+			mutex.Acquire();
+			free = new Node{ index, free };
+			mutex.Release();
+		}
+
+		GPUDescriptorHeapManager(DX_Device device, D3D12_DESCRIPTOR_HEAP_TYPE type, int capacity);
+
+		~GPUDescriptorHeapManager() {
+			while (free != nullptr)
+			{
+				Node *toDelete = free;
+				free = free->next;
+				delete toDelete;
+			}
+		}
+		// Gets the cpu descriptor handle to access to a specific index slot of this descriptor heap
+		inline D3D12_GPU_DESCRIPTOR_HANDLE getGPUVersion(int index) { return D3D12_GPU_DESCRIPTOR_HANDLE{ startGPU + index * size }; }
+		// Gets the gpu descriptor handle to access to a specific index slot of this descriptor heap
+		inline D3D12_CPU_DESCRIPTOR_HANDLE getCPUVersion(int index) { return D3D12_CPU_DESCRIPTOR_HANDLE{ startCPU + index * size }; }
+
+		inline DX_DescriptorHeap getInnerHeap() { return heap; }
+	};
+
+	// Represents a global manager of all static descriptor heaps needed.
+	// Static descriptors will be accessed by the application and any threaded command list manager
+	// Each trheaded command list manager will have their own gpu descriptors for csu and samplers.
+	class DescriptorsManager
+	{
+	public:
+		// -- Shader visible heaps --
+
+		// Descriptor heap for gui windows and fonts
+		gObj<GPUDescriptorHeapManager> gui_csu;
+
+		// -- GPU heaps --
+		// Descriptor heap for CBV, SRV and UAV
+		gObj<GPUDescriptorHeapManager> gpu_csu;
+		// Descriptor heap for sampler objects
+		gObj<GPUDescriptorHeapManager> gpu_smp;
+
+		// -- CPU heaps --
+
+		// Descriptor heap for render targets views
+		gObj<CPUDescriptorHeapManager> cpu_rt;
+		// Descriptor heap for depth stencil views
+		gObj<CPUDescriptorHeapManager> cpu_ds;
+		// Descriptor heap for cbs, srvs and uavs in CPU memory
+		gObj<CPUDescriptorHeapManager> cpu_csu;
+		// Descriptor heap for sampler objects in CPU memory
+		gObj<CPUDescriptorHeapManager> cpu_smp;
+
+		DescriptorsManager(DX_Device device) :
+			gui_csu(new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 100)),
+			gpu_csu(new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 900000)),
+			gpu_smp(new GPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2000)),
+			cpu_rt(new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1000)),
+			cpu_ds(new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1000)),
+			cpu_csu(new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1000000)),
+			cpu_smp(new CPUDescriptorHeapManager(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2000))
+		{
+		}
+	};
+}
+
+#pragma endregion
+
+#pragma region ca4GScheduler
+
+#define process(methodName) Process(this, &decltype(dr(this))::methodName)
+
+#define processPtr(methodName, tagID) ProcessPtr(this, &decltype(dr(this))::methodName)
+
+namespace CA4G
+{
+#define ENGINE_MASK_ALL ((1 << CA4G_SUPPORTED_ENGINES) - 1)
+
+#define ENGINE_MASK_DIRECT 1
+#define ENGINE_MASK_BUNDLE 2
+#define ENGINE_MASK_COMPUTE 4
+#define ENGINE_MASK_COPY 8
+
+	template<typename T>
+	T dr(T* a) { return &a; }
+
+	template<typename A>
+	struct EngineType {
+		static const D3D12_COMMAND_LIST_TYPE Type;
+	};
+	template<>
+	struct EngineType<GraphicsManager> {
+		static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	};
+	template<>
+	struct EngineType<DXRManager> {
+		static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	};
+	template<>
+	struct EngineType<ComputeManager> {
+		static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+	};
+	template<>
+	struct EngineType<CopyingManager> {
+		static const D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_COPY;
+	};
+
+#pragma region Managing Graphics Process
+
+	// Represents a signal for the end of executing queues of some engines
+	// Pass this object to execute pendings method in order to wait for GPU completition
+	class Signal {
+		friend DeviceManager;
+		friend Presenter;
+		friend GPUScheduler;
+		long fences[CA4G_SUPPORTED_ENGINES];
+		int mask = 0;
+	public:
+		// No signal at all
+		// Only GPUScheduler may change internal data of a signal
+		Signal() {}
+	};
+
+	// Represents an abstract callable member to be used as a graphics process
+	struct ICallableMember
+	{
+		friend DeviceManager;
+		friend GPUScheduler;
+
+		virtual D3D12_COMMAND_LIST_TYPE getType() = 0;
+		virtual void Call(gObj<CommandListManager> manager) = 0;
+	private:
+		int TagID = 0;
+	};
+
+	// Represents a callable member used as a process of a specific command list manager type (copy, compute or graphics)
+	template<typename T, typename A>
+	struct CallableMember : public ICallableMember {
+		T* instance;
+		typedef void(T::*Member)(gObj<A>);
+		Member function;
+		CallableMember(T* instance, Member function) : instance(instance), function(function) {
+		}
+		void Call(gObj<CommandListManager> manager) {
+			(instance->*function)(manager.Dynamic_Cast<A>());
+		}
+
+		D3D12_COMMAND_LIST_TYPE getType() {
+			return EngineType<A>::Type;
+		}
+	};
+
+	// Creates a callable member for a specific instance and RTX process method
+	template<typename T>
+	CallableMember<T, DXRManager> Process(T* instance, typename CallableMember<T, DXRManager>::Member f) {
+		return CallableMember<T, DXRManager>(instance, f);
+	}
+
+	// Creates a callable member for a specific instance and graphics process method
+	template<typename T>
+	CallableMember<T, GraphicsManager> Process(T* instance, typename CallableMember<T, GraphicsManager>::Member f) {
+		return CallableMember<T, GraphicsManager>(instance, f);
+	}
+
+	// Creates a callable member for a specific instance and compute process method
+	template<typename T>
+	CallableMember<T, ComputeManager> Process(T* instance, typename CallableMember<T, ComputeManager>::Member f) {
+		return  CallableMember<T, ComputeManager>(instance, f);
+	}
+
+	// Creates a callable member for a specific instance and copy process method
+	template<typename T>
+	CallableMember<T, CopyingManager> Process(T* instance, typename CallableMember<T, CopyingManager>::Member f) {
+		return CallableMember<T, CopyingManager>(instance, f);
+	}
+
+	// Creates a pointer to a callable member for a specific instance and graphics process method
+	template<typename T>
+	CallableMember<T, DXRManager>* ProcessPtr(T* instance, typename CallableMember<T, DXRManager>::Member f) {
+		return new CallableMember<T, DXRManager>(instance, f);
+	}
+
+	// Creates a pointer to a callable member for a specific instance and graphics process method
+	template<typename T>
+	CallableMember<T, GraphicsManager>* ProcessPtr(T* instance, typename CallableMember<T, GraphicsManager>::Member f) {
+		return new CallableMember<T, GraphicsManager>(instance, f);
+	}
+
+	// Creates a pointer to a callable member for a specific instance and compute process method
+	template<typename T>
+	CallableMember<T, ComputeManager>* ProcessPtr(T* instance, typename CallableMember<T, ComputeManager>::Member f) {
+		return new CallableMember<T, ComputeManager>(instance, f);
+	}
+
+	// Creates a pointer to a callable member for a specific instance and copy process method
+	template<typename T>
+	CallableMember<T, CopyingManager>* ProcessPtr(T* instance, typename CallableMember<T, CopyingManager>::Member f) {
+		return new CallableMember<T, CopyingManager>(instance, f);
+	}
+
+	// Next macros are used for creating a process using simply the method name.
+	// Instance is assumed to be this reference
+
+
+#pragma endregion
+
+#pragma region GPU Scheduler
+
+	class GPUScheduler {
+		friend DeviceManager;
+		friend Presenter;
+
+		// Struct for threading parameters
+		struct GPUWorkerInfo {
+			int Index;
+			GPUScheduler* Scheduler;
+		} *workers;
+
+		// Represents a wrapper for command queue functionalities
+		class CommandQueueManager {
+			friend GPUScheduler;
+			friend Presenter;
+
+			DX_CommandQueue dxQueue;
+			long fenceValue;
+			DX_Fence fence;
+			HANDLE fenceEvent;
+			D3D12_COMMAND_LIST_TYPE type;
+		public:
+			CommandQueueManager(DX_Device device, D3D12_COMMAND_LIST_TYPE type);
+
+			// Executes a command list set in this engine
+			inline void Commit(DX_CommandList* cmdLists, int count) {
+				dxQueue->ExecuteCommandLists(count, (ID3D12CommandList**)cmdLists);
+			}
+
+			// Send a signals through this queue
+			inline long Signal() {
+				dxQueue->Signal(fence, fenceValue);
+				return fenceValue++;
+			}
+
+			// Triggers the event of reaching some fence value.
+			inline HANDLE TriggerEvent(long rallyPoint) {
+				fence->SetEventOnCompletion(rallyPoint, fenceEvent);
+				return fenceEvent;
+			}
+
+		} *queues[CA4G_SUPPORTED_ENGINES];
+
+		// Info per engine (common to all frames)
+		struct PerEngineInfo {
+			CommandQueueManager *queue;
+
+			// Info per thread
+			struct PerThreadInfo {
+				gObj<CommandListManager> manager;
+				DX_CommandList cmdList;
+				bool isActive;
+				// Prepares this command list for recording. This method resets the command list to use the desiredAllocator.
+				void Activate(DX_CommandAllocator desiredAllocator);
+
+				// Prepares this cmd list for flushing to the GPU
+				void Close() {
+					if (!isActive)
+						return;
+					isActive = false;
+					cmdList->Close();
+				}
+			} *threadInfos;
+
+			// Info per frame and per engine
+			struct PerFrameInfo {
+				DX_CommandAllocator* allocatorSet;
+				bool* allocatorsUsed;
+
+				inline DX_CommandAllocator RequireAllocator(int index) {
+					allocatorsUsed[index] = true;
+					return allocatorSet[index];
+				}
+
+				void ResetUsedAllocators(int threads);
+			} *frames;
+
+		} engines[CA4G_SUPPORTED_ENGINES];
+
+		// Used by flush method to call execute command list for each engine
+		DX_CommandList* __activeCmdLists;
+
+		gObj<DeviceManager> manager;
+		HANDLE* threads;
+		ProducerConsumerQueue<ICallableMember*>* workToDo;
+		CountEvent *counting;
+		int threadsCount;
+		int currentFrameIndex;
+		// Gets whenever the user wants to synchronize frame rendering using frame buffering
+		bool useFrameBuffer;
+
+		Signal* perFrameFinishedSignal;
+
+		static DWORD WINAPI __WORKER_TODO(LPVOID param);
+
+		GPUScheduler(gObj<DeviceManager> manager, bool useFrameBuffer, int max_threads = CA4G_MAX_NUMBER_OF_WORKERS, int buffers = CA4G_SUPPORTED_BUFFERING);
+
+		void PopulateCommandsBy(ICallableMember *process, int workerIndex);
+
+		bool _closed = false;
+
+		void Terminate() {
+			_closed = true;
+		}
+
+		// Gets when this scheduler is terminated
+		inline bool isClosed() {
+			return _closed;
+		}
+
+		// Commit all pending works at specific engines and returns a mask with the active engines.
+		int Flush(int mask);
+
+		// Sends a signal throught the specific engines and returns the Signal object with all fence values
+		Signal SendSignal(int mask) {
+			Signal s;
+			for (int e = 0; e < CA4G_SUPPORTED_ENGINES; e++)
+				if (!((1 << e) & ENGINE_MASK_BUNDLE))
+					if (mask & (1 << e))
+						s.fences[e] = queues[e]->Signal();
+			s.mask = mask;
+			return s;
+		}
+
+		HANDLE __fencesForWaiting[CA4G_SUPPORTED_ENGINES];
+
+		// Waits for the gpu notification of certain signal
+		void WaitFor(const Signal &signal) {
+			int fencesForWaiting = 0;
+			for (int e = 0; e < CA4G_SUPPORTED_ENGINES; e++)
+				if (!((1 << e) & ENGINE_MASK_BUNDLE))
+					if (signal.mask & (1 << e))
+						__fencesForWaiting[fencesForWaiting++] = queues[e]->TriggerEvent(signal.fences[e]);
+			WaitForMultipleObjects(fencesForWaiting, __fencesForWaiting, true, INFINITE);
+		}
+
+		void SetupFrame(int frame) {
+			if (useFrameBuffer)
+				WaitFor(perFrameFinishedSignal[frame]); // Grants the GPU finished working this frame in a previous stage
+
+			currentFrameIndex = frame;
+
+			for (int e = 0; e < CA4G_SUPPORTED_ENGINES; e++)
+				engines[e].frames[frame].ResetUsedAllocators(threadsCount);
+		}
+
+		void FinishFrame() {
+			perFrameFinishedSignal[currentFrameIndex] = SendSignal(ENGINE_MASK_ALL);
+
+			if (!useFrameBuffer)
+				// Grants the GPU finished working this frame before finishing this frame
+				WaitFor(perFrameFinishedSignal[currentFrameIndex]);
+		}
+
+		void Enqueue(ICallableMember* process) {
+			PopulateCommandsBy(process, 0); // worker 0 is the synchronous worker (main thread)
+		}
+
+		void EnqueueAsync(ICallableMember *process) {
+			counting->Increment();
+			workToDo->TryProduce(process);
+		}
+	};
+
+#pragma endregion
+}
+
+#pragma endregion
+
+#pragma region ca4GResources_Private.h
+
+namespace CA4G {
+	// Represents the accessibility optimization of a resource by the cpu
+	typedef enum CPU_ACCESS {
+		// The CPU can not read or write
+		CPU_ACCESS_NONE = 0,
+		// The CPU can write and GPU can access frequently efficiently
+		CPU_WRITE_GPU_READ = 1,
+		// The GPU can write once and CPU can access frequently efficiently
+		CPU_READ_GPU_WRITE = 2
+	} CPU_ACCESS;
+
+	// Gets the total number of bytes required by a resource with this description
+	inline UINT64 GetRequiredIntermediateSize(DX_Device device, const D3D12_RESOURCE_DESC &desc)
+	{
+		UINT64 RequiredSize = 0;
+		device->GetCopyableFootprints(&desc, 0, desc.DepthOrArraySize*desc.MipLevels, 0, nullptr, nullptr, nullptr, &RequiredSize);
+		return RequiredSize;
+	}
+
+	// Represents a wrapper to a DX12 resource. This class is for internal purpose only. Users access directly always via a resource view.
+	class ResourceWrapper {
+		friend Creating; //allow to access to resource wrapper private constructor for resource creation
+		friend Presenter; // allow to access to resource wrapper private constructor for presented render targets
+		friend ResourceView; // allow to reference counting
+
+	private:
+
+		// Creates a wrapper to a resource with a description and an initial state
+		ResourceWrapper(gObj<DeviceManager> manager, D3D12_RESOURCE_DESC description, DX_Resource resource, D3D12_RESOURCE_STATES initialState);
+
+		int subresources;
+
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT *pLayouts;
+		unsigned int* pNumRows;
+		UINT64 *pRowSizesInBytes;
+		UINT64 pTotalSizes;
+		Mutex mutex;
+		// How many resource views are referencing this resource. This resource is automatically released when no view is referencing it.
+		int references = 0;
+
+
+	public:
+		~ResourceWrapper() {
+			delete[] pLayouts;
+			delete[] pNumRows;
+			delete[] pRowSizesInBytes;
+		}
+
+		D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() {
+			return internalResource->GetGPUVirtualAddress();
+		}
+		// Device Manager to manage this resource
+		gObj<DeviceManager> manager;
+		// Resource
+		DX_Resource internalResource;
+		// Abstract resource description
+		D3D12_RESOURCE_DESC desc;
+		// Last used state of this resource on the GPU
+		D3D12_RESOURCE_STATES LastUsageState;
+
+		// Gets the cpu accessibility of this resource wrapper.
+		CPU_ACCESS cpu_access;
+
+		// Cached version of this resource for uploading (CPU-to-GPU) purposes.
+		gObj<ResourceWrapper> uploadingResourceCache = nullptr; //cache for copying to GPU
+		// Cached version of this resource for downloading (GPU-to-CPU) purposes.
+		gObj<ResourceWrapper> downloadingResourceCache = nullptr; //cache for copying from GPU
+
+		// If this resource is in upload heap, this is a ptr to the mapped data (to prevent map/unmap overhead)
+		void* mappedData = nullptr;
+
+		void UpdateMappedData(int position, void* data, int size);
+
+		byte* GetMappedDataAddress();
+
+		// Prepares this resource wrapper to have an uploading version
+		void CreateForUploading();
+
+		//---Copied from d3d12x.hs----------------------------------------------------------------------------
+		// Row-by-row memcpy
+		inline void MemcpySubresource(
+			_In_ const D3D12_MEMCPY_DEST* pDest,
+			_In_ const D3D12_SUBRESOURCE_DATA* pSrc,
+			SIZE_T RowSizeInBytes,
+			UINT NumRows,
+			UINT NumSlices,
+			bool flipRows = false
+		)
+		{
+			for (UINT z = 0; z < NumSlices; ++z)
+			{
+				BYTE* pDestSlice = reinterpret_cast<BYTE*>(pDest->pData) + pDest->SlicePitch * z;
+				const BYTE* pSrcSlice = reinterpret_cast<const BYTE*>(pSrc->pData) + pSrc->SlicePitch * z;
+				for (UINT y = 0; y < NumRows; ++y)
+				{
+					memcpy(pDestSlice + pDest->RowPitch * y,
+						pSrcSlice + pSrc->RowPitch * (flipRows ? NumRows - y - 1 : y),
+						RowSizeInBytes);
+				}
+			}
+		}
+
+		// Uploads a full data mapped of this resource.
+		// All data (for all subresources if any) appears sequentially in ptr buffer.
+		void UploadFullData(byte* data, long long dataSize, bool flipRows = false);
+
+		// Uploads the data of a region of a single subresource.
+		template<typename T>
+		void Upload(T* data, int subresource = 0, const D3D12_BOX *box = nullptr);
+	};
+
+
+}
+
+#pragma endregion
+
+#pragma region ca4GResources.h
+
+namespace CA4G {
+
+	// Represents a sampler object
+	struct Sampler {
+		D3D12_FILTER Filter;
+		D3D12_TEXTURE_ADDRESS_MODE AddressU;
+		D3D12_TEXTURE_ADDRESS_MODE AddressV;
+		D3D12_TEXTURE_ADDRESS_MODE AddressW;
+		FLOAT MipLODBias;
+		UINT MaxAnisotropy;
+		D3D12_COMPARISON_FUNC ComparisonFunc;
+		float4 BorderColor;
+		FLOAT MinLOD;
+		FLOAT MaxLOD;
+
+		// Creates a default point sampling object.
+		static Sampler Point(
+			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP
+		)
+		{
+			return Create(D3D12_FILTER_MIN_MAG_MIP_POINT,
+				AddressU,
+				AddressV,
+				AddressW);
+		}
+
+		// Creates a default point sampling object.
+		static Sampler PointWithoutMipMaps(
+			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP
+		)
+		{
+			return Create(D3D12_FILTER_MIN_MAG_MIP_POINT,
+				AddressU,
+				AddressV,
+				AddressW, 0, 0, D3D12_COMPARISON_FUNC_ALWAYS, float4(0,0,0,0), 0, 0);
+		}
+
+		// Creates a default linear sampling object
+		static Sampler Linear(
+			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP
+		)
+		{
+			return Create(D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+				AddressU,
+				AddressV,
+				AddressW);
+		}
+
+		static Sampler LinearWithoutMipMaps(
+			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER
+		)
+		{
+			return Create(D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT,
+				AddressU,
+				AddressV,
+				AddressW, 0, 0, D3D12_COMPARISON_FUNC_ALWAYS, float4(0, 0, 0, 0), 0, 0);
+		}
+
+		// Creates a default anisotropic sampling object
+		static Sampler Anisotropic(
+			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP
+		)
+		{
+			return Create(D3D12_FILTER_ANISOTROPIC,
+				AddressU,
+				AddressV,
+				AddressW);
+		}
+	private:
+		static Sampler Create(
+			D3D12_FILTER filter = D3D12_FILTER_MIN_MAG_MIP_POINT,
+			D3D12_TEXTURE_ADDRESS_MODE AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			float mipLODBias = 0.0f,
+			UINT maxAnisotropy = 16,
+			D3D12_COMPARISON_FUNC comparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS,
+			float4 borderColor = float4(0, 0, 0, 0),
+			float minLOD = 0,
+			float maxLOD = D3D12_FLOAT32_MAX
+		) {
+			return Sampler{
+				filter,
+				AddressU,
+				AddressV,
+				AddressW,
+				mipLODBias,
+				maxAnisotropy,
+				comparisonFunc,
+				borderColor,
+				minLOD,
+				maxLOD
+			};
+		}
+	};
+
+	// Represents a resource view. In this engine resources are treated always through some view.
+	// Although, views can be cast from one type to another.
+	class ResourceView {
+		friend Presenter;
+		friend CommandListManager;
+		friend Creating;
+		friend Copying;
+		template <typename ...A> friend class PipelineBindings;
+		friend GraphicsManager;
+		friend DeviceManager;
+		friend GeometryCollection;
+		friend TriangleGeometryCollection;
+		friend InstanceCollection;
+		friend IRTProgram;
+
+		// Used for binding and other scenarios to synchronize the usage of the resource
+		// barriering the states changes.
+		void ChangeStateTo(DX_CommandList cmdList, D3D12_RESOURCE_STATES dst) {
+			if (resource->LastUsageState == dst)
+				return;
+
+			D3D12_RESOURCE_BARRIER barrier = { };
+			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+			barrier.Transition.pResource = resource->internalResource;
+			barrier.Transition.StateAfter = dst;
+			barrier.Transition.StateBefore = resource->LastUsageState;
+			barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+			cmdList->ResourceBarrier(1, &barrier);
+			resource->LastUsageState = dst;
+		}
+
+		void ChangeStateToUAV(DX_CommandList cmdList) {
+			ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		}
+
+		void ChangeStateToRT(DX_CommandList cmdList) {
+			ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		}
+
+		void BarrierUAV(DX_CommandList cmdList) {
+			D3D12_RESOURCE_BARRIER barrier = { };
+			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+			barrier.UAV.pResource = this->resource->internalResource;
+			cmdList->ResourceBarrier(1, &barrier);
+			resource->LastUsageState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		}
+
+		void ChangeStateFromTo(DX_CommandList cmdList, D3D12_RESOURCE_STATES src, D3D12_RESOURCE_STATES dst) {
+			/*if (resource->LastUsageState == dst)
+				return;*/
+
+			D3D12_RESOURCE_BARRIER barrier = { };
+			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+			barrier.Transition.pResource = resource->internalResource;
+			barrier.Transition.StateAfter = dst;
+			barrier.Transition.StateBefore = resource->LastUsageState;
+			barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+			cmdList->ResourceBarrier(1, &barrier);
+			resource->LastUsageState = dst;
+		}
+
+		// This is a special ResourceView instance representing the creation of a null descriptor.
+		// This instancing is using only for binding null purposes.
+		static gObj<ResourceView> getNullView(gObj<DeviceManager> manager, D3D12_RESOURCE_DIMENSION dimension);
+
+
+	protected:
+		// Gets the internal resource this view is representing to.
+		gObj<ResourceWrapper> resource = nullptr;
+		gObj<DeviceManager> manager;
+
+		// Slice that represents the subresources this view refers to
+		int mipSliceStart = 0;
+		int mipSliceCount = 1;
+		int arraySliceStart = 0;
+		int arraySliceCount = 1;
+
+		// Cached CPU descriptor handles (each descriptor for view is stored in a single CPU slot)
+		int srv; // 1
+		int uav; // 2
+		int cbv; // 4
+		int rtv; // 8
+		int dsv; // 16
+		// Mask representing the slots of the cpu descriptor this resource has a descriptor view built at.
+		unsigned int handleMask = 0;
+
+		Mutex mutex;
+
+		virtual void CreateUAVDesc(D3D12_UNORDERED_ACCESS_VIEW_DESC &d) = 0;
+		virtual void CreateSRVDesc(D3D12_SHADER_RESOURCE_VIEW_DESC &d) = 0;
+		virtual void CreateCBVDesc(D3D12_CONSTANT_BUFFER_VIEW_DESC &d) = 0;
+		virtual void CreateRTVDesc(D3D12_RENDER_TARGET_VIEW_DESC &d) = 0;
+		virtual void CreateDSVDesc(D3D12_DEPTH_STENCIL_VIEW_DESC &d) = 0;
+
+		ResourceView(gObj<ResourceWrapper> resource, int arrayStart = 0, int arrayCount = INT_MAX, int mipStart = 0, int mipsCount = INT_MAX)
+			: resource(resource), manager(resource->manager)
+		{
+			resource->references++;
+
+			if (resource->desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER) {
+				this->mipSliceStart = mipStart;
+				this->mipSliceCount = min(resource->desc.MipLevels, mipsCount);
+				this->arraySliceStart = arrayStart;
+				this->arraySliceCount = min(resource->desc.DepthOrArraySize, arrayCount);
+			}
+		}
+
+		// Creates a NULL RESOURCE VIEW
+		ResourceView(gObj<DeviceManager> manager) :manager(manager) {
+
+		}
+
+		int getSRV();
+
+		D3D12_CPU_DESCRIPTOR_HANDLE getSRVHandle();
+
+		int getUAV();
+
+		D3D12_CPU_DESCRIPTOR_HANDLE getUAVHandle();
+
+		int getCBV();
+
+		D3D12_CPU_DESCRIPTOR_HANDLE getCBVHandle();
+
+		int getRTV();
+
+		D3D12_CPU_DESCRIPTOR_HANDLE getRTVHandle();
+
+		int getDSV();
+
+		D3D12_CPU_DESCRIPTOR_HANDLE getDSVHandle();
+
+		void getCPUHandleFor(D3D12_DESCRIPTOR_RANGE_TYPE type, D3D12_CPU_DESCRIPTOR_HANDLE &handle) {
+			switch (type) {
+			case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
+				handle = getCBVHandle();
+				break;
+			case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+				handle = getSRVHandle();
+				break;
+			case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+				handle = getUAVHandle();
+				break;
+			}
+		}
+
+		void getCPUHandleFor(D3D12_ROOT_PARAMETER_TYPE type, D3D12_CPU_DESCRIPTOR_HANDLE &handle) {
+			switch (type) {
+			case D3D12_ROOT_PARAMETER_TYPE_CBV:
+				handle = getCBVHandle();
+				break;
+			case D3D12_ROOT_PARAMETER_TYPE_SRV:
+				handle = getSRVHandle();
+				break;
+			case D3D12_ROOT_PARAMETER_TYPE_UAV:
+				handle = getUAVHandle();
+				break;
+			}
+		}
+
+
+	public:
+
+		~ResourceView();
+
+		// Cast this resource to a different view type.
+		template<typename V>
+		V* CreateCastView()
+		{
+			return new V(this->resource, this->arraySliceStart, this->arraySliceCount, this->mipSliceStart, this->mipSliceCount);
+		}
+	};
+
+	// Represents a buffer view of a resource.
+	class Buffer : public ResourceView {
+		friend Creating;
+		friend Presenter;
+		friend GraphicsManager;
+		friend ResourceView;
+		friend DXRManager;
+		friend SceneBuilder;
+		friend RTPipelineManager;
+		friend IRTProgram;
+		friend TriangleGeometryCollection;
+		friend ProceduralGeometryCollection;
+		friend GeometryCollection;
+		friend InstanceCollection;
+
+		byte* GetShaderRecordStartAddress(int index) {
+			return ((byte*)resource->GetMappedDataAddress()) + index * Stride;
+		}
+
+	protected:
+		// Inherited via Resource
+		void CreateUAVDesc(D3D12_UNORDERED_ACCESS_VIEW_DESC & d)
+		{
+			d.Buffer.CounterOffsetInBytes = 0;
+			d.Buffer.FirstElement = 0;
+			d.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+			d.Buffer.NumElements = ElementCount;
+			d.Buffer.StructureByteStride = Stride;
+			d.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+			d.Format = DXGI_FORMAT_UNKNOWN;// !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+		}
+
+		void CreateSRVDesc(D3D12_SHADER_RESOURCE_VIEW_DESC & d)
+		{
+			d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			d.Buffer.FirstElement = 0;
+			d.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+			d.Buffer.NumElements = ElementCount;
+			d.Buffer.StructureByteStride = Stride;
+			d.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+		}
+
+		void CreateCBVDesc(D3D12_CONSTANT_BUFFER_VIEW_DESC & d)
+		{
+			d.BufferLocation = !resource ? 0 : resource->internalResource->GetGPUVirtualAddress();
+			d.SizeInBytes = (Stride * ElementCount + 255)&~255;
+		}
+
+		void CreateRTVDesc(D3D12_RENDER_TARGET_VIEW_DESC & d)
+		{
+			throw "Not supported a buffer as render target";
+		}
+
+		void CreateDSVDesc(D3D12_DEPTH_STENCIL_VIEW_DESC & d)
+		{
+			throw "Not supported a buffer as depth stencil view";
+		}
+
+		void CreateVBV(D3D12_VERTEX_BUFFER_VIEW &v) {
+			v.BufferLocation = !resource ? 0 : resource->internalResource->GetGPUVirtualAddress();
+			v.SizeInBytes = ElementCount * Stride;
+			v.StrideInBytes = Stride;
+		}
+
+		void CreateIBV(D3D12_INDEX_BUFFER_VIEW &i) {
+			i.BufferLocation = !resource ? 0 : resource->internalResource->GetGPUVirtualAddress();
+			i.Format = !resource ? DXGI_FORMAT_UNKNOWN : Stride == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+			i.SizeInBytes = ElementCount * Stride;
+		}
+
+		Buffer(gObj<ResourceWrapper> resource, int stride)
+			: ResourceView(resource), ElementCount(resource->desc.Width / stride), Stride(stride)
+		{
+		}
+
+		Buffer(gObj<DeviceManager> manager) : ResourceView(manager), ElementCount(1), Stride(256)
+		{
+		}
+
+	public:
+		// Number of elements of this buffer
+		unsigned int const
+			ElementCount;
+		// Number of bytes of each element in this buffer
+		unsigned int const
+			Stride;
+	};
+
+	// Represents a 2D view of a resource. This view includes texture arrays, mipmaps and planes.
+	class Texture2D : public ResourceView {
+		friend Creating;
+		friend Presenter;
+		friend ResourceView;
+		friend CommandListManager;
+
+	protected:
+		// Inherited via Resource
+		void CreateUAVDesc(D3D12_UNORDERED_ACCESS_VIEW_DESC & d)
+		{
+			d.Texture2DArray.ArraySize = arraySliceCount;
+			d.Texture2DArray.FirstArraySlice = arraySliceStart;
+			d.Texture2DArray.MipSlice = mipSliceStart;
+			d.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+		}
+
+		void CreateSRVDesc(D3D12_SHADER_RESOURCE_VIEW_DESC & d)
+		{
+			d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			d.Texture2DArray.ArraySize = arraySliceCount;
+			d.Texture2DArray.FirstArraySlice = arraySliceStart;
+			d.Texture2DArray.MipLevels = mipSliceCount;
+			d.Texture2DArray.MostDetailedMip = mipSliceStart;
+			d.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+			d.Format = !resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+		}
+
+		void CreateCBVDesc(D3D12_CONSTANT_BUFFER_VIEW_DESC & d)
+		{
+			throw "Not supported convert a texture 2D into a constant buffer";
+		}
+
+		void CreateRTVDesc(D3D12_RENDER_TARGET_VIEW_DESC & d)
+		{
+			d.Texture2DArray.ArraySize = arraySliceCount;
+			d.Texture2DArray.FirstArraySlice = arraySliceStart;
+			d.Texture2DArray.MipSlice = mipSliceStart;
+			d.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+		}
+
+		void CreateDSVDesc(D3D12_DEPTH_STENCIL_VIEW_DESC & d)
+		{
+			d.Texture2DArray.ArraySize = arraySliceCount;
+			d.Texture2DArray.FirstArraySlice = arraySliceStart;
+			d.Texture2DArray.MipSlice = mipSliceStart;
+			d.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+		}
+
+		Texture2D(gObj<ResourceWrapper> resource, int arrayStart = 0, int arrayCount = INT_MAX, int mipStart = 0, int mipsCount = INT_MAX)
+			: ResourceView(resource, arrayStart, arrayCount, mipStart, mipsCount)
+			, Width(max(1, resource->desc.Width >> mipStart)), Height(max(1, resource->desc.Height >> mipStart))
+		{
+		}
+
+		Texture2D(gObj<DeviceManager> manager) : ResourceView(manager), Width(1), Height(1) {
+		}
+	public:
+		// Width of this Texture2D
+		int const Width;
+		// Height of this Texture2D
+		int const Height;
+
+		inline int getMipsCount() {
+			return mipSliceCount;
+		}
+		inline int getSlicesCount() {
+			return arraySliceCount;
+		}
+		gObj<Texture2D> CreateSlice(int sliceStart = 0, int sliceCount = INT_MAX, int mipStart = 0, int mipCount = INT_MAX) {
+			return new Texture2D(this->resource, this->arraySliceStart + sliceStart, sliceCount, this->mipSliceStart + mipStart, mipCount);
+		}
+		gObj<Texture2D> CreateSubresource(int sliceStart = 0, int mipStart = 0) {
+			return CreateSlice(sliceStart, 1, mipStart, 1);
+		}
+		gObj<Texture2D> CreateArraySlice(int slice) {
+			return CreateSlice(slice, 1);
+		}
+		gObj<Texture2D> CreateMipSlice(int slice) {
+			return CreateSlice(arraySliceStart, arraySliceCount, slice, 1);
+		}
+	};
+
+}
+
+#pragma endregion
+
+#pragma region ca4GPipelineBindings.h
+
+
+
 namespace CA4G {
 
 	// Represents the shader stage a resource is bound to.
@@ -12265,7 +12288,7 @@ namespace CA4G {
 			}
 
 		public:
-			void Instance(gObj<GeometriesOnGPU> geometries, UINT mask = 0xFF, float4x4 transform = float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1), UINT instanceID = INTSAFE_UINT_MAX);
+			void Instance(gObj<GeometriesOnGPU> geometries, UINT mask = 0xFF, int instanceContribution = 0, UINT instanceID = INTSAFE_UINT_MAX, float4x4 transform = float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 		} *const loading;
 
 		class Creating {
@@ -13552,7 +13575,7 @@ namespace CA4G {
 			Clearing(CommandListManager* manager, DX_CommandList cmdList) :manager(manager), cmdList(cmdList) {}
 
 			inline void UAV(gObj<ResourceView> uav, const FLOAT values[4]) {
-				uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				uav->ChangeStateToUAV(cmdList);
 				long gpuHandleIndex = this->manager->manager->descriptors->gpu_csu->Malloc(1);
 				auto cpuHandleAtVisibleHeap = this->manager->manager->descriptors->gpu_csu->getCPUVersion(gpuHandleIndex);
 				auto gpuHandle = this->manager->manager->descriptors->gpu_csu->getGPUVersion(gpuHandleIndex);
@@ -13565,7 +13588,7 @@ namespace CA4G {
 			}
 			inline void UAV(gObj<ResourceView> uav, const float4 &value) {
 				float v[4]{ value.x, value.y, value.z, value.w };
-				uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				uav->ChangeStateToUAV(cmdList);
 				long gpuHandleIndex = this->manager->manager->descriptors->gpu_csu->Malloc(1);
 				auto cpuHandleAtVisibleHeap = this->manager->manager->descriptors->gpu_csu->getCPUVersion(gpuHandleIndex);
 				auto gpuHandle = this->manager->manager->descriptors->gpu_csu->getGPUVersion(gpuHandleIndex);
@@ -13578,7 +13601,7 @@ namespace CA4G {
 			}
 			inline void UAV(gObj<ResourceView> uav, const unsigned int &value) {
 				unsigned int v[4]{ value, value, value, value };
-				uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				uav->ChangeStateToUAV(cmdList);
 				long gpuHandleIndex = this->manager->manager->descriptors->gpu_csu->Malloc(1);
 				auto cpuHandleAtVisibleHeap = this->manager->manager->descriptors->gpu_csu->getCPUVersion(gpuHandleIndex);
 				auto gpuHandle = this->manager->manager->descriptors->gpu_csu->getGPUVersion(gpuHandleIndex);
@@ -13591,7 +13614,7 @@ namespace CA4G {
 			}
 			inline void UAV(gObj<ResourceView> uav, const uint4 &value) {
 				unsigned int v[4]{ value.x, value.y, value.z, value.w };
-				uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				uav->ChangeStateToUAV(cmdList);
 				long gpuHandleIndex = this->manager->manager->descriptors->gpu_csu->Malloc(1);
 				auto cpuHandleAtVisibleHeap = this->manager->manager->descriptors->gpu_csu->getCPUVersion(gpuHandleIndex);
 				auto gpuHandle = this->manager->manager->descriptors->gpu_csu->getGPUVersion(gpuHandleIndex);
@@ -13603,7 +13626,7 @@ namespace CA4G {
 					uav->resource->internalResource, v, 0, nullptr);
 			}
 			inline void UAV(gObj<ResourceView> uav, const unsigned int values[4]) {
-				uav->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				uav->ChangeStateToUAV(cmdList);
 				long gpuHandleIndex = this->manager->manager->descriptors->gpu_csu->Malloc(1);
 				auto cpuHandleAtVisibleHeap = this->manager->manager->descriptors->gpu_csu->getCPUVersion(gpuHandleIndex);
 				auto gpuHandle = this->manager->manager->descriptors->gpu_csu->getGPUVersion(gpuHandleIndex);

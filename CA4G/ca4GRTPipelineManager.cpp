@@ -105,7 +105,7 @@ namespace CA4G {
 						switch (binding.Root_Parameter.DescriptorTable.pDescriptorRanges[0].RangeType)
 						{
 						case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-							resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_GENERIC_READ);
+							resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 							break;
 						case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
 							resource->ChangeStateToUAV(cmdList);
@@ -172,7 +172,7 @@ namespace CA4G {
 		}
 	}
 
-	void InstanceCollection::Loading::Instance(gObj<GeometriesOnGPU> geometries, UINT mask, float4x4 transform, UINT instanceID)
+	void InstanceCollection::Loading::Instance(gObj<GeometriesOnGPU> geometries, UINT mask, int instanceContribution, UINT instanceID, float4x4 transform)
 	{
 		manager->usedGeometries->add(geometries);
 
@@ -182,7 +182,7 @@ namespace CA4G {
 			d.InstanceMask = mask;
 			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 			//d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
-			d.InstanceContributionToHitGroupIndex = 0;
+			d.InstanceContributionToHitGroupIndex = instanceContribution;
 			d.AccelerationStructure = geometries->emulatedPtr;
 			if (manager->isUpdating)
 			{
@@ -201,7 +201,7 @@ namespace CA4G {
 			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
 			FillMat4x3(d.Transform, transform);
 			d.InstanceMask = mask;
-			d.InstanceContributionToHitGroupIndex = 0;
+			d.InstanceContributionToHitGroupIndex = instanceContribution;
 			d.AccelerationStructure = geometries->bottomLevelAccDS->resource->GetGPUVirtualAddress();
 			if (manager->isUpdating) {
 				d.InstanceID = instanceID == INTSAFE_UINT_MAX ? manager->currentInstance : instanceID;
@@ -326,6 +326,7 @@ namespace CA4G {
 	}
 
 	void GeometryCollection::PrepareBuffer(gObj<Buffer> bufferForGeometry) {
+		bufferForGeometry->BarrierUAV(cmdList->cmdList);
 		bufferForGeometry->ChangeStateTo(cmdList->cmdList, D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
 
