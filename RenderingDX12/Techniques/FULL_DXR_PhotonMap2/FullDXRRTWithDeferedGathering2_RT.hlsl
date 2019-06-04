@@ -16,22 +16,20 @@ RaytracingAccelerationStructure Scene		: register(t0);
 
 // > Photons buffer with photon information (position, direction, alpha and radius)
 StructuredBuffer<Photon> Photons			: register(t1);
-// > Number of photons (to discard intersections with unused AABBs)
-Texture2D<uint> PhotonCount					: register(t2);
 
-StructuredBuffer<Vertex> vertices			: register(t3);
-StructuredBuffer<Material> materials		: register(t4);
+StructuredBuffer<Vertex> vertices			: register(t2);
+StructuredBuffer<Material> materials		: register(t3);
 
 // GBuffer Used for primary rays (from light in photon trace and from viewer in raytrace)
-Texture2D<float3> Positions					: register(t5);
-Texture2D<float3> Normals					: register(t6);
-Texture2D<float2> Coordinates				: register(t7);
-Texture2D<int> MaterialIndices				: register(t8);
+Texture2D<float3> Positions					: register(t4);
+Texture2D<float3> Normals					: register(t5);
+Texture2D<float2> Coordinates				: register(t6);
+Texture2D<int> MaterialIndices				: register(t7);
 // Used for direct light visibility test
-Texture2D<float3> LightPositions			: register(t9);
+Texture2D<float3> LightPositions			: register(t8);
 
 // Textures
-Texture2D<float4> Textures[500]				: register(t10);
+Texture2D<float4> Textures[500]				: register(t9);
 
 // Raytracing radiance (missing diffuse and specular interreflections)
 RWTexture2D<float3> Output					: register(u0);
@@ -94,7 +92,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	float3 V = WorldRayDirection();
 	float3 H = normalize(V - p.Direction);
 	float area = pi * p.Radius * p.Radius;
-	payload.OutDiffuseAccum += 0.1;// p.Intensity / area;
+	payload.OutDiffuseAccum += p.Intensity / area;
 	payload.OutSpecularAccum += p.Intensity*pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
 
 	IgnoreHit(); // Continue search to accumulate other photons
@@ -104,9 +102,10 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 void PhotonGatheringIntersection() {
 	// use object info instead of PrimitiveIndex because
 	// fallback device has errors for this function with procedural geometries
-	int index = objectInfo.TriangleOffset;
-	//if (index < PhotonCount[uint2(0, 0)]) // It is a valid photon
-		ReportHit(0.1, 0, (PhotonHitAttributes)index);
+	int index = objectInfo.MaterialIndex;
+	PhotonHitAttributes att;
+	att.PhotonIdx = index;
+	ReportHit(0.01, 0, att);
 }
 
 [shader("miss")]
@@ -124,8 +123,9 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 		/*OutSpecularAccum*/		float3(0,0,0)
 	};
 	RayDesc ray;
-	ray.Origin = surfel.P - V * 0.1;
-	ray.Direction = V * 0.2;
+	float3 dir = normalize(float3(1, 1, 1));
+	ray.Origin = surfel.P - dir * 0.001;
+	ray.Direction = dir * 0.002;
 	ray.TMin = 0.0001;
 	ray.TMax = 1;
 	// Photon Map trace
@@ -138,7 +138,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// ray
 	// raypayload
 	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, IS_PHOTON_MASK, 0, 1, 1, ray, photonGatherPayload);
-	return material.Diffuse * photonGatherPayload.OutDiffuseAccum;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+	return material.Diffuse * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
 }
 
 float LightSphereRadius() {

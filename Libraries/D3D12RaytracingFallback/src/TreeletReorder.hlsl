@@ -47,14 +47,14 @@ void FormTreelet(in uint groupThreadId)
         treeletToReorder[1] = hierarchyBuffer[nodeIndex].RightChildIndex;
 
 #if USE_EXPLICIT_UNROLL_IN_FORMTREELET
-        [unroll]
+        //[unroll]
 #endif
     for (uint treeletSize = 2; treeletSize < FullTreeletSize; treeletSize++)
         {
             float largestSurfaceArea = 0.0;
             uint nodeIndexToTraverse = 0;
             uint indexOfNodeIndexToTraverse = 0;
-            [unroll]
+            //[unroll]
             for (uint i = 0; i < treeletSize; i++)
             {
                 uint treeletNodeIndex = treeletToReorder[i];
@@ -109,7 +109,7 @@ void FindOptimalPartitions(in uint threadId)
             aabb.min = float3(FLT_MAX, FLT_MAX, FLT_MAX);
             aabb.max = float3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
-            [unroll]
+            //[unroll]
             for (uint i = 0; i < FullTreeletSize; i++)
             {
                 if (BIT(i) & treeletBitmask)
@@ -135,7 +135,7 @@ void FindOptimalPartitions(in uint threadId)
     GroupMemoryBarrierWithGroupSync();
 
     // Dynamic programming from 'treelet/subset' of size 2 up to FullTreeletSize, calculate and store optimal (lowest) cost and its partition bitmask
-    [unroll]
+    //[unroll]
     for (uint subsetSize = 2; subsetSize <= FullTreeletSize; subsetSize++)
     {
         // eg. In 'treelet/subset' of size 2, there are (7 Choose 2) distinct 'treelets' in the original treelet of 7 leaves, ie. 0000011, 0000101, ..., 1100000
@@ -256,7 +256,7 @@ void ReformTree(in uint groupThreadId)
 
     // Start from the back. This is optimizing since the previous traversal went from
     // top-down, the reverse order is guaranteed to be bottom-up
-    [unroll]
+    //[unroll]
     for (int j = NumInternalTreeletNodes - 1; j >= 0; j--)
     {
         uint internalNodeIndex = internalNodes[j];

@@ -387,7 +387,7 @@ public:
 
 		manager gCopy ValueData(dxrPTPipeline->_Program->ProgressivePass, FrameIndex);
 
-		FrameIndex++;
+		//FrameIndex++;
 
 		auto ptRTProgram = dxrPTPipeline->_Program;
 
@@ -476,6 +476,8 @@ public:
 		dxrRTPipeline->_Program->Coordinates = gBufferFromViewer->pipeline->GBuffer_C;
 		dxrRTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
 		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
+
+		manager gClear UAV(rtProgram->Output, 0u);
 
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrRTPipeline);

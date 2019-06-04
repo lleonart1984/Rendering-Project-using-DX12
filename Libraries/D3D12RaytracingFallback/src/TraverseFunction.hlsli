@@ -661,9 +661,10 @@ bool Traverse(
 #endif
                         if (!culled && isProceduralGeometry)
                         {
+							// Bug? using primitiveIndex to know the box id
                             uint hitGroupRecordOffset =
                                 HitGroupShaderRecordStride * (RayContributionToHitGroupIndex +
-                                primitiveMetadata.GeometryContributionToHitGroupIndex * MultiplierForGeometryContributionToHitGroupIndex +
+                                primitiveMetadata.PrimitiveIndex * MultiplierForGeometryContributionToHitGroupIndex +
                                 instanceOffset);
 
                             Fallback_SetPendingCustomVals(hitGroupRecordOffset, primitiveMetadata.PrimitiveIndex, instanceIndex, instanceId);

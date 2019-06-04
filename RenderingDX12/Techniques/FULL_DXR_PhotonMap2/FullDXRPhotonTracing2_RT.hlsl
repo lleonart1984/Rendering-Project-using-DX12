@@ -34,7 +34,6 @@ Texture2D<float4> Textures[500]			: register(t7);
 // Photon Map binding objects
 RWStructuredBuffer<AABB> PhotonAABBs	: register(u0);
 RWStructuredBuffer<Photon> Photons		: register(u1);
-RWTexture2D<uint> Malloc				: register(u2);
 
 SamplerState gSmp : register(s0);
 
@@ -58,11 +57,6 @@ ConstantBuffer<ObjInfo> objectInfo : register(b2);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
-struct PhotonHitAttributes {
-	// Photon Index
-	int PhotonIdx;
-};
-
 struct RayPayload
 {
 	float3 color;
@@ -77,6 +71,11 @@ struct RayPayload
 void PTMainRays() {
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
+
+	uint photonIndexInBuffer = raysIndex.x + raysIndex.y * raysDimensions.x;
+
+	// Turn off existing photon
+	Photons[photonIndexInBuffer].Intensity = 0;
 
 	int rayId = raysIndex.x + raysIndex.y*raysDimensions.x + raysDimensions.x * raysDimensions.y * 0;
 	// Initialize random iterator using rays index as seed
@@ -104,7 +103,7 @@ void PTMainRays() {
 	N = mul(float4(N, 0), ViewToWorld).xyz;
 	float3 L = normalize(LightPosition - P); // V is really L in this case, since the "viewer" is positioned in light position to trace rays
 
-	RayPayload payload = { LightIntensity * 100000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), 1 };
+	RayPayload payload = { LightIntensity * 100000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), 2 };
 
 	Vertex surfel = {
 		P,
@@ -174,15 +173,21 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 	bool exiting = NdotV < 0;
 	float3 fN = exiting ? -surfel.N : surfel.N;
 
-	if (material.Roulette.x > 0 && NdotV > 0) // Material has some diffuse component
-	{ // Store the photon in the photon map
-		uint photonIndexInBuffer;
-		InterlockedAdd(Malloc[uint2(0,0)], 1, photonIndexInBuffer);
-		float radius = 0.005;
+	uint2 raysIndex = DispatchRaysIndex();
+	uint2 raysDimensions = DispatchRaysDimensions();
+
+	uint photonIndexInBuffer = raysIndex.x + raysIndex.y * raysDimensions.x;
+
+	float russianRoulette = random();
+	float pdf = material.Roulette.x * 0.5;
+
+	if (russianRoulette < pdf) // photon stay here
+	{
+		float radius = 0.1;
 
 		Photon p = {
 			WorldRayDirection(), // photon direction
-			payload.color, // photon intensity in a specific area
+			payload.color * (1 / pdf), // photon intensity in a specific area
 			surfel.P,
 			radius // photon radius
 		};
@@ -195,23 +200,22 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 		PhotonAABBs[photonIndexInBuffer] = box;
 		Photons[photonIndexInBuffer] = p;
 	}
-
-	//if (false)
-	if (payload.bounce > 0) // Photon can bounce one more time
-	{
-		float3 ratio;
-		float3 direction;
-		RandomScatterRay(V, surfel, material, ratio, direction);
-
-		if (any(ratio))
+	else
+		if (payload.bounce > 0) // Photon can bounce one more time
 		{
-			RayPayload newPhotonPayload = { payload.color * ratio, payload.bounce - 1 };
-			RayDesc newPhotonRay;
-			newPhotonRay.TMin = 0.001;
-			newPhotonRay.TMax = 10000.0;
-			newPhotonRay.Direction = direction;
-			newPhotonRay.Origin = surfel.P + sign(dot(direction, fN))*0.0001*fN; // avoid self shadowing
-			TraceRay(Scene, RAY_FLAG_NONE, IS_TRIANGLE_MASK, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
+			float3 ratio;
+			float3 direction;
+			RandomScatterRay(V, surfel, material, ratio, direction);
+
+			if (any(ratio))
+			{
+				RayPayload newPhotonPayload = { payload.color * ratio / (1 - pdf), payload.bounce - 1 };
+				RayDesc newPhotonRay;
+				newPhotonRay.TMin = 0.001;
+				newPhotonRay.TMax = 10000.0;
+				newPhotonRay.Direction = direction;
+				newPhotonRay.Origin = surfel.P + sign(dot(direction, fN))*0.0001*fN; // avoid self shadowing
+				TraceRay(Scene, RAY_FLAG_NONE, IS_TRIANGLE_MASK, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
+			}
 		}
-	}
 }
