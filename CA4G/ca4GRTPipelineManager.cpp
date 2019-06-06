@@ -75,7 +75,7 @@ namespace CA4G {
 			switch (binding.Root_Parameter.ParameterType)
 			{
 			case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
-				cmdList->SetComputeRoot32BitConstants(i, binding.Root_Parameter.Constants.Num32BitValues,
+				cmdList->SetGraphicsRoot32BitConstants(i, binding.Root_Parameter.Constants.Num32BitValues,
 					binding.ConstantData.ptrToConstant, 0);
 				break;
 			case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
@@ -123,7 +123,7 @@ namespace CA4G {
 				manager->dstDescriptorRangeLengths.add(count);
 				int startIndex = this->manager->descriptors->gpu_csu->Malloc(count);
 				manager->dstDescriptors.add(this->manager->descriptors->gpu_csu->getCPUVersion(startIndex));
-				cmdList->SetComputeRootDescriptorTable(i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
+				cmdList->SetGraphicsRootDescriptorTable(i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
 				break; // DESCRIPTOR TABLE
 #pragma endregion
 			}
@@ -132,7 +132,7 @@ namespace CA4G {
 #pragma region DESCRIPTOR CBV
 				// Gets the range length (if bound an array) or 1 if single.
 				gObj<ResourceView> resource = *((gObj<ResourceView>*)binding.DescriptorData.ptrToResourceViewArray);
-				cmdList->SetComputeRootConstantBufferView(i, resource->resource->GetGPUVirtualAddress());
+				cmdList->SetGraphicsRootConstantBufferView(i, resource->resource->GetGPUVirtualAddress());
 				break; // DESCRIPTOR CBV
 #pragma endregion
 			}
@@ -147,7 +147,7 @@ namespace CA4G {
 					fallbackCmdList->SetTopLevelAccelerationStructure(i, scene->topLevelAccFallbackPtr);
 				}
 				else
-					cmdList->SetComputeRootShaderResourceView(i, scene->topLevelAccDS->resource->GetGPUVirtualAddress());
+					cmdList->SetGraphicsRootShaderResourceView(i, scene->topLevelAccDS->resource->GetGPUVirtualAddress());
 				break; // DESCRIPTOR CBV
 #pragma endregion
 			}
@@ -273,7 +273,7 @@ namespace CA4G {
 		else
 			manager->cmdList->cmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
 
-		buffer->ChangeStateToUAV(manager->cmdList->cmdList);
+		//buffer->ChangeStateToUAV(manager->cmdList->cmdList);
 
 		gObj<GeometriesOnGPU> result = new GeometriesOnGPU();
 		result->bottomLevelAccDS = buffer;

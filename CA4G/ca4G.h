@@ -9934,7 +9934,7 @@ namespace CA4G
 			int index;
 			Node* next;
 		} *free = nullptr;
-		size_t startCPU;
+		SIZE_T startCPU;
 		Mutex mutex;
 	public:
 		CPUDescriptorHeapManager(DX_Device device, D3D12_DESCRIPTOR_HEAP_TYPE type, int capacity);
@@ -9960,7 +9960,7 @@ namespace CA4G
 		friend Presenter;
 		DX_DescriptorHeap heap;
 		unsigned int size;
-		size_t startCPU;
+		SIZE_T startCPU;
 		UINT64 startGPU;
 
 		volatile long mallocOffset = 0;
@@ -13942,7 +13942,7 @@ namespace CA4G {
 
 			void Program(gObj<IRTProgram> program) {
 				manager->activeRTProgram = program;
-				manager->cmdList->SetComputeRootSignature(program->globals->rootSignature);
+				manager->cmdList->SetGraphicsRootSignature(program->globals->rootSignature);
 				program->BindOnGPU(manager, program->globals);
 			}
 
