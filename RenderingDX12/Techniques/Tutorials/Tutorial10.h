@@ -26,7 +26,7 @@ struct DXRBasic : public RTPipelineManager {
 			_ gSet Payload(16);
 			_ gLoad Shader(Context()->MyRaygenShader);
 			_ gLoad Shader(Context()->MyMissShader);
-			_ gCreate HitGroup(ClosestHit, Context()->MyClosestHitShader, {}, {});
+			_ gCreate HitGroup(ClosestHit, Context()->MyClosestHitShader, nullptr, nullptr);
 		}
 
 		void Globals() override {
@@ -99,7 +99,7 @@ class Tutorial10 : public Technique {
 		// Performs a copying commanding execution for uploading data to resources
 		perform(UploadData);
 
-		flush_all_to_gpu;
+		wait_for(signal(flush_all_to_gpu));
 
 		// Performs a building process to generate acceleration data structures (scene)
 		// using a DXRManager object.
@@ -120,7 +120,7 @@ class Tutorial10 : public Technique {
 
 	// A copy engine can be used to populate buffers using GPU commands.
 	void UploadData(gObj<ComputeManager> manager) {
-		manager gClear UAV(vertices, float4(0, 0, 0, 0));
+		//manager gClear UAV(vertices, float4(0, 0, 0, 0));
 		// Copies a buffer written using an initializer_list
 		manager	gCopy ListData(vertices, {
 				VERTEX { float3(0.8, -0.4, 0), float3(1, 0, 0)},

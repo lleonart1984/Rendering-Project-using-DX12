@@ -273,7 +273,7 @@ namespace CA4G {
 		else
 			manager->cmdList->cmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
 
-		buffer->ChangeStateToUAV(manager->cmdList->cmdList);
+		buffer->BarrierUAV(manager->cmdList->cmdList);
 
 		gObj<GeometriesOnGPU> result = new GeometriesOnGPU();
 		result->bottomLevelAccDS = buffer;
