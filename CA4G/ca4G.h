@@ -13942,7 +13942,7 @@ namespace CA4G {
 
 			void Program(gObj<IRTProgram> program) {
 				manager->activeRTProgram = program;
-				manager->cmdList->SetGraphicsRootSignature(program->globals->rootSignature);
+				manager->cmdList->SetComputeRootSignature(program->globals->rootSignature);
 				program->BindOnGPU(manager, program->globals);
 			}
 
