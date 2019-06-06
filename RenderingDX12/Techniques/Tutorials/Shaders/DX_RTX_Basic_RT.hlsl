@@ -18,7 +18,7 @@ struct RayPayload
 };
 
 RaytracingAccelerationStructure Scene : register(t0);
-RaytracingAccelerationStructure Scene2 : register(t1);
+//RaytracingAccelerationStructure Scene2 : register(t1);
 RWTexture2D<float4> RenderTarget : register(u0);
 ConstantBuffer<RayGenConstantBuffer> g_rayGenCB : register(b0);
 
@@ -49,7 +49,7 @@ void MyRaygenShader()
 		ray.TMin = 0.001;
 		ray.TMax = 10000.0;
 		RayPayload payload = { float4(0, 0, 1, 1) };
-		TraceRay(Scene2, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
+		TraceRay(Scene, RAY_FLAG_NONE, ~0, 0, 1, 0, ray, payload);
 
 		// Write the raytraced color to the output texture.
 		RenderTarget[DispatchRaysIndex().xy] = payload.color;// float4(lerpValues, 0, 1);// payload.color;
