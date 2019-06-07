@@ -27,5 +27,6 @@ using namespace CA4G;
 #include "Techniques/RASTER_DXR_Photontracer/HybridPhotonTracer.h"
 #include "Techniques/AccPathtracing/DXRPathtracer.h"
 #include "Techniques/ItAccPathtracing/DXRItPathtracer.h"
+#include "Techniques/FULL_DXR_PhotonMap/FullDXRPhotontracerTechnique.h"
 #include "Techniques/FULL_DXR_PhotonMap2/FullDXRPhotontracerTechnique2.h"
 #include "main.h"

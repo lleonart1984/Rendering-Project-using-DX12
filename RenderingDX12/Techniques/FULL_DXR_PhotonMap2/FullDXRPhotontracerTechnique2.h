@@ -7,7 +7,6 @@ struct FullDXRPhotonTracer2 : public Technique, public IHasScene, public IHasLig
 public:
 
 #define DISPATCH_RAYS_DIMENSION 128
-
 #define NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION)
 
 	// Scene loading process to retain scene on the GPU
@@ -248,7 +247,7 @@ public:
 		gBufferFromViewer->sceneLoader = this->sceneLoader;
 		_ gLoad Subprocess(gBufferFromViewer);
 
-		wait_for(signal(flush_all_to_gpu));
+		flush_all_to_gpu;
 
 		_ gLoad Pipeline(dxrPTPipeline);
 		_ gLoad Pipeline(dxrRTPipeline);
@@ -268,6 +267,9 @@ public:
 		float Radius;
 	};
 
+	double doubleRand() {
+		return double(rand()) / (double(RAND_MAX) + 1.0);
+	}
 
 	void CreatingAssets(gObj<CopyingManager> manager) {
 		// Photons aabbs used in bottom level structure building and updates
@@ -275,10 +277,10 @@ public:
 		D3D12_RAYTRACING_AABB* aabbs = new D3D12_RAYTRACING_AABB[NUMBER_OF_PHOTONS];
 		for (int i = 0; i < NUMBER_OF_PHOTONS; i++)
 		{
-			float x = 4 * (rand() % 1000) / 1000.0f - 2;
-			float y = 4 * (rand() % 1000) / 1000.0f - 2;
-			float z = 4 * (rand() % 1000) / 1000.0f - 2;
-			aabbs[i] = { x,y,z, x + 0.005f, y + 0.005f ,z + 0.005f };
+			float x = 2 * doubleRand() - 1;
+			float y = 2 * doubleRand() - 1;
+			float z = 2 * doubleRand() - 1;
+			aabbs[i] = { x,y,z, x + 0.001f, y + 0.001f ,z + 0.001f };
 		}
 		manager gCopy PtrData(PhotonsAABBs, aabbs);
 		delete aabbs;
@@ -366,9 +368,11 @@ public:
 		ExecuteFrame(gBufferFromLight);
 #pragma endregion
 
+		wait_for(signal(flush_all_to_gpu));
+
 		perform(Photontracing);
 
-		//flush_all_to_gpu; // Grant PhotonAABBs was fully updated
+		wait_for(signal(flush_all_to_gpu)); // Grant PhotonAABBs was fully updated
 
 		perform(BuildPhotonMap);
 
