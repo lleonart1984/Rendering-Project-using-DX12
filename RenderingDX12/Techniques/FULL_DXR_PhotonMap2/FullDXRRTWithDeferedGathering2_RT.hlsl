@@ -88,12 +88,21 @@ struct PhotonRayPayload
 
 [shader("anyhit")]
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
+	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection()*0.5;
+	
 	Photon p = Photons[attr.PhotonIdx];
 	float3 V = WorldRayDirection();
 	float3 H = normalize(V - p.Direction);
 	float area = pi * p.Radius * p.Radius;
-	payload.OutDiffuseAccum += float3(0.05, 0.05, 0.01);// p.Intensity / area;
-	payload.OutSpecularAccum += p.Intensity*pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
+
+	float d = distance(surfelPosition, p.Position);
+
+	if (d < p.Radius)
+	{
+		float kernel = 2 - 2 * d / p.Radius;
+		payload.OutDiffuseAccum += p.Intensity * kernel / area;
+		payload.OutSpecularAccum += p.Intensity* kernel*pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
+	}
 	IgnoreHit(); // Continue search to accumulate other photons
 }
 
@@ -101,7 +110,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 void PhotonGatheringIntersection() {
 	// use object info instead of PrimitiveIndex because
 	// fallback device has errors for this function with procedural geometries
-	int index = objectInfo.MaterialIndex;
+	int index = PrimitiveIndex();// objectInfo.MaterialIndex;
 	PhotonHitAttributes att;
 	att.PhotonIdx = index;
 	ReportHit(0.001, 0, att);
@@ -136,8 +145,8 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// 1 : Miss index for PhotonGatheringMiss shader
 	// ray
 	// raypayload
-	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, IS_PHOTON_MASK, 0, 1, 1, ray, photonGatherPayload);
-	return photonGatherPayload.OutDiffuseAccum;// material.Diffuse * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, IS_PHOTON_MASK, 0, 0, 1, ray, photonGatherPayload);
+	return material.Diffuse / pi * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
 }
 
 float LightSphereRadius() {

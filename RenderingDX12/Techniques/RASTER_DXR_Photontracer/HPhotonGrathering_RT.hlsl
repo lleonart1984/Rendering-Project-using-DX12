@@ -102,7 +102,7 @@ int FromPositionToCellIndex(float3 P) {
 // Perform photon gathering
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
 
-	float radius = 0.005;// 4 * max(CellSize.x, max(CellSize.y, CellSize.z));
+	float radius = 0.025;// 4 * max(CellSize.x, max(CellSize.y, CellSize.z));
 
 	int3 begCell = FromPositionToCell(surfel.P - radius);
 	int3 endCell = FromPositionToCell(surfel.P + radius);

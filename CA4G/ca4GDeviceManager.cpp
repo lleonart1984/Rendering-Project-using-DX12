@@ -22,7 +22,8 @@ namespace CA4G {
 		if (SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options)))
 			&& options.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
 		{
-			fallbackDevice = nullptr; // device supports DXR! no necessary fallback device
+			if (!FORCE_FALLBACK_DEVICE)
+				fallbackDevice = nullptr; // device supports DXR! no necessary fallback device
 		}
 
 		Scheduler = new GPUScheduler(this, useFrameBuffering, CA4G_MAX_NUMBER_OF_WORKERS, buffers);

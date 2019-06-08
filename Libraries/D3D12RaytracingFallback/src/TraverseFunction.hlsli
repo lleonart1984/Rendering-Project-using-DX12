@@ -664,10 +664,10 @@ bool Traverse(
 							// Bug? using primitiveIndex to know the box id
                             uint hitGroupRecordOffset =
                                 HitGroupShaderRecordStride * (RayContributionToHitGroupIndex +
-                                primitiveMetadata.PrimitiveIndex * MultiplierForGeometryContributionToHitGroupIndex +
+                                primitiveMetadata.GeometryContributionToHitGroupIndex * MultiplierForGeometryContributionToHitGroupIndex +
                                 instanceOffset);
-
-                            Fallback_SetPendingCustomVals(hitGroupRecordOffset, primitiveMetadata.PrimitiveIndex, instanceIndex, instanceId);
+							Fallback_SetPrimitiveIndex(primitiveMetadata.PrimitiveIndex);
+							Fallback_SetPendingCustomVals(hitGroupRecordOffset, primitiveMetadata.PrimitiveIndex, instanceIndex, instanceId);
                             uint intersectionStateId, anyHitStateId;
                             GetAnyHitAndIntersectionStateId(HitGroupShaderTable, hitGroupRecordOffset, anyHitStateId, intersectionStateId);
                             

@@ -13142,6 +13142,8 @@ namespace CA4G {
 
 namespace CA4G {
 
+	static bool FORCE_FALLBACK_DEVICE = false;
+
 	// Wrapper to a DX 12 device. Exposes functionalities through Creating, Loading, and Perform interface.
 	class DeviceManager {
 		friend Presenter;
@@ -13182,6 +13184,7 @@ namespace CA4G {
 	public:
 		Creating * const creating;
 		Loading * const loading;
+
 
 		// Gets or sets the tag used for next created process
 		int Tag;

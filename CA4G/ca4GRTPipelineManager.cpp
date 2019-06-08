@@ -320,7 +320,7 @@ namespace CA4G {
 		else
 			manager->cmdList->cmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
 
-		manager->updatingGeometry->bottomLevelAccDS->ChangeStateToUAV(manager->cmdList->cmdList);
+		manager->updatingGeometry->bottomLevelAccDS->BarrierUAV(manager->cmdList->cmdList);
 
 		return manager->updatingGeometry;
 	}

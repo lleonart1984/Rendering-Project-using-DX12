@@ -9,7 +9,7 @@ public:
 	~HybridPhotonTracer() {
 	}
 #define RESOLUTION 128
-#define DISPATCH_RAYS_DIMENSION 1024
+#define DISPATCH_RAYS_DIMENSION 512
 #define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*3)
 
 	// Scene loading process to retain scene on the GPU
@@ -355,13 +355,15 @@ public:
 	float4x4 lightView, lightProj;
 
 	void Frame() {
+		if (CameraIsDirty) {
 #pragma region Construct GBuffer from viewer
-		Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
+			Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
 
-		gBufferFromViewer->ViewMatrix = view;
-		gBufferFromViewer->ProjectionMatrix = proj;
-		ExecuteFrame(gBufferFromViewer);
+			gBufferFromViewer->ViewMatrix = view;
+			gBufferFromViewer->ProjectionMatrix = proj;
+			ExecuteFrame(gBufferFromViewer);
 #pragma endregion
+		}
 
 
 #pragma region Construct GBuffer from light
@@ -384,6 +386,9 @@ public:
 	void Photontracing(gObj<DXRManager> manager) {
 
 		static int FrameIndex = 0;
+
+		if (CameraIsDirty)
+			FrameIndex = 0;
 
 		manager gCopy ValueData(dxrPTPipeline->_Program->ProgressivePass, FrameIndex);
 
@@ -477,7 +482,8 @@ public:
 		dxrRTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
 		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
 
-		//manager gClear UAV(rtProgram->Output, 0u);
+		if (CameraIsDirty)
+			manager gClear UAV(rtProgram->Output, 0u);
 
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrRTPipeline);

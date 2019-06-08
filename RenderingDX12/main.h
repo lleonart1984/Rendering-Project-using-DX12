@@ -1,16 +1,21 @@
 #pragma once
 
-
 #define BUNNY_OBJ 0
 #define RING_OBJ 1
 #define SPONZA_OBJ 2
 #define SIBENIK_OBJ 3
 #define SANMIGUEL_OBJ 4
 
-#define USE_SCENE BUNNY_OBJ  
+#define USE_SCENE SPONZA_OBJ  
+
+// Change this to force every frame camera dirty
+#define PERMANENT_CAMERA_DIRTY false
 
 // Uncomment this to use warp device for unsupported DX12 functionalities in your device
 //#define WARP
+
+// Uncomment this to Force fallback device
+//#define FORCE_FALLBACK
 
 //class NoTechnique : public Technique {}; gObj<NoTechnique> technique;
 
@@ -35,4 +40,4 @@ gObj<DXRItPathtracer> technique;
 //gObj<HybridPhotonTracer> technique;
 //gObj<DXRPathtracer> technique;
 //gObj<FullDXRPhotonTracer2> technique; 
-gObj<FullDXRPhotonTracer> technique;
+//gObj<FullDXRPhotonTracer> technique;

@@ -8,7 +8,6 @@
 
 #include "stdafx.h"
 
-//#define WARP
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -93,6 +92,12 @@ int main(int, char**)
 	// Show the window
 	ShowWindow(hWnd, SW_SHOWDEFAULT);
 	UpdateWindow(hWnd);
+
+#ifdef FORCE_FALLBACK
+	FORCE_FALLBACK_DEVICE = true;
+#else
+	FORCE_FALLBACK_DEVICE = false;
+#endif
 
 #ifdef WARP
 	static Presenter* presenter = new Presenter(hWnd, false, 2, false, true);
@@ -203,6 +208,7 @@ int main(int, char**)
     ZeroMemory(&msg, sizeof(msg));
 
 	static float lastTime = ImGui::GetTime();
+	static bool firstFrame = true;
 
     while (msg.message != WM_QUIT)
     {
@@ -248,24 +254,42 @@ int main(int, char**)
 					camera->RotateAround(delta.x*0.01f, -delta.y*0.01f);
 				else
 					camera->Rotate(delta.x*0.01f, -delta.y*0.01f);
-				if (delta.x != 0 || delta.y != 0)
-					ImGui::ResetMouseDragDelta(1);
 
+				bool cameraChanged = false;
+				if (delta.x != 0 || delta.y != 0)
+				{
+					cameraChanged = true;
+					ImGui::ResetMouseDragDelta(1);
+				}
 				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_UpArrow)))
+				{
 					camera->MoveForward(deltaTime);
+					cameraChanged = true;
+				}
 				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_DownArrow)))
+				{
 					camera->MoveBackward(deltaTime);
+					cameraChanged = true;
+				}
 				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_LeftArrow)))
+				{
 					camera->MoveLeft(deltaTime);
+					cameraChanged = true;
+				}
 				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_RightArrow)))
+				{
 					camera->MoveRight(deltaTime);
+					cameraChanged = true;
+				}
+
+				if (asCameraRenderer != nullptr)
+					asCameraRenderer->CameraIsDirty = cameraChanged || firstFrame || PERMANENT_CAMERA_DIRTY;
 			}
         }
 
         // Rendering
 		presenter->Present(technique);
 
-		static bool firstFrame = true;
 
 		if (firstFrame)
 			ImGui::GetIO().Framerate;

@@ -374,13 +374,13 @@ public:
 		ExecuteFrame(gBufferFromLight);
 #pragma endregion
 
-		flush_all_to_gpu; // Grant PhotonAABBs was fully updated
+		//flush_all_to_gpu; // Grant PhotonAABBs was fully updated
 
-		perform(Photontracing);
+		//perform(Photontracing);
 
-		flush_all_to_gpu; // Grant PhotonAABBs was fully updated
+		//flush_all_to_gpu; // Grant PhotonAABBs was fully updated
 
-		perform(BuildPhotonMap);
+		//perform(BuildPhotonMap);
 
 		flush_all_to_gpu; // Grant PhotonMap was fully updated
 

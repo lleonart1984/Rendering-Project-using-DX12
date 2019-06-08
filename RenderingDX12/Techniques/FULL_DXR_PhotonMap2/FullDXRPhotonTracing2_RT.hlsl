@@ -89,10 +89,12 @@ void PTMainRays() {
 	ray.TMin = 0.001;
 	ray.TMax = 10000.0;
 
-	float3 P = Positions[raysIndex];
-	float3 N = Normals[raysIndex];
-	float2 C = Coordinates[raysIndex];
-	Material material = materials[MaterialIndices[raysIndex]];
+	uint2 rayCoordinates = uint2((exiting.xz*0.5 + 0.5)*raysDimensions);
+
+	float3 P = Positions[rayCoordinates];
+	float3 N = Normals[rayCoordinates];
+	float2 C = Coordinates[rayCoordinates];
+	Material material = materials[MaterialIndices[rayCoordinates]];
 	if (!any(P)) // force miss execution
 	{
 		return;
@@ -183,7 +185,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 
 	if (russianRoulette < pdf) // photon stay here
 	{
-		float radius = 0.1;
+		float radius = 0.025;
 
 		Photon p = {
 			WorldRayDirection(), // photon direction

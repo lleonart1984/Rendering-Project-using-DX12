@@ -207,14 +207,15 @@ public:
 	float4x4 lightView, lightProj;
 
 	void Frame() {
+		if (CameraIsDirty) {
 #pragma region Construct GBuffer from viewer
-		Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
+			Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
 
-		gBufferFromViewer->ViewMatrix = view;
-		gBufferFromViewer->ProjectionMatrix = proj;
-		ExecuteFrame(gBufferFromViewer);
+			gBufferFromViewer->ViewMatrix = view;
+			gBufferFromViewer->ProjectionMatrix = proj;
+			ExecuteFrame(gBufferFromViewer);
 #pragma endregion
-
+		}
 
 #pragma region Construct GBuffer from light
 		lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
@@ -236,8 +237,12 @@ public:
 		static int FrameIndex = 0;
 
 		auto rtProgram = dxrPTPipeline->_Program;
-
-		//manager gClear UAV(rtProgram->Output, float4(0, 0, 0, 0));
+		
+		if (CameraIsDirty)
+		{
+			FrameIndex = 0;
+			manager gClear UAV(rtProgram->Output, float4(0, 0, 0, 0));
+		}
 
 		// Update camera
 		// Required during ray-trace stage

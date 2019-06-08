@@ -6,7 +6,7 @@
 struct FullDXRPhotonTracer2 : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
 
-#define DISPATCH_RAYS_DIMENSION 128
+#define DISPATCH_RAYS_DIMENSION 512
 #define NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION)
 
 	// Scene loading process to retain scene on the GPU
@@ -136,7 +136,7 @@ public:
 			void Setup() {
 				_ gSet Payload(4 * (3 + 1 + 3 + 3)); // 3- Normal, 1- SpecularSharpness, 3- OutDiffAcc, 3- OutSpecAcc
 				_ gSet StackSize(3);
-				_ gSet MaxHitGroupIndex(NUMBER_OF_PHOTONS + 1000); // photons + number of geometries
+				_ gSet MaxHitGroupIndex(1 + 1000); // 1 hitgroup for all photons + one hitgroup per number of geometries
 				_ gLoad Shader(Context()->RTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
 				_ gLoad Shader(Context()->PhotonGatheringMiss);
@@ -342,8 +342,8 @@ public:
 		auto sceneInstances = manager gCreate Instances();
 		sceneInstances gLoad Instance(PhotonAABBsOnTheGPU, 2, 0);
 		// Mask 1 to represent triangle (scene) data
-		// contribution is used to offset hit group to tresspass all photons
-		sceneInstances gLoad Instance(sceneGeometriesOnGPU, 1, NUMBER_OF_PHOTONS);
+		// contribution is used to offset hit group to tresspass the photon hitgroup
+		sceneInstances gLoad Instance(sceneGeometriesOnGPU, 1, 1);
 
 		dxrPTPipeline->_Program->Scene = dxrRTPipeline->_Program->Scene = sceneInstances gCreate BakedScene(true, true);
 	}
@@ -368,15 +368,15 @@ public:
 		ExecuteFrame(gBufferFromLight);
 #pragma endregion
 
-		wait_for(signal(flush_all_to_gpu));
+		flush_all_to_gpu;
 
 		perform(Photontracing);
 
-		wait_for(signal(flush_all_to_gpu)); // Grant PhotonAABBs was fully updated
+		flush_all_to_gpu; // Grant PhotonAABBs was fully updated
 
 		perform(BuildPhotonMap);
 
-		//flush_all_to_gpu; // Grant PhotonMap was fully updated
+		flush_all_to_gpu; // Grant PhotonMap was fully updated
 
 		perform(Raytracing);
 	}
@@ -424,7 +424,7 @@ public:
 				ptRTProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
 				ptRTProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-				manager gSet HitGroup(dxrPTPipeline->PhotonMaterial, NUMBER_OF_PHOTONS + i);
+				manager gSet HitGroup(dxrPTPipeline->PhotonMaterial, 1 + i);
 
 				startTriangle += sceneObject.vertexesCount / 3;
 			}
@@ -493,13 +493,7 @@ public:
 
 		if (firstTime) {
 			// Set PhotonGatheringMaterial for each photon in ST
-			for (int i = 0; i < NUMBER_OF_PHOTONS; i++)
-			{
-				rtProgram->CurrentObjectInfo.TriangleOffset = i;
-				rtProgram->CurrentObjectInfo.MaterialIndex = i;
-
-				manager gSet HitGroup(dxrRTPipeline->PhotonGatheringMaterial, i);
-			}
+			manager gSet HitGroup(dxrRTPipeline->PhotonGatheringMaterial, 0);
 			// Setup a simple hitgroup per object
 			// each object knows the offset in triangle buffer
 			// and the material index for further light scattering
@@ -511,7 +505,7 @@ public:
 				rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
 				rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-				manager gSet HitGroup(dxrRTPipeline->RTMaterial, NUMBER_OF_PHOTONS + i);
+				manager gSet HitGroup(dxrRTPipeline->RTMaterial, 1 + i);
 
 				startTriangle += sceneObject.vertexesCount / 3;
 			}

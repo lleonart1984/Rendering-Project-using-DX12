@@ -13,6 +13,7 @@ private:
 // Defines this technique will use a camera
 struct IHasCamera {
 	Camera* Camera;
+	bool CameraIsDirty;
 private:
 	virtual void Boo() {}
 };
@@ -20,6 +21,7 @@ private:
 // Defines this technique will use a light settings
 struct IHasLight {
 	LightSource* Light;
+	bool LightSourceIsDirty;
 private:
 	virtual void Boo() {}
 };
