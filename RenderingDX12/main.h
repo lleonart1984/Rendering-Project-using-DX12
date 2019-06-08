@@ -1,4 +1,5 @@
 #pragma once
+#include "stdafx.h"
 
 #define BUNNY_OBJ 0
 #define RING_OBJ 1
@@ -6,7 +7,7 @@
 #define SIBENIK_OBJ 3
 #define SANMIGUEL_OBJ 4
 
-#define USE_SCENE SPONZA_OBJ  
+#define USE_SCENE RING_OBJ  
 
 // Change this to force every frame camera dirty
 #define PERMANENT_CAMERA_DIRTY false
@@ -35,9 +36,9 @@
 //gObj<RetainedBasicRenderer> technique;
 //gObj<DXRBasicSceneRaytracer> technique;
 //gObj<DXRBasicScenePhotontracer> technique;
-gObj<DXRItPathtracer> technique;
+//gObj<DXRItPathtracer> technique;
 //gObj<DeferredShadingTechnique> technique;
 //gObj<HybridPhotonTracer> technique;
 //gObj<DXRPathtracer> technique;
 //gObj<FullDXRPhotonTracer2> technique; 
-//gObj<FullDXRPhotonTracer> technique;
+gObj<FullDXRPhotonTracer> technique;

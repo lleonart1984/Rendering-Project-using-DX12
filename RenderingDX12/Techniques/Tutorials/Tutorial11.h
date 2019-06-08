@@ -2,7 +2,7 @@
 
 // Drawing a single triangle with ray-tracing
 #include "../../stdafx.h"
-#define RES 128
+#define RES 512
 
 
 class Tutorial11 : public Technique {
@@ -156,9 +156,7 @@ class Tutorial11 : public Technique {
 		manager gSet Pipeline(pipeline);
 		manager gSet Program(rtProgram);
 		manager gSet Miss(pipeline->MyMissShader, 0);
-		for (int i = 0; i < RES; i++)
-			for (int j = 0; j < RES; j++)
-				manager gSet HitGroup(rtProgram->ClosestHit, i * RES + j);
+		manager gSet HitGroup(rtProgram->ClosestHit, 0);
 		manager gSet RayGeneration(pipeline->MyRaygenShader);
 		manager gDispatch Rays(render_target->Width, render_target->Height);
 		manager gCopy All(render_target, rtRenderTarget);

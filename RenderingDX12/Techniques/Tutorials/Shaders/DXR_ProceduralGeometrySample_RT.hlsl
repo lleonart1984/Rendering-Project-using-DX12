@@ -54,8 +54,7 @@ void MyIntersectionShader() {
 	float THit = RayTCurrent();
 	MyAttributes attr = (MyAttributes)float2(RayTCurrent(), THit/20000.0);
 
-	if((int)PrimitiveIndex() <= 10000)
-		ReportHit(0.5, /*hitKind*/ 0, attr);
+	ReportHit(0.5, /*hitKind*/ 0, attr);
 }
 
 [shader("closesthit")]

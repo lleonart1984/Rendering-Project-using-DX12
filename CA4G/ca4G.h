@@ -12194,7 +12194,7 @@ namespace CA4G {
 				else {
 					D3D12_RAYTRACING_GEOMETRY_DESC desc{ };
 					desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE::D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
-					desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION;
+					desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 					desc.AABBs.AABBCount = count;
 					desc.AABBs.AABBs = D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE
 					{
@@ -13142,7 +13142,6 @@ namespace CA4G {
 
 namespace CA4G {
 
-	static bool FORCE_FALLBACK_DEVICE = false;
 
 	// Wrapper to a DX 12 device. Exposes functionalities through Creating, Loading, and Perform interface.
 	class DeviceManager {
@@ -13177,6 +13176,7 @@ namespace CA4G {
 		gObj<Buffer> __NullBuffer = nullptr;
 		gObj<Texture2D> __NullTexture2D = nullptr;
 
+		
 		DeviceManager(DX_Device device, int buffers, bool useFrameBuffer, bool isWarpDevice);
 
 		WRAPPED_GPU_POINTER CreateFallbackWrappedPointer(gObj<Buffer> resource, UINT bufferNumElements);
@@ -13185,6 +13185,7 @@ namespace CA4G {
 		Creating * const creating;
 		Loading * const loading;
 
+		static bool FORCE_FALLBACK_DEVICE;
 
 		// Gets or sets the tag used for next created process
 		int Tag;

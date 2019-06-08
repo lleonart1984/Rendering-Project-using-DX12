@@ -86,12 +86,21 @@ struct PhotonRayPayload
 
 [shader("anyhit")]
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
+	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection() * 0.5;
+
 	Photon p = Photons[attr.PhotonIdx];
 	float3 V = WorldRayDirection();
 	float3 H = normalize(V - p.Direction);
 	float area = pi * p.Radius * p.Radius;
-	payload.OutDiffuseAccum += float3(0.05, 0.05, 0.01);// p.Intensity / area;
-	payload.OutSpecularAccum += p.Intensity*pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
+
+	float d = distance(surfelPosition, p.Position);
+
+	//if (d < p.Radius)
+	{
+		float kernel = 2 - 2 * d / p.Radius;
+		payload.OutDiffuseAccum += float3(10000, 0, 10000);// p.Intensity* kernel / area;
+		payload.OutSpecularAccum += p.Intensity * kernel * pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
+	}
 	IgnoreHit(); // Continue search to accumulate other photons
 }
 
@@ -116,7 +125,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	float3 dir = normalize(float3(1, 1, 1));
 	ray.Origin = surfel.P - dir * 0.001;
 	ray.Direction = dir * 0.002;
-	ray.TMin = 0.0001;
+	ray.TMin = 0.00001;
 	ray.TMax = 1;
 	// Photon Map trace
 	// PhotonMap ADS
@@ -128,7 +137,8 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// ray
 	// raypayload
 	TraceRay(PhotonMap, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 0, 1, ray, photonGatherPayload);
-	return photonGatherPayload.OutDiffuseAccum;// material.Diffuse * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+	//return material.Diffuse / pi * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+	return photonGatherPayload.OutDiffuseAccum;// +material.Specular * photonGatherPayload.OutSpecularAccum;
 }
 
 // Required by Scattering tools header

@@ -5,7 +5,7 @@
 
 struct FullDXRPhotonTracer : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
-#define DISPATCH_RAYS_DIMENSION 128
+#define DISPATCH_RAYS_DIMENSION 512
 #define NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION)
 
 	// Scene loading process to retain scene on the GPU
@@ -345,7 +345,7 @@ public:
 		auto photonMapBuilder = manager gCreate ProceduralGeometries();
 		photonMapBuilder gSet AABBs(PhotonsAABBs);
 		photonMapBuilder gLoad Geometry(0, NUMBER_OF_PHOTONS);
-		PhotonsAABBsOnTheGPU = photonMapBuilder gCreate BakedGeometry(true, true);
+		PhotonsAABBsOnTheGPU = photonMapBuilder gCreate BakedGeometry(true, false);
 
 		// Creates a single instance to refer all static objects in bottom level acc ds.
 		auto photonMapInstance = manager gCreate Instances();
@@ -376,13 +376,13 @@ public:
 
 		//flush_all_to_gpu; // Grant PhotonAABBs was fully updated
 
-		//perform(Photontracing);
+		perform(Photontracing);
 
 		//flush_all_to_gpu; // Grant PhotonAABBs was fully updated
 
-		//perform(BuildPhotonMap);
+		perform(BuildPhotonMap);
 
-		flush_all_to_gpu; // Grant PhotonMap was fully updated
+		//flush_all_to_gpu; // Grant PhotonMap was fully updated
 
 		perform(Raytracing);
 	}

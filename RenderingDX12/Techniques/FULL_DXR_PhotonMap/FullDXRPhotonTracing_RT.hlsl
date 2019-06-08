@@ -71,6 +71,8 @@ void PTMainRays() {
 
 	uint photonIndexInBuffer = raysIndex.x + raysIndex.y * raysDimensions.x;
 
+	PhotonAABBs[photonIndexInBuffer] = (AABB)0;
+	
 	// Turn off existing photon
 	Photons[photonIndexInBuffer].Intensity = 0;
 
@@ -80,7 +82,7 @@ void PTMainRays() {
 
 	RayDesc ray;
 	ray.Origin = LightPosition;
-	float3 exiting = float3(random() * 2 - 1, -1, random() * 2 - 1);
+	float3 exiting = float3(raysIndex.x * 2.0 / raysDimensions.x - 1, -1, raysIndex.y * 2.0 / raysDimensions.y - 1);// float3(random() * 2 - 1, -1, random() * 2 - 1);
 	float fact = length(exiting);
 	ray.Direction = exiting / fact;
 	ray.TMin = 0.001;

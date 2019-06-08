@@ -82,6 +82,8 @@ public:
 	}
 };
 
+bool DeviceManager::FORCE_FALLBACK_DEVICE = false;
+
 int main(int, char**)
 {
     // Create application window
@@ -94,9 +96,9 @@ int main(int, char**)
 	UpdateWindow(hWnd);
 
 #ifdef FORCE_FALLBACK
-	FORCE_FALLBACK_DEVICE = true;
+	DeviceManager::FORCE_FALLBACK_DEVICE = true;
 #else
-	FORCE_FALLBACK_DEVICE = false;
+	DeviceManager::FORCE_FALLBACK_DEVICE = false;
 #endif
 
 #ifdef WARP
