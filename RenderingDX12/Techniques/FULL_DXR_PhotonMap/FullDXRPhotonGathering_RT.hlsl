@@ -9,27 +9,26 @@ struct Photon {
 };
 
 // Top level structure with the scene
-RaytracingAccelerationStructure Scene		: register(t0); // Two Instances (first the geometries AABBs for photon map, second the scene)
+RaytracingAccelerationStructure Scene		: register(t0); 
 // Photon Map
 // > Acceleration structure with the photon map based on AABBs
 RaytracingAccelerationStructure PhotonMap	: register(t1);
+
 // > Photons buffer with photon information (position, direction, alpha and radius)
 StructuredBuffer<Photon> Photons			: register(t2);
-// > Number of photons (to discard intersections with unused AABBs)
-StructuredBuffer<int> PhotonCount			: register(t3);
-StructuredBuffer<Vertex> vertices			: register(t4);
-StructuredBuffer<Material> materials		: register(t5);
+StructuredBuffer<Vertex> vertices			: register(t3);
+StructuredBuffer<Material> materials		: register(t4);
 
 // GBuffer Used for primary rays (from light in photon trace and from viewer in raytrace)
-Texture2D<float3> Positions					: register(t6);
-Texture2D<float3> Normals					: register(t7);
-Texture2D<float2> Coordinates				: register(t8);
-Texture2D<int> MaterialIndices				: register(t9);
+Texture2D<float3> Positions					: register(t5);
+Texture2D<float3> Normals					: register(t6);
+Texture2D<float2> Coordinates				: register(t7);
+Texture2D<int> MaterialIndices				: register(t8);
 // Used for direct light visibility test
-Texture2D<float3> LightPositions			: register(t10);
+Texture2D<float3> LightPositions			: register(t9);
 
 // Textures
-Texture2D<float4> Textures[500]				: register(t11);
+Texture2D<float4> Textures[500]				: register(t10);
 
 RWTexture2D<float3> Output					: register(u0);
 
@@ -90,19 +89,18 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	Photon p = Photons[attr.PhotonIdx];
 	float3 V = WorldRayDirection();
 	float3 H = normalize(V - p.Direction);
-	payload.OutDiffuseAccum += p.Intensity;
-	payload.OutSpecularAccum += p.Intensity*pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness);
-	
-	//payload.OutDiffuseAccum += attr.PhotonIdx/1000.0f*float3(1, 0.1, 0.05);
-
+	float area = pi * p.Radius * p.Radius;
+	payload.OutDiffuseAccum += float3(0.05, 0.05, 0.01);// p.Intensity / area;
+	payload.OutSpecularAccum += p.Intensity*pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
 	IgnoreHit(); // Continue search to accumulate other photons
 }
 
 [shader("intersection")]
 void PhotonGatheringIntersection() {
 	int index = PrimitiveIndex();
-	//if (index < PhotonCount[0]) // It is a valid photon
-		ReportHit(0.1, 0, (PhotonHitAttributes)index);
+	PhotonHitAttributes att;
+	att.PhotonIdx = index;
+	ReportHit(0.001, 0, att);
 }
 
 // Perform photon gathering using DXR API
@@ -115,8 +113,9 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 		/*OutSpecularAccum*/		float3(0,0,0)
 	};
 	RayDesc ray;
-	ray.Origin = surfel.P - V*0.1;
-	ray.Direction = V*0.2;
+	float3 dir = normalize(float3(1, 1, 1));
+	ray.Origin = surfel.P - dir * 0.001;
+	ray.Direction = dir * 0.002;
 	ray.TMin = 0.0001;
 	ray.TMax = 1;
 	// Photon Map trace
@@ -128,8 +127,29 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// 1 : Miss index for PhotonGatheringMiss shader
 	// ray
 	// raypayload
-	//TraceRay(PhotonMap, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 0, 1, ray, photonGatherPayload);
-	return material.Diffuse * photonGatherPayload.OutDiffuseAccum + material.Specular * photonGatherPayload.OutSpecularAccum;
+	TraceRay(PhotonMap, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 0, 1, ray, photonGatherPayload);
+	return photonGatherPayload.OutDiffuseAccum;// material.Diffuse * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+}
+
+// Required by Scattering tools header
+float LightSphereRadius() {
+	return 0.1;
+}
+
+// Required by Scattering tools header
+// Gets true if current surfel is lit by the light source
+// checking not with DXR but with classic shadow maps represented
+// by GBuffer obtained from light
+float ShadowCast(Vertex surfel)
+{
+	float3 pInLightViewSpace = mul(float4(surfel.P, 1), LightView).xyz;
+	float4 pInLightProjSpace = mul(float4(pInLightViewSpace, 1), LightProj);
+	if (pInLightProjSpace.z <= 0)
+		return 0;
+	float2 cToTest = 0.5 + 0.5 * pInLightProjSpace.xy / pInLightProjSpace.w;
+	cToTest.y = 1 - cToTest.y;
+	float3 lightSampleP = LightPositions.SampleGrad(shadowSmp, cToTest, 0, 0);
+	return pInLightViewSpace.z - lightSampleP.z < 0.001;
 }
 
 float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int bounces)
@@ -166,7 +186,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			reflectionRay.TMin = 0.001;
 			reflectionRay.TMax = 10000.0;
 			RayPayload reflectionPayload = { float3(0, 0, 0), bounces - 1 };
-			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, reflectionRay, reflectionPayload);
+			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 1, 1, 0, reflectionRay, reflectionPayload);
 			total += R.w * material.Specular * reflectionPayload.color; /// Mirror and fresnel reflection
 		}
 
@@ -179,7 +199,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			refractionRay.TMin = 0.001;
 			refractionRay.TMax = 10000.0;
 			RayPayload refractionPayload = { float3(0, 0, 0), bounces - 1 };
-			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, refractionRay, refractionPayload);
+			TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 1, 1, 0, refractionRay, refractionPayload);
 			total += T.w * material.Specular * refractionPayload.color;
 		}
 	}
@@ -189,7 +209,6 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 [shader("miss")]
 void EnvironmentMap(inout RayPayload payload)
 {
-	payload.color = WorldRayDirection();
 }
 
 [shader("miss")]
@@ -271,7 +290,7 @@ void RTScattering(inout RayPayload payload, in MyAttributes attr)
 	Material material;
 	GetHitInfo(attr, surfel, material);
 
-	float3 V = -normalize(WorldRayDirection());
+	float3 V = -WorldRayDirection();
 
 	payload.color = RaytracingScattering(V, surfel, material, payload.bounce);
 }

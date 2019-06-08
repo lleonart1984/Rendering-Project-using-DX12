@@ -5,8 +5,8 @@
 
 struct FullDXRPhotonTracer : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
-#define DISPATCH_RAYS_DIMENSION 256
-#define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*3)
+#define DISPATCH_RAYS_DIMENSION 128
+#define NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION)
 
 	// Scene loading process to retain scene on the GPU
 	gObj<RetainedSceneLoader> sceneLoader;
@@ -35,6 +35,7 @@ public:
 		};
 		gObj<DXR_PT_IL> _Library;
 
+		// DXR Photon trace program wrapper
 		struct DXR_PT_Program : public RTProgram<DXR_PT_Pipeline> {
 			void Setup() {
 				_ gSet Payload(16);
@@ -63,7 +64,6 @@ public:
 			// Photon map binding objects
 			gObj<Buffer> PhotonAABBs; // Buffer with generated photon's aabbs for BVH photon map building
 			gObj<Buffer> Photons; // Buffer with all Photon attributes
-			gObj<Buffer> Malloc; // buffer used to allocate memory using InterlockedAdd. one single element needed
 
 			struct ObjInfo {
 				int TriangleOffset;
@@ -74,7 +74,6 @@ public:
 			void Globals() {
 				UAV(0, PhotonAABBs);
 				UAV(1, Photons);
-				UAV(2, Malloc);
 
 				ADS(0, Scene);
 				SRV(1, Vertices);
@@ -137,7 +136,7 @@ public:
 			void Setup() {
 				_ gSet Payload(4 * (3 + 1 + 3 + 3)); // 3- Normal, 1- SpecularSharpness, 3- OutDiffAcc, 3- OutSpecAcc
 				_ gSet StackSize(3);
-				_ gSet MaxHitGroupIndex(MAX_NUMBER_OF_PHOTONS+1);
+				_ gSet MaxHitGroupIndex(1+1000); // max number of geometries
 				_ gLoad Shader(Context()->RTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
 				_ gLoad Shader(Context()->PhotonGatheringMiss);
@@ -148,7 +147,6 @@ public:
 			gObj<SceneOnGPU> Scene;
 			gObj<SceneOnGPU> PhotonMap;
 			gObj<Buffer> Photons;
-			gObj<Buffer> PhotonCount;
 
 			gObj<Buffer> Vertices;
 			gObj<Buffer> Materials;
@@ -184,19 +182,18 @@ public:
 				ADS(1, PhotonMap);
 
 				SRV(2, Photons);
-				SRV(3, PhotonCount);
 
-				SRV(4, Vertices);
-				SRV(5, Materials);
+				SRV(3, Vertices);
+				SRV(4, Materials);
 
-				SRV(6, Positions);
-				SRV(7, Normals);
-				SRV(8, Coordinates);
-				SRV(9, MaterialIndices);
+				SRV(5, Positions);
+				SRV(6, Normals);
+				SRV(7, Coordinates);
+				SRV(8, MaterialIndices);
 
-				SRV(10, LightPositions);
+				SRV(9, LightPositions);
 
-				SRV_Array(11, Textures, TextureCount);
+				SRV_Array(10, Textures, TextureCount);
 
 				Static_SMP(0, Sampler::Linear());
 				Static_SMP(1, Sampler::LinearWithoutMipMaps());
@@ -253,13 +250,15 @@ public:
 		gBufferFromViewer->sceneLoader = this->sceneLoader;
 		_ gLoad Subprocess(gBufferFromViewer);
 
-		wait_for(signal(flush_all_to_gpu));
+		flush_all_to_gpu;
 
 		_ gLoad Pipeline(dxrPTPipeline);
 		_ gLoad Pipeline(dxrRTPipeline);
 
 		// Load assets to render the deferred lighting image
 		perform(CreatingAssets);
+
+		flush_all_to_gpu;
 
 		perform(CreateSceneOnGPU);
 	}
@@ -271,30 +270,20 @@ public:
 		float Radius;
 	};
 
+	double doubleRand() {
+		return double(rand()) / (double(RAND_MAX) + 1.0);
+	}
 
 	void CreatingAssets(gObj<CopyingManager> manager) {
-
-		// load screen vertices
-		screenVertices = _ gCreate VertexBuffer<float2>(6);
-		manager gCopy ListData(screenVertices, {
-				float2(-1, 1),
-				float2(1, 1),
-				float2(1, -1),
-
-				float2(1, -1),
-				float2(-1, -1),
-				float2(-1, 1),
-			});
-
 		// Photons aabbs used in bottom level structure building and updates
-		PhotonsAABBs = _ gCreate RWAccelerationDatastructureBuffer<D3D12_RAYTRACING_AABB>(MAX_NUMBER_OF_PHOTONS);
-		D3D12_RAYTRACING_AABB* aabbs = new D3D12_RAYTRACING_AABB[MAX_NUMBER_OF_PHOTONS];
-		for (int i = 0; i < MAX_NUMBER_OF_PHOTONS; i++)
+		PhotonsAABBs = _ gCreate RWAccelerationDatastructureBuffer<D3D12_RAYTRACING_AABB>(NUMBER_OF_PHOTONS);
+		D3D12_RAYTRACING_AABB* aabbs = new D3D12_RAYTRACING_AABB[NUMBER_OF_PHOTONS];
+		for (int i = 0; i < NUMBER_OF_PHOTONS; i++)
 		{
-			float x = 2*(rand() % 1000) / 1000.0f - 1;
-			float y = 2*(rand() % 1000) / 1000.0f - 1;
-			float z = 2*(rand() % 1000) / 1000.0f - 1;
-			aabbs[i] = { x,y,z, x + 0.01f, y + 0.01f ,z + 0.01f };
+			float x = 2 * doubleRand() - 1;
+			float y = 2 * doubleRand() - 1;
+			float z = 2 * doubleRand() - 1;
+			aabbs[i] = { x,y,z, x + 0.001f, y + 0.001f ,z + 0.001f };
 		}
 		manager gCopy PtrData(PhotonsAABBs, aabbs);
 		delete aabbs;
@@ -310,8 +299,7 @@ public:
 		dxrPTPipeline->_Program->CameraCB = _ gCreate ConstantBuffer<float4x4>();
 		dxrPTPipeline->_Program->LightingCB = _ gCreate ConstantBuffer<Lighting>();
 		dxrPTPipeline->_Program->PhotonAABBs = PhotonsAABBs;
-		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(MAX_NUMBER_OF_PHOTONS);
-		dxrPTPipeline->_Program->Malloc = _ gCreate RWStructuredBuffer<int>(4);
+		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(NUMBER_OF_PHOTONS);
 #pragma endregion
 
 #pragma region DXR Photon gathering Pipeline Objects
@@ -331,7 +319,6 @@ public:
 		// Bind now Photon map as SRVs
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 		// Photon counter during photon trace is used to decide wich photons are 
-		dxrRTPipeline->_Program->PhotonCount = dxrPTPipeline->_Program->Malloc;
 #pragma endregion
 	}
 
@@ -357,7 +344,7 @@ public:
 
 		auto photonMapBuilder = manager gCreate ProceduralGeometries();
 		photonMapBuilder gSet AABBs(PhotonsAABBs);
-		photonMapBuilder gLoad Geometry(0, MAX_NUMBER_OF_PHOTONS);
+		photonMapBuilder gLoad Geometry(0, NUMBER_OF_PHOTONS);
 		PhotonsAABBsOnTheGPU = photonMapBuilder gCreate BakedGeometry(true, true);
 
 		// Creates a single instance to refer all static objects in bottom level acc ds.
@@ -387,13 +374,15 @@ public:
 		ExecuteFrame(gBufferFromLight);
 #pragma endregion
 
+		flush_all_to_gpu; // Grant PhotonAABBs was fully updated
+
 		perform(Photontracing);
 
-		//flush_all_to_gpu; // Grant PhotonAABBs was fully updated
+		flush_all_to_gpu; // Grant PhotonAABBs was fully updated
 
 		perform(BuildPhotonMap);
 
-		//flush_all_to_gpu; // Grant PhotonMap was fully updated
+		flush_all_to_gpu; // Grant PhotonMap was fully updated
 
 		perform(Raytracing);
 	}
@@ -419,8 +408,6 @@ public:
 		manager gSet Pipeline(dxrPTPipeline);
 		// Activate program with main shaders
 		manager gSet Program(ptRTProgram);
-
-		manager gClear UAV(ptRTProgram->Malloc, 0U); // reset allocation pointer
 
 		int startTriangle;
 
@@ -459,7 +446,7 @@ public:
 		auto geomUpdater = manager gCreate ProceduralGeometries(PhotonsAABBsOnTheGPU);
 		geomUpdater->PrepareBuffer(PhotonsAABBs);
 		geomUpdater gSet AABBs(PhotonsAABBs);
-		geomUpdater gLoad Geometry(0, MAX_NUMBER_OF_PHOTONS);
+		geomUpdater gLoad Geometry(0, NUMBER_OF_PHOTONS);
 		geomUpdater gCreate UpdatedGeometry();
 #pragma endregion
 	}

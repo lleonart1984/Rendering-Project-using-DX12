@@ -92,9 +92,8 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	float3 V = WorldRayDirection();
 	float3 H = normalize(V - p.Direction);
 	float area = pi * p.Radius * p.Radius;
-	payload.OutDiffuseAccum += p.Intensity / area;
+	payload.OutDiffuseAccum += float3(0.05, 0.05, 0.01);// p.Intensity / area;
 	payload.OutSpecularAccum += p.Intensity*pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
-
 	IgnoreHit(); // Continue search to accumulate other photons
 }
 
@@ -105,7 +104,7 @@ void PhotonGatheringIntersection() {
 	int index = objectInfo.MaterialIndex;
 	PhotonHitAttributes att;
 	att.PhotonIdx = index;
-	ReportHit(0.01, 0, att);
+	ReportHit(0.001, 0, att);
 }
 
 [shader("miss")]
@@ -138,7 +137,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// ray
 	// raypayload
 	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, IS_PHOTON_MASK, 0, 1, 1, ray, photonGatherPayload);
-	return material.Diffuse * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+	return photonGatherPayload.OutDiffuseAccum;// material.Diffuse * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
 }
 
 float LightSphereRadius() {
