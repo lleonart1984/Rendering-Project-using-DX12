@@ -38,7 +38,7 @@
 //gObj<DXRBasicScenePhotontracer> technique;
 //gObj<DXRItPathtracer> technique;
 //gObj<DeferredShadingTechnique> technique;
-//gObj<HybridPhotonTracer> technique;
+gObj<HybridPhotonTracer> technique;
 //gObj<DXRPathtracer> technique;
 //gObj<FullDXRPhotonTracer2> technique; 
-gObj<FullDXRPhotonTracer> technique;
+//gObj<FullDXRPhotonTracer> technique;

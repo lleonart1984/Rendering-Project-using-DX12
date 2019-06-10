@@ -100,7 +100,7 @@ void PTMainRays() {
 
 	RayDesc ray;
 	ray.Origin = LightPosition;
-	float3 exiting = float3(random() * 2 - 1, -1, random() * 2 - 1);
+	float3 exiting = float3(raysIndex.x*2.0 / raysDimensions.x - 1, -1, raysIndex.y*2.0 / raysDimensions.y - 1);// float3(random() * 2 - 1, -1, random() * 2 - 1);
 	float fact = length(exiting);
 	ray.Direction = exiting / fact;
 	ray.TMin = 0.001;
@@ -191,7 +191,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 	bool exiting = NdotV < 0;
 	float3 fN = exiting ? -surfel.N : surfel.N;
 
-	if (material.Roulette.x > 0 && NdotV > 0) // Material has some diffuse component
+	if (material.Roulette.x > 0 && NdotV > 0.001) // Material has some diffuse component
 	{ // Store the photon in the photon map
 		int cellIndex = FromPositionToCellIndex(surfel.P); // get the cellindex of the volume grid given the position in space
 		if (cellIndex != -1) {

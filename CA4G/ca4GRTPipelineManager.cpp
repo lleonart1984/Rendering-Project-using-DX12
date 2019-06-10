@@ -288,6 +288,47 @@ namespace CA4G {
 
 		return result;
 	}
+	
+	gObj<GeometriesOnGPU> GeometryCollection::Creating::RebuiltGeometry(bool allowUpdates, bool preferFastTrace) {
+		
+		if (!manager->isUpdating)
+			throw CA4GException("Can not rebuild a geometry is being created.");
+
+		// creates the bottom level acc ds and emulated gpu pointer if necessary
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags =
+			(preferFastTrace ? D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE : D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD)
+			| (allowUpdates ? D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE : D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE);
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+		inputs.Flags = buildFlags;
+		inputs.NumDescs = manager->geometries->size();
+		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+		inputs.pGeometryDescs = &manager->geometries->first();
+
+		// Bottom Level Acceleration Structure desc
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
+		{
+			bottomLevelBuildDesc.Inputs = inputs;
+			bottomLevelBuildDesc.ScratchAccelerationStructureData = this->manager->updatingGeometry->scratchBottomLevelAccDS->resource->GetGPUVirtualAddress();
+			bottomLevelBuildDesc.DestAccelerationStructureData = this->manager->updatingGeometry->bottomLevelAccDS->resource->GetGPUVirtualAddress();
+		}
+
+		if (manager->manager->fallbackDevice != nullptr)
+		{
+			ID3D12DescriptorHeap *pDescriptorHeaps[] = {
+				manager->manager->descriptors->gpu_csu->getInnerHeap(),
+				manager->manager->descriptors->gpu_smp->getInnerHeap() };
+			manager->cmdList->fallbackCmdList->SetDescriptorHeaps(ARRAYSIZE(pDescriptorHeaps), pDescriptorHeaps);
+			manager->cmdList->fallbackCmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+		}
+		else
+			manager->cmdList->cmdList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+
+		manager->updatingGeometry->bottomLevelAccDS->BarrierUAV(manager->cmdList->cmdList);
+
+		return manager->updatingGeometry;
+	}
+
 	gObj<GeometriesOnGPU> GeometryCollection::Creating::UpdatedGeometry() {
 		if (!manager->isUpdating)
 			throw CA4GException("Can not update a geometry is being created.");
@@ -328,6 +369,11 @@ namespace CA4G {
 	void GeometryCollection::PrepareBuffer(gObj<Buffer> bufferForGeometry) {
 		bufferForGeometry->BarrierUAV(cmdList->cmdList);
 		bufferForGeometry->ChangeStateTo(cmdList->cmdList, D3D12_RESOURCE_STATE_GENERIC_READ);
+	}
+
+	void ProceduralGeometryCollection::Setting::AABBs(gObj<Buffer> aabbs) {
+		aabbs->ChangeStateTo(manager->cmdList->cmdList, D3D12_RESOURCE_STATE_GENERIC_READ);
+		manager->boundAABBs = aabbs;
 	}
 
 	gObj<SceneOnGPU> InstanceCollection::Creating::BakedScene(bool allowUpdate, bool preferFastTrace) {

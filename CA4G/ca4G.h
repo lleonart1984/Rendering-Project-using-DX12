@@ -10617,6 +10617,7 @@ namespace CA4G {
 		friend TriangleGeometryCollection;
 		friend InstanceCollection;
 		friend IRTProgram;
+		friend ProceduralGeometryCollection;
 
 		// Used for binding and other scenarios to synchronize the usage of the resource
 		// barriering the states changes.
@@ -10775,6 +10776,10 @@ namespace CA4G {
 		V* CreateCastView()
 		{
 			return new V(this->resource, this->arraySliceStart, this->arraySliceCount, this->mipSliceStart, this->mipSliceCount);
+		}
+
+		void SetDebugName(LPCWSTR name) {
+			this->resource->internalResource->SetName(name);
 		}
 	};
 
@@ -12036,6 +12041,7 @@ namespace CA4G {
 		public:
 			gObj<GeometriesOnGPU> BakedGeometry(bool allowUpdates = false, bool preferFastTrace = true);
 			gObj<GeometriesOnGPU> UpdatedGeometry();
+			gObj<GeometriesOnGPU> RebuiltGeometry(bool allowUpdates = false, bool preferFastTrace = true);
 		} *const creating;
 	};
 
@@ -12212,9 +12218,7 @@ namespace CA4G {
 			Setting(ProceduralGeometryCollection* manager) :manager(manager) {}
 
 		public:
-			void AABBs(gObj<Buffer> aabbs) {
-				manager->boundAABBs = aabbs;
-			}
+			void AABBs(gObj<Buffer> aabbs);
 		} *const setting;
 	};
 
@@ -13302,7 +13306,6 @@ namespace CA4G {
 			auto hr = manager->device->CreateCommittedResource(
 				cpuAccess == CPU_ACCESS_NONE ? &defaultProp : cpuAccess == CPU_WRITE_GPU_READ ? &uploadProp : &downloadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, state, clearDefault,
 				IID_PPV_ARGS(&resource));
-
 			if (FAILED(hr))
 			{
 				auto _hr = manager->device->GetDeviceRemovedReason();
@@ -13525,6 +13528,7 @@ namespace CA4G {
 		friend Copying;
 		friend GPUScheduler;
 		friend TriangleGeometryCollection;
+		friend ProceduralGeometryCollection;
 
 		// Indicates the command list was closed and can be sent to the allocator
 		bool closed;

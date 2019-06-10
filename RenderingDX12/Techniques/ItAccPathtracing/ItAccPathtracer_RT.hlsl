@@ -148,7 +148,7 @@ void EnvironmentMap(inout RayPayload payload)
 {
 }
 
-#define PATHS_PER_PASS 10
+#define PATHS_PER_PASS 1
 
 [shader("raygeneration")]
 void PTMainRays()

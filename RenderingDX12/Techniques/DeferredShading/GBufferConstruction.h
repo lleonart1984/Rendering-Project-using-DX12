@@ -102,9 +102,13 @@ protected:
 		pipeline->globals = _ gCreate ConstantBuffer<Globals>();
 
 		pipeline->GBuffer_P = _ gCreate DrawableTexture2D<float4>(width, height);
+		pipeline->GBuffer_P->SetDebugName(L"GBuffer Positions");
 		pipeline->GBuffer_N = _ gCreate DrawableTexture2D<float4>(width, height);
+		pipeline->GBuffer_N->SetDebugName(L"GBuffer Normals");
 		pipeline->GBuffer_C = _ gCreate DrawableTexture2D<float4>(width, height);
+		pipeline->GBuffer_C->SetDebugName(L"GBuffer Coordinates");
 		pipeline->GBuffer_M = _ gCreate DrawableTexture2D<int>(width, height);
+		pipeline->GBuffer_M->SetDebugName(L"GBuffer Materials");
 
 		pipeline->TextureCount = sceneLoader->TextureCount;
 		pipeline->Textures = sceneLoader->Textures;

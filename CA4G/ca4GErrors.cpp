@@ -1,6 +1,5 @@
 #include "ca4G_Private.h"
 
-
 namespace CA4G {
 
 	CA4GException CA4GException::FromError(CA4G_Errors error, const char * arg, HRESULT hr) {

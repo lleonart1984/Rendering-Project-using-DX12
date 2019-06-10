@@ -81,7 +81,7 @@ struct PhotonRayPayload
 	float3 InNormal;
 	float InSpecularSharpness;
 	float3 OutDiffuseAccum;
-	float3 OutSpecularAccum;
+	//float3 OutSpecularAccum;
 };
 
 #include "../CommonGI/ScatteringTools.h"
@@ -91,8 +91,8 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection()*0.5;
 	
 	Photon p = Photons[attr.PhotonIdx];
-	float3 V = WorldRayDirection();
-	float3 H = normalize(V - p.Direction);
+	//float3 V = WorldRayDirection();
+	//float3 H = normalize(V - p.Direction);
 	float area = pi * p.Radius * p.Radius;
 
 	float d = distance(surfelPosition, p.Position);
@@ -100,8 +100,8 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	if (d < p.Radius)
 	{
 		float kernel = 2 - 2 * d / p.Radius;
-		payload.OutDiffuseAccum += p.Intensity * kernel / area;
-		payload.OutSpecularAccum += p.Intensity* kernel*pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
+		payload.OutDiffuseAccum += p.Intensity * kernel * saturate(dot(payload.InNormal, -p.Direction)) / area;
+		//payload.OutSpecularAccum += p.Intensity* kernel*pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
 	}
 	IgnoreHit(); // Continue search to accumulate other photons
 }
@@ -127,8 +127,8 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	PhotonRayPayload photonGatherPayload = {
 		/*InNormal*/				surfel.N,
 		/*InSpecularSharpness*/		material.SpecularSharpness,
-		/*OutDiffuseAccum*/			float3(0,0,0),
-		/*OutSpecularAccum*/		float3(0,0,0)
+		/*OutDiffuseAccum*/			float3(0,0,0)//,
+		///*OutSpecularAccum*/		float3(0,0,0)
 	};
 	RayDesc ray;
 	float3 dir = normalize(float3(1, 1, 1));
@@ -202,7 +202,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			reflectionRay.TMin = 0.001;
 			reflectionRay.TMax = 10000.0;
 			RayPayload reflectionPayload = { float3(0, 0, 0), bounces - 1 };
-			TraceRay(Scene, RAY_FLAG_NONE, IS_TRIANGLE_MASK, 0, 1, 0, reflectionRay, reflectionPayload);
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, IS_TRIANGLE_MASK, 1, 1, 0, reflectionRay, reflectionPayload);
 			total += R.w * material.Specular * reflectionPayload.color; /// Mirror and fresnel reflection
 		}
 
@@ -215,7 +215,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			refractionRay.TMin = 0.001;
 			refractionRay.TMax = 10000.0;
 			RayPayload refractionPayload = { float3(0, 0, 0), bounces - 1 };
-			TraceRay(Scene, RAY_FLAG_NONE, IS_TRIANGLE_MASK, 0, 1, 0, refractionRay, refractionPayload);
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, IS_TRIANGLE_MASK, 1, 1, 0, refractionRay, refractionPayload);
 			total += T.w * material.Specular * refractionPayload.color;
 		}
 	}

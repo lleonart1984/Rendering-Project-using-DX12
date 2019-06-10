@@ -10,7 +10,7 @@ public:
 	}
 #define RESOLUTION 128
 #define DISPATCH_RAYS_DIMENSION 512
-#define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*3)
+#define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*2)
 
 	// Scene loading process to retain scene on the GPU
 	gObj<RetainedSceneLoader> sceneLoader;
@@ -91,7 +91,6 @@ public:
 				SRV(4, Normals);
 				SRV(5, Coordinates);
 				SRV(6, MaterialIndices);
-
 
 				SRV_Array(7, Textures, TextureCount);
 
@@ -365,16 +364,19 @@ public:
 #pragma endregion
 		}
 
+		static bool firstTime = true;
 
+		if (firstTime) {
 #pragma region Construct GBuffer from light
-		lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
-		lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
-		gBufferFromLight->ViewMatrix = lightView;
-		gBufferFromLight->ProjectionMatrix = lightProj;
-		ExecuteFrame(gBufferFromLight);
+			lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
+			lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
+			gBufferFromLight->ViewMatrix = lightView;
+			gBufferFromLight->ProjectionMatrix = lightProj;
+			ExecuteFrame(gBufferFromLight);
 #pragma endregion
 
-		perform(Photontracing);
+			perform(Photontracing);
+		}
 
 		perform(Raytracing);
 
