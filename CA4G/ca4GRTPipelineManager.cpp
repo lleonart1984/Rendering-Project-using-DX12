@@ -198,7 +198,7 @@ namespace CA4G {
 		}
 		else {
 			D3D12_RAYTRACING_INSTANCE_DESC d{ };
-			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
+			d.Flags = D3D12_RAYTRACING_INSTANCE_FLAGS::D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 			FillMat4x3(d.Transform, transform);
 			d.InstanceMask = mask;
 			d.InstanceContributionToHitGroupIndex = instanceContribution;

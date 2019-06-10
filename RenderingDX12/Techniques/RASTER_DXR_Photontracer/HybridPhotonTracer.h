@@ -9,7 +9,7 @@ public:
 	~HybridPhotonTracer() {
 	}
 #define RESOLUTION 128
-#define DISPATCH_RAYS_DIMENSION 512
+#define DISPATCH_RAYS_DIMENSION 1024
 #define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*2)
 
 	// Scene loading process to retain scene on the GPU
@@ -136,7 +136,7 @@ public:
 		struct DXR_RT_Program : public RTProgram<DXR_RT_Pipeline> {
 			void Setup() {
 				_ gSet Payload(16);
-				_ gSet StackSize(3);
+				_ gSet StackSize(2);
 				_ gLoad Shader(Context()->RTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
 				_ gCreate HitGroup(Context()->RTMaterial, Context()->RTScattering, nullptr, nullptr);

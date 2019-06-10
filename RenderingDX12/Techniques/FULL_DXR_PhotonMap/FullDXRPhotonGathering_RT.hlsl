@@ -79,7 +79,7 @@ struct PhotonRayPayload
 	float3 InNormal;
 	float InSpecularSharpness;
 	float3 OutDiffuseAccum;
-	float3 OutSpecularAccum;
+	//float3 OutSpecularAccum;
 };
 
 #include "../CommonGI/ScatteringTools.h"
@@ -95,11 +95,14 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 
 	float d = distance(surfelPosition, p.Position);
 
-	//if (d < p.Radius)
+	float NdotP = dot(payload.InNormal, -p.Direction);
+
+	if (d < p.Radius && NdotP > 0.001)
 	{
 		float kernel = 2 - 2 * d / p.Radius;
-		payload.OutDiffuseAccum += float3(10000, 0, 10000);// p.Intensity* kernel / area;
-		payload.OutSpecularAccum += p.Intensity * kernel * pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
+		//payload.OutDiffuseAccum += (p.Intensity > 0 ? float3(1, 0, 1) : float3(1, 1, 0)) * 0.1;/// p.Intensity* NdotP* kernel / area;
+		payload.OutDiffuseAccum += p.Intensity * NdotP * kernel / area;
+		//payload.OutSpecularAccum += p.Intensity * kernel * pow(saturate(dot(payload.InNormal, H)), payload.InSpecularSharpness) / area;
 	}
 	IgnoreHit(); // Continue search to accumulate other photons
 }
@@ -118,13 +121,13 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	PhotonRayPayload photonGatherPayload = { 
 		/*InNormal*/				surfel.N,
 		/*InSpecularSharpness*/		material.SpecularSharpness,
-		/*OutDiffuseAccum*/			float3(0,0,0),
-		/*OutSpecularAccum*/		float3(0,0,0)
+		/*OutDiffuseAccum*/			float3(0,0,0) //,
+		///*OutSpecularAccum*/		float3(0,0,0)
 	};
 	RayDesc ray;
 	float3 dir = normalize(float3(1, 1, 1));
-	ray.Origin = surfel.P - dir * 0.001;
-	ray.Direction = dir * 0.002;
+	ray.Origin = surfel.P - dir * 0.0001;
+	ray.Direction = dir * 0.0002;
 	ray.TMin = 0.00001;
 	ray.TMax = 1;
 	// Photon Map trace
@@ -137,8 +140,8 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// ray
 	// raypayload
 	TraceRay(PhotonMap, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 0, 1, ray, photonGatherPayload);
-	//return material.Diffuse / pi * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
-	return photonGatherPayload.OutDiffuseAccum;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+	//return photonGatherPayload.OutDiffuseAccum;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+	return material.Roulette.x * material.Diffuse / pi * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
 }
 
 // Required by Scattering tools header
@@ -265,7 +268,7 @@ void RTMainRays()
 	AugmentMaterialWithTextureMapping(surfel, material);
 
 	// Write the raytraced color to the output texture.
-	Output[DispatchRaysIndex().xy] = RaytracingScattering(V, surfel, material, 2);
+	Output[DispatchRaysIndex().xy] = RaytracingScattering(V, surfel, material, 1);
 }
 
 void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)

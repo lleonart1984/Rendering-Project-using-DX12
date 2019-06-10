@@ -38,7 +38,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 	float d = length(L);
 	L /= d;
 
-	float3 Lin = LightIntensity / (4 * 3.14159*max(0.1, d * d));
+	float3 Lin = LightIntensity / (4 * 3.1415 * 3.14159*max(0.1, d * d));
 
 	float3 DiffTex = Texture_Mask.x > 0 ? Diffuse_Texture.Sample(Sampler, input.uv) : 1;
 	float3 SpecularTex = Texture_Mask.y > 0 ? Specular_Texture.Sample(Sampler, input.uv) : 0;
@@ -48,9 +48,9 @@ float4 PSMain(PSInput input) : SV_TARGET
 	if (MaskTex.x < 0.5)
 		clip(-1);
 
-	float3x3 worldToTangent = { input.tangent, input.binormal, input.normal };
+	float3x3 worldToTangent = { normalize(input.tangent), normalize(input.binormal), input.normal };
 
-	float3 normal = normalize(mul(BumpTex * 2 - 1, worldToTangent));
+	float3 normal = input.normal;// normalize(mul(BumpTex * 2 - 1, worldToTangent));
 
 	float3 V = normalize(-input.position);
 	float3 H = normalize(V + L);
@@ -59,7 +59,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 	float NdotH = NdotL < 0 ? 0 : max(0, dot(normal, H));
 
 	float3 diff = Diffuse * DiffTex / 3.14159;
-	float3 spec = max(Specular, SpecularTex) * pow(NdotH, SpecularSharpness);
+	float3 spec = max(Specular, SpecularTex)* pow(NdotH, SpecularSharpness);
 
 	float3 light = (
 		Roulette.x * diff * NdotL +

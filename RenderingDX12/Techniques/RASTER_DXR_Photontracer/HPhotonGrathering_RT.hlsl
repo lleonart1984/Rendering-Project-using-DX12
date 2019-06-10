@@ -102,7 +102,7 @@ int FromPositionToCellIndex(float3 P) {
 // Perform photon gathering
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
 
-	float radius = 0.025;// 4 * max(CellSize.x, max(CellSize.y, CellSize.z));
+	float radius = 0.02;// 4 * max(CellSize.x, max(CellSize.y, CellSize.z));
 
 	int3 begCell = FromPositionToCell(surfel.P - radius);
 	int3 endCell = FromPositionToCell(surfel.P + radius);
@@ -128,18 +128,18 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 				float photonDistance = length(p.Position - surfel.P);
 
 				// Aggregate current Photon contribution if inside radius
-				if (photonDistance < radius && NdotL > 0)
+				if (photonDistance < radius && NdotL > 0.001)
 				{
 					// Lambert Diffuse component (normalized dividing by pi)
 					float3 DiffuseRatio = DiffuseBRDF(V, -p.Direction, surfel.N, NdotL, material);
 					// Blinn Specular component (normalized multiplying by (2+n)/(2pi)
-					float3 SpecularRatio = SpecularBRDF(V, -p.Direction, surfel.N, NdotL, material);
+					//float3 SpecularRatio = SpecularBRDF(V, -p.Direction, surfel.N, NdotL, material);
 
 					float kernel = 2 * (1 - photonDistance / radius);
 
 					float3 BRDF =
-						material.Roulette.x * DiffuseRatio
-						+ material.Roulette.y * SpecularRatio;
+						material.Roulette.x * material.Diffuse / pi;// *DiffuseRatio;
+						//+ material.Roulette.y * SpecularRatio;
 
 					totalLighting += NdotL * kernel * p.Intensity * BRDF;
 				}

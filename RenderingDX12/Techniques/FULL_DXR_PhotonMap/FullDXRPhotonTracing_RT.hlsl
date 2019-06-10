@@ -71,14 +71,17 @@ void PTMainRays() {
 
 	uint photonIndexInBuffer = raysIndex.x + raysIndex.y * raysDimensions.x;
 
-	PhotonAABBs[photonIndexInBuffer] = (AABB)0;
 	
 	// Turn off existing photon
 	Photons[photonIndexInBuffer].Intensity = 0;
 
-	int rayId = raysIndex.x + raysIndex.y*raysDimensions.x + raysDimensions.x * raysDimensions.y * 0;
+	int rayId = raysIndex.x + raysIndex.y*raysDimensions.x + 17 * raysDimensions.x * raysDimensions.y * 0;
 	// Initialize random iterator using rays index as seed
 	initializeRandom(rayId);
+
+	PhotonAABBs[photonIndexInBuffer] = (AABB)0;
+	//PhotonAABBs[photonIndexInBuffer].Minimum = float3(random(), random(), random()) * 2 - 1;// (AABB)0;
+	//PhotonAABBs[photonIndexInBuffer].Maximum = PhotonAABBs[photonIndexInBuffer].Minimum + 0.001;
 
 	RayDesc ray;
 	ray.Origin = LightPosition;
@@ -102,7 +105,7 @@ void PTMainRays() {
 	N = mul(float4(N, 0), ViewToWorld).xyz;
 	float3 L = normalize(LightPosition - P); // V is really L in this case, since the "viewer" is positioned in light position to trace rays
 
-	RayPayload payload = { LightIntensity * 100000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), 2 };
+	RayPayload payload = { LightIntensity * 100000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), 1 };
 
 	Vertex surfel = {
 		P,
@@ -177,27 +180,31 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 
 	uint photonIndexInBuffer = raysIndex.x + raysIndex.y * raysDimensions.x;
 
+	initializeRandom(photonIndexInBuffer + raysDimensions.x*raysDimensions.y*payload.bounce);
 	float russianRoulette = random();
-	float pdf = material.Roulette.x * 0.5;
+	float pdf = material.Roulette.x * 0.5;// *0.002;
 
 	if (russianRoulette < pdf) // photon stay here
 	{
-		float radius = 0.001;
+		if (NdotV > 0.001) 
+		{
+			float radius = 0.04;
 
-		Photon p = {
-			WorldRayDirection(), // photon direction
-			payload.color * (1 / pdf), // photon intensity in a specific area
-			surfel.P,
-			radius // photon radius
-		};
+			Photon p = {
+				WorldRayDirection(), // photon direction
+				payload.color / NdotV * (1 / pdf), // photon intensity in a specific area
+				surfel.P,
+				radius // photon radius
+			};
 
-		AABB box = {
-			surfel.P - radius,
-			surfel.P + radius
-		};
+			AABB box = {
+				surfel.P - radius,
+				surfel.P + radius
+			};
 
-		PhotonAABBs[photonIndexInBuffer] = box;
-		Photons[photonIndexInBuffer] = p;
+			PhotonAABBs[photonIndexInBuffer] = box;
+			Photons[photonIndexInBuffer] = p;
+		}
 	}
 	else
 		if (payload.bounce > 0) // Photon can bounce one more time

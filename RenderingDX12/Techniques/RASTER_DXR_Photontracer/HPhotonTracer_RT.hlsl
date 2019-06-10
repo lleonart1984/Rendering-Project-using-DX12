@@ -185,6 +185,13 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 	Material material;
 	GetHitInfo(attr, surfel, material);
 
+	uint2 raysIndex = DispatchRaysIndex();
+	uint2 raysDimensions = DispatchRaysDimensions();
+
+	int rayId = raysIndex.x + raysIndex.y * raysDimensions.x + raysDimensions.x * raysDimensions.y * payload.bounce;
+	// Initialize random iterator using rays index as seed
+	initializeRandom(rayId);
+
 	float3 V = -WorldRayDirection();
 
 	float NdotV = dot(V, surfel.N);

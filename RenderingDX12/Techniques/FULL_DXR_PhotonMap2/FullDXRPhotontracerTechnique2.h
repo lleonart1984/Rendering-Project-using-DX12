@@ -6,7 +6,7 @@
 struct FullDXRPhotonTracer2 : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
 
-#define DISPATCH_RAYS_DIMENSION 512
+#define DISPATCH_RAYS_DIMENSION 1024
 #define NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION)
 
 	// Scene loading process to retain scene on the GPU
@@ -383,7 +383,7 @@ public:
 		gBufferFromLight->ProjectionMatrix = lightProj;
 		ExecuteFrame(gBufferFromLight);
 #pragma endregion
-		//wait_for(signal(flush_all_to_gpu));
+		flush_all_to_gpu;
 
 		static bool firstTime = true;
 
@@ -394,7 +394,7 @@ public:
 
 			perform(CreatePhotonMapAndScene);
 
-			//wait_for(signal(flush_all_to_gpu));
+			wait_for(signal(flush_all_to_gpu));
 
 			firstTime = false;
 		}

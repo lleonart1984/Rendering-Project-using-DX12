@@ -5,7 +5,7 @@
 
 struct FullDXRPhotonTracer : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
-#define DISPATCH_RAYS_DIMENSION 512
+#define DISPATCH_RAYS_DIMENSION 1024
 #define NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION)
 
 	// Scene loading process to retain scene on the GPU
@@ -39,7 +39,7 @@ public:
 		struct DXR_PT_Program : public RTProgram<DXR_PT_Pipeline> {
 			void Setup() {
 				_ gSet Payload(16);
-				_ gSet StackSize(3);
+				_ gSet StackSize(2);
 				_ gLoad Shader(Context()->PTMainRays);
 				_ gLoad Shader(Context()->PhotonMiss);
 				_ gCreate HitGroup(Context()->PhotonMaterial, Context()->PhotonScattering, nullptr, nullptr);
@@ -134,8 +134,8 @@ public:
 
 		struct DXR_RT_Program : public RTProgram<DXR_RT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(4 * (3 + 1 + 3 + 3)); // 3- Normal, 1- SpecularSharpness, 3- OutDiffAcc, 3- OutSpecAcc
-				_ gSet StackSize(3);
+				_ gSet Payload(4 * (3 + 1 + 3)); // 3- Normal, 1- SpecularSharpness, 3- OutDiffAcc, 3- OutSpecAcc
+				_ gSet StackSize(2);
 				_ gSet MaxHitGroupIndex(1+1000); // max number of geometries
 				_ gLoad Shader(Context()->RTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
@@ -345,7 +345,7 @@ public:
 		auto photonMapBuilder = manager gCreate ProceduralGeometries();
 		photonMapBuilder gSet AABBs(PhotonsAABBs);
 		photonMapBuilder gLoad Geometry(0, NUMBER_OF_PHOTONS);
-		PhotonsAABBsOnTheGPU = photonMapBuilder gCreate BakedGeometry(true, false);
+		PhotonsAABBsOnTheGPU = photonMapBuilder gCreate BakedGeometry(true, true);
 
 		// Creates a single instance to refer all static objects in bottom level acc ds.
 		auto photonMapInstance = manager gCreate Instances();
@@ -357,30 +357,38 @@ public:
 	float4x4 lightView, lightProj;
 
 	void Frame() {
+		if (CameraIsDirty) {
 #pragma region Construct GBuffer from viewer
-		Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
+			Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
 
-		gBufferFromViewer->ViewMatrix = view;
-		gBufferFromViewer->ProjectionMatrix = proj;
-		ExecuteFrame(gBufferFromViewer);
+			gBufferFromViewer->ViewMatrix = view;
+			gBufferFromViewer->ProjectionMatrix = proj;
+			ExecuteFrame(gBufferFromViewer);
 #pragma endregion
+		}
 
+		//flush_all_to_gpu; // Grant PhotonAABBs was fully updated
+
+		static bool firstTime = true;
+
+		if (firstTime) {
 
 #pragma region Construct GBuffer from light
-		lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
-		lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
-		gBufferFromLight->ViewMatrix = lightView;
-		gBufferFromLight->ProjectionMatrix = lightProj;
-		ExecuteFrame(gBufferFromLight);
+			lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
+			lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
+			gBufferFromLight->ViewMatrix = lightView;
+			gBufferFromLight->ProjectionMatrix = lightProj;
+			ExecuteFrame(gBufferFromLight);
 #pragma endregion
 
-		//flush_all_to_gpu; // Grant PhotonAABBs was fully updated
+			perform(Photontracing);
 
-		perform(Photontracing);
+			//flush_all_to_gpu; // Grant PhotonAABBs was fully updated
 
-		//flush_all_to_gpu; // Grant PhotonAABBs was fully updated
+			perform(BuildPhotonMap);
 
-		perform(BuildPhotonMap);
+			firstTime = false;
+		}
 
 		//flush_all_to_gpu; // Grant PhotonMap was fully updated
 
@@ -447,7 +455,7 @@ public:
 		geomUpdater->PrepareBuffer(PhotonsAABBs);
 		geomUpdater gSet AABBs(PhotonsAABBs);
 		geomUpdater gLoad Geometry(0, NUMBER_OF_PHOTONS);
-		geomUpdater gCreate UpdatedGeometry();
+		geomUpdater gCreate RebuiltGeometry(true, true);
 #pragma endregion
 	}
 
@@ -486,28 +494,34 @@ public:
 
 #pragma region Raytrace Stage
 
-		// Set Environment Miss in slot 0
-		manager gSet Miss(dxrRTPipeline->EnvironmentMap, 0);
-		// Set PhotonGatheringMiss in slot 1
-		manager gSet Miss(dxrRTPipeline->PhotonGatheringMiss, 1);
+		static bool firstTime = true;
 
-		// Set PhotonGatheringMaterial in ST slot 0
-		manager gSet HitGroup(dxrRTPipeline->PhotonGatheringMaterial, 0);
+		if (firstTime) {
+			// Set Environment Miss in slot 0
+			manager gSet Miss(dxrRTPipeline->EnvironmentMap, 0);
+			// Set PhotonGatheringMiss in slot 1
+			manager gSet Miss(dxrRTPipeline->PhotonGatheringMiss, 1);
 
-		// Setup a simple hitgroup per object
-		// each object knows the offset in triangle buffer
-		// and the material index for further light scattering
-		startTriangle = 0;
-		for (int i = 0; i < Scene->ObjectsCount(); i++)
-		{
-			auto sceneObject = Scene->Objects()[i];
+			// Set PhotonGatheringMaterial in ST slot 0
+			manager gSet HitGroup(dxrRTPipeline->PhotonGatheringMaterial, 0);
 
-			rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
-			rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
+			// Setup a simple hitgroup per object
+			// each object knows the offset in triangle buffer
+			// and the material index for further light scattering
+			startTriangle = 0;
+			for (int i = 0; i < Scene->ObjectsCount(); i++)
+			{
+				auto sceneObject = Scene->Objects()[i];
 
-			manager gSet HitGroup(dxrRTPipeline->RTMaterial, i + 1); 
+				rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
+				rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-			startTriangle += sceneObject.vertexesCount / 3;
+				manager gSet HitGroup(dxrRTPipeline->RTMaterial, i + 1);
+
+				startTriangle += sceneObject.vertexesCount / 3;
+			}
+
+			firstTime = false;
 		}
 
 		// Setup a raygen shader

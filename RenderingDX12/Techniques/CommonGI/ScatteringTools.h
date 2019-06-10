@@ -263,7 +263,7 @@ float3 ComputeDirectLighting(
 	return shadowFactor * (
 		// Direct diffuse and glossy lighting
 		(material.Roulette.x*DiffuseRatio + material.Roulette.y*SpecularRatio)*NdotL*Ip
-		+ (R.w * DirectReflection + T.w * DirectRefraction)*I / (pi*pi* lightRadius*lightRadius));
+		+ (R.w * DirectReflection + T.w * DirectRefraction)*I / (4*pi*pi* lightRadius*lightRadius));
 }
 
 

@@ -191,7 +191,7 @@ void PTMainRays()
 
 	[loop]
 	for (int i = 0; i < PATHS_PER_PASS; i++)
-		totalAcc += ComputePath(V, surfel, material, 2);
+		totalAcc += ComputePath(V, surfel, material, 3);
 	// Write the raytraced color to the output texture.
 	Output[DispatchRaysIndex().xy] = (Output[DispatchRaysIndex().xy] * PATHS_PER_PASS * CurrentPass + totalAcc) / (PATHS_PER_PASS * (CurrentPass + 1));
 }
