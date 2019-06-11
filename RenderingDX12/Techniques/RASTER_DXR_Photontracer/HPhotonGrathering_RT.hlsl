@@ -102,7 +102,7 @@ int FromPositionToCellIndex(float3 P) {
 // Perform photon gathering
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
 
-	float radius = 0.02;// 4 * max(CellSize.x, max(CellSize.y, CellSize.z));
+	float radius = 0.025;// 4 * max(CellSize.x, max(CellSize.y, CellSize.z));
 
 	int3 begCell = FromPositionToCell(surfel.P - radius);
 	int3 endCell = FromPositionToCell(surfel.P + radius);
@@ -269,7 +269,7 @@ void RTMainRays()
 	AugmentMaterialWithTextureMapping(surfel, material);
 
 	// Write the raytraced color to the output texture.
-	Output[DispatchRaysIndex().xy] = (Output[DispatchRaysIndex().xy] * CurrentPass + RaytracingScattering(V, surfel, material, 1)) / (CurrentPass + 1);
+	Output[DispatchRaysIndex().xy] = (Output[DispatchRaysIndex().xy] * CurrentPass + RaytracingScattering(V, surfel, material, 2)) / (CurrentPass + 1);
 }
 
 void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)

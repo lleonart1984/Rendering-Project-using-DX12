@@ -1,5 +1,7 @@
 #include "../CommonGI/Definitions.h"
 
+#define DEBUG_PHOTONS
+
 // Photon Data
 struct Photon {
 	float3 Direction;
@@ -84,6 +86,25 @@ struct PhotonRayPayload
 
 #include "../CommonGI/ScatteringTools.h"
 
+#ifdef DEBUG_PHOTONS
+[shader("anyhit")]
+void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
+	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection() * 0.5;
+
+	Photon p = Photons[attr.PhotonIdx];
+
+	float3 ab = saturate(abs(surfelPosition - p.Position) / p.Radius);
+	float d = max(ab.x, max(ab.y, ab.z));// distance(surfelPosition, p.Position);
+
+	float kernel = pow(d, 80);// 2 - 2 * d / p.Radius;
+	if (any(p.Intensity))
+		payload.OutDiffuseAccum += kernel * 0.1 * float3(0, 0, 1);
+	else
+		payload.OutDiffuseAccum += kernel * 0.05 * float3(1, 0, 0);
+
+	IgnoreHit(); // Continue search to accumulate other photons
+}
+#else
 [shader("anyhit")]
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
 	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection() * 0.5;
@@ -106,6 +127,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	}
 	IgnoreHit(); // Continue search to accumulate other photons
 }
+#endif
 
 [shader("intersection")]
 void PhotonGatheringIntersection() {
@@ -140,8 +162,12 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// ray
 	// raypayload
 	TraceRay(PhotonMap, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 0, 1, ray, photonGatherPayload);
-	//return photonGatherPayload.OutDiffuseAccum;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+
+#ifdef DEBUG_PHOTONS
+	return photonGatherPayload.OutDiffuseAccum;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+#else
 	return material.Roulette.x * material.Diffuse / pi * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+#endif
 }
 
 // Required by Scattering tools header
@@ -177,6 +203,9 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 	bool invertNormal;
 	float3 fN;
 	float4 R, T;
+#ifdef DEBUG_PHOTONS
+	total += 0.5;
+#else
 	total += ComputeDirectLighting(
 		V,
 		surfel,
@@ -184,6 +213,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 		LightPosition,
 		LightIntensity,
 		/*Out*/ NdotV, invertNormal, fN, R, T);
+#endif
 
 	// Get indirect diffuse light compute using photon map
 	total += ComputeDirectLightInWorldSpace(surfel, material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
@@ -268,7 +298,7 @@ void RTMainRays()
 	AugmentMaterialWithTextureMapping(surfel, material);
 
 	// Write the raytraced color to the output texture.
-	Output[DispatchRaysIndex().xy] = RaytracingScattering(V, surfel, material, 1);
+	Output[DispatchRaysIndex().xy] = RaytracingScattering(V, surfel, material, 2);
 }
 
 void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)

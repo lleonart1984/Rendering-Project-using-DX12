@@ -124,15 +124,15 @@ int main(int, char**)
 		switch (USE_SCENE) {
 		case BUNNY_OBJ:
 			filePath = desktop_directory();
-			//strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
+			strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
 			//strcat(filePath, "\\Models\\BunnyInCornell\\BunnyScene.obj");
-			strcat(filePath, "\\Models\\CornellBox\\BoxBox.obj");
+			//strcat(filePath, "\\Models\\CornellBox\\BoxBox.obj");
 			scene = new Scene(filePath);
-			camera->Position = float3(0, 0, 1.7f);
+			camera->Position = float3(0, 0.5, 1.15f);
 			camera->Target = float3(0, 0, 0);
-			lightSource->Position = float3(0, 0.48, 0);
-			lightSource->Intensity = float3(300, 300, 300);
-			//MixGlassMaterial(&scene->Materials()[0], 1);
+			lightSource->Position = float3(0.2, 0.58, 0.2);
+			lightSource->Intensity = float3(400, 400, 400);
+			MixGlassMaterial(&scene->Materials()[0], 1);
 			break;
 		case RING_OBJ:
 			filePath = desktop_directory();
