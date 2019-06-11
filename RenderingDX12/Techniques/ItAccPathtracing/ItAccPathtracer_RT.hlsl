@@ -62,6 +62,7 @@ struct RayPayload
 	float3 Importance;
 	float3 AccRadiance;
 	Ray ScatteredRay;
+	int bounce;
 };
 
 #include "../CommonGI/ScatteringTools.h"
@@ -134,10 +135,13 @@ float3 ComputePath(float3 V, Vertex surfel, Material material, int bounces)
 		newRay.Origin = payload.ScatteredRay.Position;
 		newRay.Direction = payload.ScatteredRay.Direction;
 		newRay.TMin = 0.001;
-		newRay.TMax = 10000.0;
+		newRay.TMax = 10.0;
 
-		if (any(payload.Importance > 0.01))
+		if (any(payload.Importance > 0.001))
+		{
+			payload.bounce = bounce;
 			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, payload);
+		}
 	}
 
 	return payload.AccRadiance;
@@ -148,7 +152,23 @@ void EnvironmentMap(inout RayPayload payload)
 {
 }
 
-#define PATHS_PER_PASS 1
+#define PATHS_PER_FRAME 1
+#define MAX_BOUNCES 2
+
+void StartRandom(uint2 raysIndex, uint2 raysDimensions, int bounce, int path, int frame) {
+	int index = 0;
+	int dim = 1;
+	index += raysIndex.x * dim;
+	dim *= raysDimensions.x;
+	index += raysIndex.y * dim;
+	dim *= raysDimensions.y;
+	index += bounce * dim;
+	dim *= (MAX_BOUNCES + 1);
+	index += path * dim;
+	dim *= PATHS_PER_FRAME;
+	index += frame * dim;
+	initializeRandom(index);
+}
 
 [shader("raygeneration")]
 void PTMainRays()
@@ -157,7 +177,8 @@ void PTMainRays()
 	uint2 raysDimensions = DispatchRaysDimensions();
 
 	// Initialize random iterator using rays index as seed
-	initializeRandom(raysIndex.x + raysIndex.y*raysDimensions.x + raysDimensions.x*raysDimensions.y*CurrentPass);
+	//initializeRandom(raysIndex.x + raysIndex.y*raysDimensions.x + raysDimensions.x*raysDimensions.y*CurrentPass*MAX_BOUNCES*PATHS_PER_PASS);
+	StartRandom(raysIndex, raysDimensions, MAX_BOUNCES, 0, CurrentPass);
 
 	float3 P = Positions[raysIndex];
 	float3 N = Normals[raysIndex];
@@ -190,10 +211,10 @@ void PTMainRays()
 	float3 totalAcc = 0;
 
 	[loop]
-	for (int i = 0; i < PATHS_PER_PASS; i++)
-		totalAcc += ComputePath(V, surfel, material, 3);
+	for (int i = 0; i < PATHS_PER_FRAME; i++)
+		totalAcc += ComputePath(V, surfel, material, MAX_BOUNCES);
 	// Write the raytraced color to the output texture.
-	Output[DispatchRaysIndex().xy] = (Output[DispatchRaysIndex().xy] * PATHS_PER_PASS * CurrentPass + totalAcc) / (PATHS_PER_PASS * (CurrentPass + 1));
+	Output[DispatchRaysIndex().xy] = (Output[DispatchRaysIndex().xy] * PATHS_PER_FRAME * CurrentPass + totalAcc) / (PATHS_PER_FRAME * (CurrentPass + 1));
 }
 
 void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)
@@ -227,6 +248,8 @@ void PTScattering(inout RayPayload payload, in MyAttributes attr)
 	Vertex surfel;
 	Material material;
 	GetHitInfo(attr, surfel, material);
+
+	StartRandom(DispatchRaysIndex(), DispatchRaysDimensions(), payload.bounce, 0, CurrentPass);
 
 	// This is not a recursive closest hit but it will accumulate in payload
 	// all the result of the scattering to this surface

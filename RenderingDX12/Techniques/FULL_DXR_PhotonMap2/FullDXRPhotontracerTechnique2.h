@@ -6,7 +6,7 @@
 struct FullDXRPhotonTracer2 : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
 
-#define DISPATCH_RAYS_DIMENSION 1024
+#define DISPATCH_RAYS_DIMENSION 128
 #define NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION)
 
 	// Scene loading process to retain scene on the GPU

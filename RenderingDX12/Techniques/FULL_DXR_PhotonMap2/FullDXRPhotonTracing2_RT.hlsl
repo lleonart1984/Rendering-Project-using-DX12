@@ -83,7 +83,7 @@ void PTMainRays() {
 	initializeRandom(rayId);
 
 	PhotonAABBs[photonIndexInBuffer].Minimum = float3(random() * 2 - 1, random() * 2 - 1, random() * 2 - 1);
-	PhotonAABBs[photonIndexInBuffer].Maximum = PhotonAABBs[photonIndexInBuffer].Minimum + float3(0.025, 0.025, 0.025);
+	PhotonAABBs[photonIndexInBuffer].Maximum = PhotonAABBs[photonIndexInBuffer].Minimum + float3(0.001, 0.001, 0.001);
 
 	RayDesc ray;
 	ray.Origin = LightPosition;
@@ -110,7 +110,7 @@ void PTMainRays() {
 	N = mul(float4(N, 0), ViewToWorld).xyz;
 	float3 L = normalize(LightPosition - P); // V is really L in this case, since the "viewer" is positioned in light position to trace rays
 
-	RayPayload payload = { LightIntensity * 100000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), 2, 0.01 };
+	RayPayload payload = { LightIntensity * 100000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), 1, 0.05 };
 
 	Vertex surfel = {
 		P,
@@ -131,7 +131,7 @@ void PTMainRays() {
 		ray.Origin = surfel.P + sign(dot(direction, surfel.N))*surfel.N*0.001;
 		ray.Direction = direction;
 		payload.color *= ratio;
-		payload.radius *= (material.Roulette.x*2 + 1);
+		payload.radius *= 1;// (material.Roulette.x * 2 + 1);
 		// Trace the ray.
 		// Set the ray's extents.
 		if (any(payload.color))
@@ -219,7 +219,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 
 			if (any(ratio))
 			{
-				RayPayload newPhotonPayload = { payload.color * ratio / (1 - pdf), payload.bounce - 1, payload.radius * (pdf*4 + 1) };
+				RayPayload newPhotonPayload = { payload.color * ratio / (1 - pdf), payload.bounce - 1, payload.radius };
 				RayDesc newPhotonRay;
 				newPhotonRay.TMin = 0.001;
 				newPhotonRay.TMax = 10000.0;
