@@ -124,15 +124,15 @@ int main(int, char**)
 		switch (USE_SCENE) {
 		case BUNNY_OBJ:
 			filePath = desktop_directory();
-			strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
-			//strcat(filePath, "\\Models\\BunnyInCornell\\BunnyScene.obj");
+			//strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
+			strcat(filePath, "\\Models\\CornellWithSphere\\sphereBoxScene.obj");
 			//strcat(filePath, "\\Models\\CornellBox\\BoxBox.obj");
 			scene = new Scene(filePath);
-			camera->Position = float3(0, 0.5, 1.15f);
+			camera->Position = float3(0, 0, 1.8f);
 			camera->Target = float3(0, 0, 0);
-			lightSource->Position = float3(0.2, 0.58, 0.2);
+			lightSource->Position = float3(0, 0.4, 0);
 			lightSource->Intensity = float3(400, 400, 400);
-			MixGlassMaterial(&scene->Materials()[0], 1);
+			MixGlassMaterial(&scene->Materials()[5], 1);
 			break;
 		case RING_OBJ:
 			filePath = desktop_directory();
@@ -220,7 +220,7 @@ int main(int, char**)
 		if (asLightRenderer)
 		{
 			// Light Updates here
-			//asLightRenderer->Light->Position.x = 1;// *sin(ImGui::GetTime()*0.1f);
+			//asLightRenderer->Light->Position.y = 0.3+sin(ImGui::GetTime()*0.5f)*0.1f;
 		}
 
         // Poll and handle messages (inputs, window resize, etc.)

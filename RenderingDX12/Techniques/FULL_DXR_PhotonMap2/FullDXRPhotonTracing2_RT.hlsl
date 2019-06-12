@@ -192,7 +192,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 	if (russianRoulette < pdf) // photon stay here
 	{
 		float radius = payload.radius;// 0.025;
-		if (NdotV > 0.01)
+		if (NdotV > 0.001)
 		{
 			Photon p = {
 				WorldRayDirection(), // photon direction

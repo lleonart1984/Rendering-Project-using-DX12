@@ -358,8 +358,15 @@ public:
 
 		sceneInstances gLoad Instance(sceneGeometriesOnGPU, 1);
 		sceneInstances gLoad Instance(PhotonAABBsOnTheGPU, 2);
-		
+
 		dxrRTPipeline->_Program->Scene = sceneInstances gCreate BakedScene();
+	}
+
+	void UpdatePhotonMap(gObj<DXRManager> manager) {
+		auto photonMapBuilder = manager gCreate ProceduralGeometries(PhotonAABBsOnTheGPU);
+		photonMapBuilder gSet AABBs(PhotonsAABBs);
+		photonMapBuilder gLoad Geometry(0, NUMBER_OF_PHOTONS);
+		PhotonAABBsOnTheGPU = photonMapBuilder gCreate UpdatedGeometry();
 	}
 
 	float4x4 view, proj;
@@ -387,17 +394,15 @@ public:
 
 		static bool firstTime = true;
 
+		perform(Photontracing);
+
 		if (firstTime) {
-			perform(Photontracing);
-
-			//wait_for(signal(flush_all_to_gpu));
-
 			perform(CreatePhotonMapAndScene);
-
-			wait_for(signal(flush_all_to_gpu));
-
+			
 			firstTime = false;
 		}
+		else
+			perform(UpdatePhotonMap);
 
 		perform(Raytracing);
 	}

@@ -1,5 +1,7 @@
 #include "../CommonGI/Definitions.h"
 
+//#define DEBUG_PHOTONS
+
 // Photon Data
 struct Photon {
 	float3 Direction;
@@ -86,8 +88,9 @@ struct PhotonRayPayload
 
 #include "../CommonGI/ScatteringTools.h"
 
+#ifdef DEBUG_PHOTONS
 [shader("anyhit")]
-void PhotonGatheringAnyHit2(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
+void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
 	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection()*0.5;
 	
 	Photon p = Photons[attr.PhotonIdx];
@@ -97,12 +100,13 @@ void PhotonGatheringAnyHit2(inout PhotonRayPayload payload, in PhotonHitAttribut
 
 	float3 ab = abs(surfelPosition - p.Position)/p.Radius;
 	float d = max(ab.x, max(ab.y, ab.z));// distance(surfelPosition, p.Position);
+	//float d = ab.x + ab.y + ab.z;// distance(surfelPosition, p.Position);
 
 	//if (d < p.Radius)
 	{
-		float kernel = pow(d, 20);// 2 - 2 * d / p.Radius;
+		float kernel = pow(1 - saturate(d), 10);// 2 - 2 * d / p.Radius;
 		if (any(p.Intensity))
-			payload.OutDiffuseAccum += kernel * 0.1;// p.Intensity * kernel * saturate(dot(payload.InNormal, -p.Direction)) / area;
+			payload.OutDiffuseAccum += kernel * 1;// p.Intensity * kernel * saturate(dot(payload.InNormal, -p.Direction)) / area;
 		//else
 		//	payload.OutDiffuseAccum += kernel * 0.05 * float3(1, 0, 1);// p.Intensity * kernel * saturate(dot(payload.InNormal, -p.Direction)) / area;
 
@@ -110,7 +114,7 @@ void PhotonGatheringAnyHit2(inout PhotonRayPayload payload, in PhotonHitAttribut
 	}
 	IgnoreHit(); // Continue search to accumulate other photons
 }
-
+#else
 [shader("anyhit")]
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
 	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection()*0.5;
@@ -130,6 +134,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	}
 	IgnoreHit(); // Continue search to accumulate other photons
 }
+#endif
 
 [shader("intersection")]
 void PhotonGatheringIntersection() {
@@ -171,8 +176,11 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// ray
 	// raypayload
 	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, IS_PHOTON_MASK, 0, 0, 1, ray, photonGatherPayload);
+#ifdef DEBUG_PHOTONS
+	return photonGatherPayload.OutDiffuseAccum;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+#else
 	return material.Diffuse / pi * photonGatherPayload.OutDiffuseAccum / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
-	//return photonGatherPayload.OutDiffuseAccum;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+#endif
 }
 
 float LightSphereRadius() {
