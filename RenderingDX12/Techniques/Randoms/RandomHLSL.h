@@ -54,7 +54,7 @@ float3 randomHSDirection(float3 N, out float NdotD)
 void initializeRandom(uint seed) {
 	rng_state = seed;// ^ 0xFEFE;
 	[loop]
-	for (int i = 0; i < seed % 10 + 2; i++)
+	for (int i = 0; i < seed % 10 + 3; i++)
 		random();
 }
 

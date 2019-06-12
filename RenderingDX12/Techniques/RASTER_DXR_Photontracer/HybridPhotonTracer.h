@@ -2,15 +2,14 @@
 
 #include "../../Techniques/GUI_Traits.h"
 #include "../DeferredShading/GBufferConstruction.h"
+#include "../CommonGI/Parameters.h"
 
 struct HybridPhotonTracer : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
 
 	~HybridPhotonTracer() {
 	}
-#define RESOLUTION 128
-#define DISPATCH_RAYS_DIMENSION 1024
-#define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*4)
+#define MAX_NUMBER_OF_PHOTONS (PHOTON_DIMENSION*PHOTON_DIMENSION*(PHOTON_TRACE_MAX_BOUNCES+1))
 
 	// Scene loading process to retain scene on the GPU
 	gObj<RetainedSceneLoader> sceneLoader;
@@ -42,7 +41,7 @@ public:
 		struct DXR_PT_Program : public RTProgram<DXR_PT_Pipeline> {
 			void Setup() {
 				_ gSet Payload(16);
-				_ gSet StackSize(4);
+				_ gSet StackSize(PHOTON_TRACE_MAX_BOUNCES + 1);
 				_ gLoad Shader(Context()->PTMainRays);
 				_ gLoad Shader(Context()->PhotonMiss);
 				_ gCreate HitGroup(Context()->PhotonMaterial, Context()->PhotonScattering, nullptr, nullptr);
@@ -136,7 +135,7 @@ public:
 		struct DXR_RT_Program : public RTProgram<DXR_RT_Pipeline> {
 			void Setup() {
 				_ gSet Payload(16);
-				_ gSet StackSize(4);
+				_ gSet StackSize(RAY_TRACING_MAX_BOUNCES+1);
 				_ gLoad Shader(Context()->RTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
 				_ gCreate HitGroup(Context()->RTMaterial, Context()->RTScattering, nullptr, nullptr);
@@ -237,7 +236,7 @@ public:
 		_ gLoad Subprocess(sceneLoader);
 
 		// Load and setup gbuffer construction process from light
-		gBufferFromLight = new GBufferConstruction(DISPATCH_RAYS_DIMENSION, DISPATCH_RAYS_DIMENSION);
+		gBufferFromLight = new GBufferConstruction(PHOTON_DIMENSION, PHOTON_DIMENSION);
 		gBufferFromLight->sceneLoader = this->sceneLoader;
 		_ gLoad Subprocess(gBufferFromLight);
 
@@ -296,7 +295,7 @@ public:
 		dxrPTPipeline->_Program->LightingCB = _ gCreate ConstantBuffer<Lighting>();
 		dxrPTPipeline->_Program->SpaceInfoCB = _ gCreate ConstantBuffer <SpaceInfo>();
 		dxrPTPipeline->_Program->Malloc = _ gCreate RWStructuredBuffer<int>(4);
-		dxrPTPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(RESOLUTION*RESOLUTION*RESOLUTION);
+		dxrPTPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
 		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(MAX_NUMBER_OF_PHOTONS);
 		dxrPTPipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_PHOTONS);
 #pragma endregion
@@ -364,25 +363,17 @@ public:
 #pragma endregion
 		}
 
-		static bool firstTime = true;
-
-		if (firstTime) {
 #pragma region Construct GBuffer from light
-			lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
-			lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
-			gBufferFromLight->ViewMatrix = lightView;
-			gBufferFromLight->ProjectionMatrix = lightProj;
-			ExecuteFrame(gBufferFromLight);
+		lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
+		lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
+		gBufferFromLight->ViewMatrix = lightView;
+		gBufferFromLight->ProjectionMatrix = lightProj;
+		ExecuteFrame(gBufferFromLight);
 #pragma endregion
 
-			perform(Photontracing);
-		}
+		perform(Photontracing);
 
 		perform(Raytracing);
-
-		return;
-
-//		wait_for(signal(flush_all_to_gpu));
 	}
 
 	void Photontracing(gObj<DXRManager> manager) {
@@ -408,7 +399,7 @@ public:
 
 		float3 MinimumPosition{ -1, -1, -1 };
 		float3 BoxSize{ 2, 2, 2 };
-		int3 resolution{ RESOLUTION, RESOLUTION, RESOLUTION };
+		int3 resolution{ PHOTON_GRID_SIZE, PHOTON_GRID_SIZE, PHOTON_GRID_SIZE };
 
 		// Update SpaceInfo
 		manager gCopy ValueData(ptRTProgram->SpaceInfoCB, SpaceInfo{
@@ -459,7 +450,7 @@ public:
 		manager gSet RayGeneration(dxrPTPipeline->PTMainRays);
 
 		// Dispatch rays for 1 000 000 photons
-		manager gDispatch Rays(DISPATCH_RAYS_DIMENSION, DISPATCH_RAYS_DIMENSION);
+		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
 
 #pragma endregion
 	}

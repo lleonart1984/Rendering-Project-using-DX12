@@ -291,8 +291,8 @@ namespace CA4G {
 	
 	gObj<GeometriesOnGPU> GeometryCollection::Creating::RebuiltGeometry(bool allowUpdates, bool preferFastTrace) {
 		
-		if (!manager->isUpdating)
-			throw CA4GException("Can not rebuild a geometry is being created.");
+		//if (!manager->isUpdating)
+		//	throw CA4GException("Can not rebuild a geometry is being created.");
 
 		// creates the bottom level acc ds and emulated gpu pointer if necessary
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags =

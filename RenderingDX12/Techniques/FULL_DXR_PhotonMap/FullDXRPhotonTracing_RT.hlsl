@@ -1,4 +1,5 @@
 #include "../CommonGI/Definitions.h"
+#include "../CommonGI/Parameters.h"
 
 // Photon Data
 struct Photon {
@@ -62,6 +63,19 @@ struct RayPayload
 
 #include "../CommonGI/ScatteringTools.h"
 
+void StartRandom(uint2 raysIndex, uint2 raysDimensions, int bounce, int frame) {
+	int index = 0;
+	int dim = 1;
+	index += raysIndex.x * dim;
+	dim *= raysDimensions.x;
+	index += raysIndex.y * dim;
+	dim *= raysDimensions.y;
+	index += bounce * dim;
+	dim *= (PHOTON_TRACE_MAX_BOUNCES + 1);
+	index += frame * dim;
+	initializeRandom(index);
+}
+
 // Photon trace stage
 // Photon rays has the origin in light source and select a random direction (point source)
 [shader("raygeneration")]
@@ -70,14 +84,12 @@ void PTMainRays() {
 	uint2 raysDimensions = DispatchRaysDimensions();
 
 	uint photonIndexInBuffer = raysIndex.x + raysIndex.y * raysDimensions.x;
-
 	
 	// Turn off existing photon
 	Photons[photonIndexInBuffer].Intensity = 0;
 
-	int rayId = raysIndex.x + raysIndex.y*raysDimensions.x + 17 * raysDimensions.x * raysDimensions.y * 0;
 	// Initialize random iterator using rays index as seed
-	initializeRandom(rayId);
+	StartRandom(raysIndex, raysDimensions, PHOTON_TRACE_MAX_BOUNCES + 1, 0);
 
 	PhotonAABBs[photonIndexInBuffer] = (AABB)0;
 	//PhotonAABBs[photonIndexInBuffer].Minimum = float3(random(), random(), random()) * 2 - 1;// (AABB)0;
@@ -105,7 +117,7 @@ void PTMainRays() {
 	N = mul(float4(N, 0), ViewToWorld).xyz;
 	float3 L = normalize(LightPosition - P); // V is really L in this case, since the "viewer" is positioned in light position to trace rays
 
-	RayPayload payload = { LightIntensity * 100000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), 2 };
+	RayPayload payload = { LightIntensity * 100000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), PHOTON_TRACE_MAX_BOUNCES };
 
 	Vertex surfel = {
 		P,
@@ -162,6 +174,8 @@ void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)
 	AugmentHitInfoWithTextureMapping(surfel, material);
 }
 
+
+
 [shader("closesthit")]
 void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 {
@@ -180,7 +194,8 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 
 	uint photonIndexInBuffer = raysIndex.x + raysIndex.y * raysDimensions.x;
 
-	initializeRandom(photonIndexInBuffer + raysDimensions.x*raysDimensions.y*payload.bounce);
+	StartRandom(raysIndex, raysDimensions, payload.bounce, 0);
+	
 	float russianRoulette = random();
 	float pdf = material.Roulette.x * 0.5;// *0.002;
 
@@ -188,7 +203,7 @@ void PhotonScattering(inout RayPayload payload, in MyAttributes attr)
 	{
 		if (NdotV > 0.001) 
 		{
-			float radius = 0.025;
+			float radius = PHOTON_RADIUS;
 
 			Photon p = {
 				WorldRayDirection(), // photon direction

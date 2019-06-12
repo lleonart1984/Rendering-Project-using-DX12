@@ -48,6 +48,7 @@
     <ClInclude Include="Techniques\CommonGI\ScatteringTools.h" />
     <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial12.h" />
+    <ClInclude Include="Techniques\CommonGI\Parameters.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

@@ -149,7 +149,7 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			MixMirrorMaterial(&scene->Materials()[9], 0.4); // floor
+			//MixMirrorMaterial(&scene->Materials()[9], 0.4); // floor
 			camera->Position = float3(0.3f, 0.05f, -0.028);
 			camera->Target = float3(0, 0.07f, 0);
 			lightSource->Position = float3(0.2, 0.45, 0);
@@ -220,7 +220,8 @@ int main(int, char**)
 		if (asLightRenderer)
 		{
 			// Light Updates here
-			//asLightRenderer->Light->Position.y = 0.3+sin(ImGui::GetTime()*0.5f)*0.1f;
+			if (MOVE_LIGHT)
+				asLightRenderer->Light->Position.y = 0.3+sin(ImGui::GetTime()*0.5f)*0.1f;
 		}
 
         // Poll and handle messages (inputs, window resize, etc.)

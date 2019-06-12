@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../CommonGI/Parameters.h"
+
 class DXRBasicScenePhotontracer : public Technique, public IHasScene, public IHasCamera, public IHasLight {
 public:
 
@@ -120,9 +122,7 @@ protected:
 		float3 Intensity;
 	};
 
-	#define RESOLUTION 128
-	#define DISPATCH_RAYS_DIMENSION 1024
-	#define MAX_NUMBER_OF_PHOTONS (DISPATCH_RAYS_DIMENSION*DISPATCH_RAYS_DIMENSION*3)
+	#define MAX_NUMBER_OF_PHOTONS (PHOTON_DIMENSION*PHOTON_DIMENSION*(PHOTON_TRACE_MAX_BOUNCES+1))
 
 	void LoadingSceneAssets(gObj<CopyingManager> manager) {
 		// loading scene textures
@@ -147,7 +147,7 @@ protected:
 
 		Pipeline->_Program->ScreenOutput = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		Pipeline->_Program->Malloc = _ gCreate RWStructuredBuffer<int>(4);
-		Pipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(RESOLUTION*RESOLUTION*RESOLUTION);
+		Pipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
 		Pipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(MAX_NUMBER_OF_PHOTONS);
 		Pipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_PHOTONS);
 	}
@@ -198,7 +198,7 @@ protected:
 
 		float3 MinimumPosition{ -0.5, -0.5, -0.5 };
 		float3 BoxSize{ 1, 1, 1 };
-		int3 resolution{ RESOLUTION, RESOLUTION, RESOLUTION };
+		int3 resolution{ PHOTON_GRID_SIZE, PHOTON_GRID_SIZE, PHOTON_GRID_SIZE };
 
 		// Update SpaceInfo
 		manager gCopy ValueData(rtProgram->SpaceInfoCB, SpaceInfo{
@@ -244,7 +244,7 @@ protected:
 		manager gSet RayGeneration(Pipeline->PTMainRays);
 
 		// Dispatch rays for 1 000 000 photons
-		manager gDispatch Rays(DISPATCH_RAYS_DIMENSION, DISPATCH_RAYS_DIMENSION);
+		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
 
 #pragma endregion
 	}
