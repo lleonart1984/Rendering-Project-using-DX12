@@ -135,7 +135,7 @@ public:
 
 		struct DXR_RT_Program : public RTProgram<DXR_RT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(4 * (3 + 1 + 3)); // 3- Normal, 1- SpecularSharpness, 3- OutDiffAcc, 3- OutSpecAcc
+				_ gSet Payload(4 * (3 + 3 + 3)); // 3- Normal, 3- Albedo, 3- Accum
 				_ gSet StackSize(RAY_TRACING_MAX_BOUNCES + 2);
 				_ gSet MaxHitGroupIndex(1+1000); // max number of geometries
 				_ gLoad Shader(Context()->RTMainRays);

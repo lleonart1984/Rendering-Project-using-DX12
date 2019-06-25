@@ -8,9 +8,9 @@
 #define SANMIGUEL_OBJ 4
 
 
-#define USE_SCENE SPONZA_OBJ
+#define USE_SCENE BUNNY_OBJ
 
-#define MOVE_LIGHT true
+#define MOVE_LIGHT false
 
 // Change this to force every frame camera dirty
 #define PERMANENT_CAMERA_DIRTY true
@@ -42,7 +42,7 @@
 //gObj<DXRBasicScenePhotontracer> technique;
 //gObj<DXRItPathtracer> technique;
 //gObj<DeferredShadingTechnique> technique;
-//gObj<HybridPhotonTracer> technique;
+gObj<HybridPhotonTracer> technique;
 //gObj<DXRPathtracer> technique;
 //gObj<FullDXRPhotonTracer2> technique; 
-gObj<FullDXRPhotonTracer> technique;
+//gObj<FullDXRPhotonTracer> technique;
