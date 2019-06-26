@@ -8,9 +8,9 @@
 #define SANMIGUEL_OBJ 4
 
 
-#define USE_SCENE BUNNY_OBJ
+#define USE_SCENE SPONZA_OBJ
 
-#define MOVE_LIGHT false
+#define MOVE_LIGHT true
 
 // Change this to force every frame camera dirty
 #define PERMANENT_CAMERA_DIRTY true
