@@ -93,6 +93,7 @@
     <FxCompile Include="Techniques\RASTER_DXR_Photontracer\HPhotonTracer_RT.hlsl" />
     <FxCompile Include="Techniques\RASTER_DXR_Photontracer\HPhotonGrathering_RT.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\UpdateAABBs_PS.hlsl" />
+    <FxCompile Include="Techniques\SHPM\SHPhotonTracer_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Techniques\Tutorials\Tutorials.rm" />
