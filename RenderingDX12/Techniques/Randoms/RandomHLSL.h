@@ -58,4 +58,17 @@ void initializeRandom(uint seed) {
 		random();
 }
 
+void StartRandomSeedForRay(uint2 gridDimensions, int maxBounces, uint2 raysIndex, int bounce, int frame) {
+	int index = 0;
+	int dim = 1;
+	index += raysIndex.x * dim;
+	dim *= gridDimensions.x;
+	index += raysIndex.y * dim;
+	dim *= gridDimensions.y;
+	index += bounce * dim;
+	dim *= maxBounces;
+	index += frame * dim;
+	initializeRandom(index);
+}
+
 #endif // RANDOMHLSL_H

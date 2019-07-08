@@ -124,8 +124,8 @@ int main(int, char**)
 		switch (USE_SCENE) {
 		case BUNNY_OBJ:
 			filePath = desktop_directory();
-			//strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
-			strcat(filePath, "\\Models\\CornellWithSphere\\sphereBoxScene.obj");
+			strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
+			//strcat(filePath, "\\Models\\CornellWithSphere\\sphereBoxScene.obj");
 			//strcat(filePath, "\\Models\\CornellBox\\BoxBox.obj");
 			scene = new Scene(filePath);
 			camera->Position = float3(0, 0, 1.8f);

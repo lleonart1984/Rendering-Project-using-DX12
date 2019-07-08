@@ -1,4 +1,5 @@
 #include "../CommonGI/Definitions.h"
+#include "../CommonGI/Parameters.h"
 
 // Photon Data
 struct Photon {
@@ -110,7 +111,7 @@ void PTMainRays() {
 	N = mul(float4(N, 0), ViewToWorld).xyz;
 	float3 L = normalize(LightPosition - P); // V is really L in this case, since the "viewer" is positioned in light position to trace rays
 
-	RayPayload payload = { LightIntensity * 100000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), 1, 0.025 };
+	RayPayload payload = { LightIntensity * 100000 / (4 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y), PHOTON_TRACE_MAX_BOUNCES, PHOTON_RADIUS };
 
 	Vertex surfel = {
 		P,

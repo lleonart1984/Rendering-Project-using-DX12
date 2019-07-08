@@ -2,16 +2,17 @@
 #define SCATTERING_TOOLS_H
 
 #include "../Randoms/RandomHLSL.h"
+#include "Parameters.h"
 
 // Prototype function will be implemented by
 // global illumination algorithms using this header file.
 // Resolves the visibility between point light source an a specific surfel.
 float ShadowCast(Vertex surfel);
 
-// Prototype function will be implemented by
-// global illumination algorithms using this header.
 // Resolves the point light sphere radius for path-traced rays.
-float LightSphereRadius();
+float LightSphereRadius() {
+	return LIGHT_SOURCE_RADIUS;
+}
 
 // Compute fresnel reflection component given the cosine of input direction and refraction index ratio.
 // Refraction can be obtained subtracting to one.
@@ -23,47 +24,6 @@ float ComputeFresnel(float NdotL, float ratio)
 	float divOneMinusByOnePlus = oneMinusRatio / onePlusRatio;
 	float f = divOneMinusByOnePlus * divOneMinusByOnePlus;
 	return (f + (1.0 - f) * pow((1.0 - NdotL), 5));
-}
-
-// Transform every surfel component with a specific transform
-// Valid for isometric transformation since directions are transformed
-// using a simple multiplication operation.
-Vertex Transform(Vertex surfel, float4x3 transform) {
-	Vertex v = {
-		mul(float4(surfel.P, 1), transform),
-		mul(float4(surfel.N, 0), transform),
-		surfel.C,
-		mul(float4(surfel.T, 0), transform),
-		mul(float4(surfel.B, 0), transform) };
-	return v;
-}
-
-// Given a surfel will modify the normal with texture maps, using
-// Bump mapping and masking textures.
-// Material info is updated as well.
-void AugmentHitInfoWithTextureMapping(inout Vertex surfel, inout Material material) {
-	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
-	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0, 0) : material.Specular;
-	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, 0, 0) : float3(0.5, 0.5, 1);
-	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, 0, 0) : 1;
-
-	float3x3 TangentToWorld = { surfel.T, surfel.B, surfel.N };
-	// Change normal according to bump map
-	surfel.N = normalize(mul(BumpTex * 2 - 1, TangentToWorld));
-
-	material.Diffuse *= DiffTex * MaskTex.x; // set transparent if necessary.
-	material.Specular.xyz = max(material.Specular.xyz, SpecularTex);
-}
-
-// Given a surfel will modify the material using texture mapping.
-void AugmentMaterialWithTextureMapping(inout Vertex surfel, inout Material material) {
-	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
-	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0, 0).xyz : material.Specular;
-	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, 0, 0).xyz : float3(0.5, 0.5, 1);
-	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, 0, 0).xyz : 1;
-
-	material.Diffuse *= DiffTex * MaskTex.x; // set transparent if necessary.
-	material.Specular.xyz = max(material.Specular.xyz, SpecularTex);
 }
 
 // Gets perfect lambertian normalized brdf ratio divided by a uniform distribution pdf value
