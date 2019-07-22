@@ -10,10 +10,10 @@
 
 #define USE_SCENE SPONZA_OBJ
 
-#define MOVE_LIGHT true
+#define MOVE_LIGHT false
 
 // Change this to force every frame camera dirty
-#define PERMANENT_CAMERA_DIRTY true
+#define PERMANENT_CAMERA_DIRTY false
 
 
 // Uncomment this to use warp device for unsupported DX12 functionalities in your device
@@ -42,7 +42,16 @@
 //gObj<DXRBasicScenePhotontracer> technique;
 //gObj<DXRItPathtracer> technique;
 //gObj<DeferredShadingTechnique> technique;
-gObj<HybridPhotonTracer> technique;
+//gObj<HybridPhotonTracer> technique;
 //gObj<DXRPathtracer> technique;
 //gObj<FullDXRPhotonTracer2> technique; 
 //gObj<FullDXRPhotonTracer> technique;
+
+//----- Pathtracing approaches on the GPU using RT cores
+//gObj<IterativePathtracer> technique;
+gObj<RecursivePathtracer> technique;
+
+
+//----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
+
+//gObj<SHPhotonTracer> technique;

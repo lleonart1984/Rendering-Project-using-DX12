@@ -2,8 +2,11 @@
 
 // Top level structure with the scene
 RaytracingAccelerationStructure Scene : register(t0, space0);
-StructuredBuffer<Vertex> vertices		: register(t1);
-StructuredBuffer<Material> materials	: register(t2);
+
+#define VERTICES_REG t1
+#define MATERIALS_REG t2
+#define TEXTURES_REG t8
+#include "../CommonRT/CommonRTScenes.h"
 
 // GBuffer Used for primary rays (from light in photon trace and from viewer in raytrace)
 Texture2D<float3> Positions				: register(t3);

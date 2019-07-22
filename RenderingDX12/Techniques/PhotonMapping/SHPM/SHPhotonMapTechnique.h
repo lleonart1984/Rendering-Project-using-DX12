@@ -1,13 +1,20 @@
 #pragma once
 
-#include "../../Techniques/GUI_Traits.h"
-#include "../DeferredShading/GBufferConstruction.h"
-#include "../CommonGI/Parameters.h"
+// Spatial Hash Photon Map Technique Implementation
 
-struct FullDXRPhotonTracer2 : public Technique, public IHasScene, public IHasLight, public IHasCamera {
+
+#include "../../../Techniques/GUI_Traits.h"
+#include "../../DeferredShading/GBufferConstruction.h"
+#include "../../CommonGI/Parameters.h"
+
+struct SHPhotonTracer : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
 
-#define NUMBER_OF_PHOTONS (PHOTON_DIMENSION * PHOTON_DIMENSION)
+	~SHPhotonTracer() {
+	}
+
+// Number of photons will be Q since we are using Russian roulette with Spatial Hash Photon map as well.
+#define NUMBER_OF_PHOTONS (PHOTON_DIMENSION*PHOTON_DIMENSION)
 
 	// Scene loading process to retain scene on the GPU
 	gObj<RetainedSceneLoader> sceneLoader;
@@ -27,7 +34,7 @@ public:
 
 		class DXR_PT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\FULL_DXR_PhotonMap2\\FullDXRPhotonTracing2_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\SHPM\\SHPhotonTracer_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->PhotonMiss, L"PhotonMiss");
@@ -38,8 +45,8 @@ public:
 
 		struct DXR_PT_Program : public RTProgram<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(20);
-				_ gSet StackSize(3);
+				_ gSet Payload(16);
+				_ gSet StackSize(PHOTON_TRACE_MAX_BOUNCES + 1);
 				_ gLoad Shader(Context()->PTMainRays);
 				_ gLoad Shader(Context()->PhotonMiss);
 				_ gCreate HitGroup(Context()->PhotonMaterial, Context()->PhotonScattering, nullptr, nullptr);
@@ -62,18 +69,19 @@ public:
 			gObj<Buffer> LightingCB;
 
 			// Photon map binding objects
-			gObj<Buffer> PhotonAABBs; // Buffer with generated photon's aabbs for BVH photon map building
-			gObj<Buffer> Photons; // Buffer with all Photon attributes
+			gObj<Buffer> HashTable; // hash table with pointers to linked lists heads
+			gObj<Buffer> Photons; // Photon map in a lineal buffer
+			gObj<Buffer> NextBuffer; // Reference to next element in each linked list node
 
 			struct ObjInfo {
 				int TriangleOffset;
 				int MaterialIndex;
-				int2 padding;
 			} CurrentObjectInfo;
 
 			void Globals() {
-				UAV(0, PhotonAABBs);
+				UAV(0, HashTable);
 				UAV(1, Photons);
+				UAV(2, NextBuffer);
 
 				ADS(0, Scene);
 				SRV(1, Vertices);
@@ -112,42 +120,27 @@ public:
 		gObj<ClosestHitHandle> RTScattering;
 		gObj<HitGroupHandle> RTMaterial;
 
-		gObj<MissHandle> PhotonGatheringMiss;
-		gObj<IntersectionHandle> PhotonGatheringIntersection;
-		gObj<AnyHitHandle> PhotonGatheringAnyHit;
-		gObj<HitGroupHandle> PhotonGatheringMaterial;
-
 		class DXR_RT_IL : public DXIL_Library<DXR_RT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\FULL_DXR_PhotonMap2\\FullDXRRTWithDeferedGathering2_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\SHPM\\SHPhotonGathering_RT.cso"));
 
 				_ gLoad Shader(Context()->RTMainRays, L"RTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
 				_ gLoad Shader(Context()->RTScattering, L"RTScattering");
-
-				_ gLoad Shader(Context()->PhotonGatheringAnyHit, L"PhotonGatheringAnyHit");
-				_ gLoad Shader(Context()->PhotonGatheringIntersection, L"PhotonGatheringIntersection");
-				_ gLoad Shader(Context()->PhotonGatheringMiss, L"PhotonGatheringMiss");
 			}
 		};
 		gObj<DXR_RT_IL> _Library;
 
 		struct DXR_RT_Program : public RTProgram<DXR_RT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(4 * (3 + 1 + 3)); // 3- Normal, 1- SpecularSharpness, 3- OutDiffAcc //, 3- OutSpecAcc
-				_ gSet StackSize(2);
-				_ gSet MaxHitGroupIndex(1 + 100); // 1 hitgroup for all photons + one hitgroup per number of geometries
+				_ gSet Payload(16);
+				_ gSet StackSize(RAY_TRACING_MAX_BOUNCES + 1);
 				_ gLoad Shader(Context()->RTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
-				_ gLoad Shader(Context()->PhotonGatheringMiss);
 				_ gCreate HitGroup(Context()->RTMaterial, Context()->RTScattering, nullptr, nullptr);
-				_ gCreate HitGroup(Context()->PhotonGatheringMaterial, nullptr, Context()->PhotonGatheringAnyHit, Context()->PhotonGatheringIntersection);
 			}
 
 			gObj<SceneOnGPU> Scene;
-			gObj<Buffer> Photons;
-			gObj<Texture2D> PhotonCount;
-
 			gObj<Buffer> Vertices;
 			gObj<Buffer> Materials;
 
@@ -159,39 +152,45 @@ public:
 			// GBuffer from light for visibility test during direct lighting
 			gObj<Texture2D> LightPositions;
 
+			// Photon map binding objects (now as readonly-resources)
+			gObj<Buffer> HashTable; // hash table with pointers to linked lists heads
+			gObj<Buffer> Photons; // Photon map in a lineal buffer
+			gObj<Buffer> NextBuffer; // Reference to next element in each linked list node
+
 			gObj<Texture2D> *Textures;
 			int TextureCount;
 
 			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
 			gObj<Buffer> LightTransforms;
-
+			
 			gObj<Texture2D> Output;
+
 
 			struct ObjInfo {
 				int TriangleOffset;
 				int MaterialIndex;
-				int2 padding;
 			} CurrentObjectInfo;
 
 			void Globals() {
 				UAV(0, Output);
 
-				ADS(0, Scene); // Scene with both Photon AABBs and Scene geometries
+				ADS(0, Scene);
+				SRV(1, Vertices);
+				SRV(2, Materials);
 
-				SRV(1, Photons);
+				SRV(3, Positions);
+				SRV(4, Normals);
+				SRV(5, Coordinates);
+				SRV(6, MaterialIndices);
 
-				SRV(2, Vertices);
-				SRV(3, Materials);
+				SRV(7, LightPositions);
 
-				SRV(4, Positions);
-				SRV(5, Normals);
-				SRV(6, Coordinates);
-				SRV(7, MaterialIndices);
+				SRV(8, HashTable);
+				SRV(9, Photons);
+				SRV(10, NextBuffer);
 
-				SRV(8, LightPositions);
-
-				SRV_Array(9, Textures, TextureCount);
+				SRV_Array(11, Textures, TextureCount);
 
 				Static_SMP(0, Sampler::Linear());
 				Static_SMP(1, Sampler::LinearWithoutMipMaps());
@@ -214,15 +213,9 @@ public:
 		}
 	};
 
+	gObj<Buffer> screenVertices;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
 	gObj<DXR_RT_Pipeline> dxrRTPipeline;
-
-	gObj<GeometriesOnGPU> PhotonAABBsOnTheGPU;
-	gObj<GeometriesOnGPU> sceneGeometriesOnGPU;
-	// AABBs buffer for photon map
-	gObj<Buffer> PhotonsAABBs;
-	// Vertex buffer for scene triangles
-	gObj<Buffer> VB;
 
 	void SetScene(gObj<CA4G::Scene> scene) {
 		IHasScene::SetScene(scene);
@@ -237,8 +230,6 @@ public:
 		sceneLoader->SetScene(this->Scene);
 		_ gLoad Subprocess(sceneLoader);
 
-		wait_for(signal(flush_all_to_gpu));
-
 		// Load and setup gbuffer construction process from light
 		gBufferFromLight = new GBufferConstruction(PHOTON_DIMENSION, PHOTON_DIMENSION);
 		gBufferFromLight->sceneLoader = this->sceneLoader;
@@ -249,7 +240,7 @@ public:
 		gBufferFromViewer->sceneLoader = this->sceneLoader;
 		_ gLoad Subprocess(gBufferFromViewer);
 
-		flush_all_to_gpu;
+		wait_for(signal(flush_all_to_gpu));
 
 		_ gLoad Pipeline(dxrPTPipeline);
 		_ gLoad Pipeline(dxrRTPipeline);
@@ -257,39 +248,36 @@ public:
 		// Load assets to render the deferred lighting image
 		perform(CreatingAssets);
 
-		flush_all_to_gpu;
-
 		perform(CreateSceneOnGPU);
-
-		flush_all_to_gpu;
-
 	}
 
-	struct Photon {
-		float3 Direction;
-		float3 Intensity; 
-		float3 Position;
-		float Radius;
+	struct SpaceInfo {
+		float3 MinimumPosition; float pad0;
+		float3 BoxSize; float pad1;
+		float3 CellSize; float pad2;
+		int3 Resolution; float pad3;
 	};
 
-	double doubleRand() {
-		return double(rand()) / (double(RAND_MAX) + 1.0);
-	}
+	struct Photon {
+		float3 Position;
+		float3 Direction;
+		float3 Intensity;
+	};
+
 
 	void CreatingAssets(gObj<CopyingManager> manager) {
-		// Photons aabbs used in bottom level structure building and updates
-		PhotonsAABBs = _ gCreate RWAccelerationDatastructureBuffer<D3D12_RAYTRACING_AABB>(NUMBER_OF_PHOTONS);
-		/*D3D12_RAYTRACING_AABB* aabbs = new D3D12_RAYTRACING_AABB[NUMBER_OF_PHOTONS];
-		for (int i = 0; i < NUMBER_OF_PHOTONS; i++)
-		{
-			float x = 2 * doubleRand() - 1;
-			float y = 2 * doubleRand() - 1;
-			float z = 2 * doubleRand() - 1;
-			aabbs[i] = { x,y,z, x + 0.001f, 1,z + 0.001f };
-		}
-		manager gCopy PtrData(PhotonsAABBs, aabbs);
-		delete aabbs;*/
-		//PhotonsAABBs = _ gCreate GenericBuffer<D3D12_RAYTRACING_AABB>(D3D12_RESOURCE_STATE_GENERIC_READ, NUMBER_OF_PHOTONS, CPU_WRITE_GPU_READ);
+
+		// load screen vertices
+		screenVertices = _ gCreate VertexBuffer<float2>(6);
+		manager gCopy ListData(screenVertices, {
+				float2(-1, 1),
+				float2(1, 1),
+				float2(1, -1),
+
+				float2(1, -1),
+				float2(-1, -1),
+				float2(-1, 1),
+			});
 
 #pragma region DXR Photon trace Pipeline Objects
 		dxrPTPipeline->_Program->TextureCount = sceneLoader->TextureCount;
@@ -300,10 +288,9 @@ public:
 		// CBs will be updated every frame
 		dxrPTPipeline->_Program->CameraCB = _ gCreate ConstantBuffer<float4x4>();
 		dxrPTPipeline->_Program->LightingCB = _ gCreate ConstantBuffer<Lighting>();
-		dxrPTPipeline->_Program->PhotonAABBs = PhotonsAABBs;
-		dxrPTPipeline->_Program->PhotonAABBs->SetDebugName(L"Buffer to store AABBs");
+		dxrPTPipeline->_Program->HashTable = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
 		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(NUMBER_OF_PHOTONS);
-		dxrPTPipeline->_Program->Photons->SetDebugName(L"Buffer to store Photons");
+		dxrPTPipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(NUMBER_OF_PHOTONS);
 #pragma endregion
 
 #pragma region DXR Photon gathering Pipeline Objects
@@ -320,11 +307,14 @@ public:
 		dxrRTPipeline->_Program->LightingCB = dxrPTPipeline->_Program->LightingCB;
 
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
-		// Bind now Photon map as SRVs
+		// Bind now as SRVs
+		dxrRTPipeline->_Program->HashTable = dxrPTPipeline->_Program->HashTable;
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
+		dxrRTPipeline->_Program->NextBuffer = dxrPTPipeline->_Program->NextBuffer;
 #pragma endregion
 	}
 
+	gObj<Buffer> VB;
 	void CreateSceneOnGPU(gObj<DXRManager> manager) {
 		/// Loads a static scene for further ray-tracing
 
@@ -332,56 +322,36 @@ public:
 		VB = _ gCreate GenericBuffer<SCENE_VERTEX>(D3D12_RESOURCE_STATE_GENERIC_READ, Scene->VerticesCount(), CPU_WRITE_GPU_READ);
 		manager gCopy PtrData(VB, Scene->Vertices());
 
-		auto sceneGeometriesBuilder = manager gCreate TriangleGeometries();
-		sceneGeometriesBuilder gSet VertexBuffer(VB, SCENE_VERTEX::Layout());
+		auto geometries = manager gCreate TriangleGeometries();
+		geometries gSet VertexBuffer(VB, SCENE_VERTEX::Layout());
+		//geometries gLoad Geometry(0, VB->ElementCount);
 		for (int i = 0; i < Scene->ObjectsCount(); i++)
 		{ // Create a geometry for each obj loaded group
 			auto sceneObj = Scene->Objects()[i];
-			sceneGeometriesBuilder gLoad Geometry(sceneObj.startVertex, sceneObj.vertexesCount);
+			geometries gLoad Geometry(sceneObj.startVertex, sceneObj.vertexesCount);
 		}
-		sceneGeometriesOnGPU = sceneGeometriesBuilder gCreate BakedGeometry();
+		gObj<GeometriesOnGPU> geometriesOnGPU;
+		geometriesOnGPU = geometries gCreate BakedGeometry();
 
-		auto sceneInstances = manager gCreate Instances();
-		sceneInstances gLoad Instance(sceneGeometriesOnGPU, 1);
-		dxrPTPipeline->_Program->Scene = sceneInstances gCreate BakedScene();
-
-	}
-
-	void CreatePhotonMapAndScene(gObj<DXRManager> manager) {
-		auto sceneInstances = manager gCreate Instances();
-
-		auto photonMapBuilder = manager gCreate ProceduralGeometries();
-
-		photonMapBuilder gSet AABBs(PhotonsAABBs);
-		photonMapBuilder gLoad Geometry(0, NUMBER_OF_PHOTONS);
-		PhotonAABBsOnTheGPU = photonMapBuilder gCreate BakedGeometry(true, true);
-
-		sceneInstances gLoad Instance(sceneGeometriesOnGPU, 1);
-		sceneInstances gLoad Instance(PhotonAABBsOnTheGPU, 2);
-
-		dxrRTPipeline->_Program->Scene = sceneInstances gCreate BakedScene();
-	}
-
-	void UpdatePhotonMap(gObj<DXRManager> manager) {
-		auto photonMapBuilder = manager gCreate ProceduralGeometries(PhotonAABBsOnTheGPU);
-		photonMapBuilder gSet AABBs(PhotonsAABBs);
-		photonMapBuilder gLoad Geometry(0, NUMBER_OF_PHOTONS);
-		PhotonAABBsOnTheGPU = photonMapBuilder gCreate UpdatedGeometry();
+		// Creates a single instance to refer all static objects in bottom level acc ds.
+		auto instances = manager gCreate Instances();
+		instances gLoad Instance(geometriesOnGPU);
+		dxrPTPipeline->_Program->Scene = dxrRTPipeline->_Program->Scene = instances gCreate BakedScene();
 	}
 
 	float4x4 view, proj;
 	float4x4 lightView, lightProj;
 
 	void Frame() {
+		if (CameraIsDirty) {
 #pragma region Construct GBuffer from viewer
-		Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
+			Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
 
-		gBufferFromViewer->ViewMatrix = view;
-		gBufferFromViewer->ProjectionMatrix = proj;
-		ExecuteFrame(gBufferFromViewer);
+			gBufferFromViewer->ViewMatrix = view;
+			gBufferFromViewer->ProjectionMatrix = proj;
+			ExecuteFrame(gBufferFromViewer);
 #pragma endregion
-
-		//flush_all_to_gpu;
+		}
 
 #pragma region Construct GBuffer from light
 		lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
@@ -390,24 +360,20 @@ public:
 		gBufferFromLight->ProjectionMatrix = lightProj;
 		ExecuteFrame(gBufferFromLight);
 #pragma endregion
-		flush_all_to_gpu;
-
-		static bool firstTime = true;
 
 		perform(Photontracing);
-
-		if (firstTime) {
-			perform(CreatePhotonMapAndScene);
-			
-			firstTime = false;
-		}
-		else
-			perform(UpdatePhotonMap);
 
 		perform(Raytracing);
 	}
 
 	void Photontracing(gObj<DXRManager> manager) {
+
+		static int FrameIndex = 0;
+
+		if (CameraIsDirty)
+			FrameIndex = 0;
+
+		FrameIndex++;
 
 		auto ptRTProgram = dxrPTPipeline->_Program;
 
@@ -429,6 +395,8 @@ public:
 		// Activate program with main shaders
 		manager gSet Program(ptRTProgram);
 
+		manager gClear UAV(ptRTProgram->HashTable, (unsigned int)-1); // reset head buffer to null for every list
+
 		int startTriangle;
 
 #pragma region Photon Trace Stage
@@ -436,45 +404,31 @@ public:
 		// Set Miss in slot 0
 		manager gSet Miss(dxrPTPipeline->PhotonMiss, 0);
 
-		static bool firstTime = true;
+		// Setup a simple hitgroup per object
+		// each object knows the offset in triangle buffer
+		// and the material index for further light scattering
+		startTriangle = 0;
+		for (int i = 0; i < Scene->ObjectsCount(); i++)
+		{
+			auto sceneObject = Scene->Objects()[i];
 
-		if (firstTime) {
-			// Setup a simple hitgroup per object
-			// each object knows the offset in triangle buffer
-			// and the material index for further light scattering
-			startTriangle = 0;
-			for (int i = 0; i < Scene->ObjectsCount(); i++)
-			{
-				auto sceneObject = Scene->Objects()[i];
+			ptRTProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
+			ptRTProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-				ptRTProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
-				ptRTProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
+			manager gSet HitGroup(dxrPTPipeline->PhotonMaterial, i);
 
-				manager gSet HitGroup(dxrPTPipeline->PhotonMaterial, i);
-
-				startTriangle += sceneObject.vertexesCount / 3;
-			}
-			firstTime = false;
+			startTriangle += sceneObject.vertexesCount / 3;
 		}
 
 		// Setup a raygen shader
 		manager gSet RayGeneration(dxrPTPipeline->PTMainRays);
 
-		// Dispatch rays for more than 2^22 photons
+		// Dispatch rays for 1 000 000 photons
 		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
 
 #pragma endregion
 	}
 
-	void BuildPhotonMap(gObj<DXRManager> manager) {
-#pragma region Update Photon Map BVHs in next frames
-		auto geomUpdater = manager gCreate ProceduralGeometries(PhotonAABBsOnTheGPU);
-		geomUpdater->PrepareBuffer(PhotonsAABBs);
-		geomUpdater gSet AABBs(PhotonsAABBs);
-		geomUpdater gLoad Geometry(0, NUMBER_OF_PHOTONS);
-		geomUpdater gCreate RebuiltGeometry();
-#pragma endregion
-	}
 
 	void Raytracing(gObj<DXRManager> manager) {
 
@@ -489,17 +443,14 @@ public:
 				lightView
 			});
 
-		// Update lighting needed for photon tracing
-		manager gCopy ValueData(rtProgram->LightingCB, Lighting{
-			Light->Position, 0,
-			Light->Intensity, 0
-			});
-
 		dxrRTPipeline->_Program->Positions = gBufferFromViewer->pipeline->GBuffer_P;
 		dxrRTPipeline->_Program->Normals = gBufferFromViewer->pipeline->GBuffer_N;
 		dxrRTPipeline->_Program->Coordinates = gBufferFromViewer->pipeline->GBuffer_C;
 		dxrRTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
 		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
+
+		if (CameraIsDirty)
+			manager gClear UAV(rtProgram->Output, 0u);
 
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrRTPipeline);
@@ -510,32 +461,23 @@ public:
 
 #pragma region Raytrace Stage
 
-		// Set Environment Miss in slot 0
+		// Set Miss in slot 0
 		manager gSet Miss(dxrRTPipeline->EnvironmentMap, 0);
-		// Set PhotonGatheringMiss in slot 1
-		manager gSet Miss(dxrRTPipeline->PhotonGatheringMiss, 1);
 
-		static bool firstTime = true;
+		// Setup a simple hitgroup per object
+		// each object knows the offset in triangle buffer
+		// and the material index for further light scattering
+		startTriangle = 0;
+		for (int i = 0; i < Scene->ObjectsCount(); i++)
+		{
+			auto sceneObject = Scene->Objects()[i];
 
-		if (firstTime) {
-			// Set PhotonGatheringMaterial for each photon in ST
-			manager gSet HitGroup(dxrRTPipeline->PhotonGatheringMaterial, 0);
-			// Setup a simple hitgroup per object
-			// each object knows the offset in triangle buffer
-			// and the material index for further light scattering
-			startTriangle = 0;
-			for (int i = 0; i < Scene->ObjectsCount(); i++)
-			{
-				auto sceneObject = Scene->Objects()[i];
+			rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
+			rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-				rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
-				rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
+			manager gSet HitGroup(dxrRTPipeline->RTMaterial, i);
 
-				manager gSet HitGroup(dxrRTPipeline->RTMaterial, 1 + i);
-
-				startTriangle += sceneObject.vertexesCount / 3;
-			}
-			firstTime = false;
+			startTriangle += sceneObject.vertexesCount / 3;
 		}
 
 		// Setup a raygen shader

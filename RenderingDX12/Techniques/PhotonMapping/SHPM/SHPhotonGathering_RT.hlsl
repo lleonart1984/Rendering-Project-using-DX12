@@ -1,5 +1,5 @@
-#include "../CommonGI/Definitions.h"
-#include "../CommonGI/Parameters.h"
+#include "../../CommonGI/Definitions.h"
+#include "../../CommonGI/Parameters.h"
 
 // Photon Data
 struct Photon {
@@ -21,7 +21,7 @@ Texture2D<int> MaterialIndices			: register(t6);
 // Used for direct light visibility test
 Texture2D<float3> LightPositions		: register(t7);
 // Photon Map binding objects
-StructuredBuffer<int> HeadBuffer		: register(t8);
+StructuredBuffer<int> HashTable			: register(t8);
 StructuredBuffer<Photon> Photons		: register(t9);
 StructuredBuffer<int> NextBuffer		: register(t10);
 
@@ -46,32 +46,18 @@ cbuffer Lighting : register(b1) {
 	float3 LightIntensity;
 }
 
-cbuffer SpaceInformation : register(b2) {
-	// Grid space
-	float3 MinimumPosition;
-	float3 BoxSize;
-	float3 CellSize;
-	int3 Resolution;
-}
-
 // Matrices to transform from Light space (proj and view) to world space
-cbuffer LightTransforms : register(b3) {
+cbuffer LightTransforms : register(b2) {
 	row_major matrix LightProj;
 	row_major matrix LightView;
 }
-
-cbuffer ProgressiveArgs : register(b4) {
-	int CurrentPass;
-};
 
 struct ObjInfo {
 	int TriangleOffset;
 	int MaterialIndex;
 };
 // Locals for hit groups (fresnel and lambert)
-ConstantBuffer<ObjInfo> objectInfo : register(b5);
-
-typedef BuiltInTriangleIntersectionAttributes MyAttributes;
+ConstantBuffer<ObjInfo> objectInfo : register(b3);
 
 struct RayPayload
 {
@@ -79,31 +65,13 @@ struct RayPayload
 	int bounce;
 };
 
-#include "../CommonGI/ScatteringTools.h"
-
-int3 FromPositionToCell(float3 P) {
-	return (int3)((P - MinimumPosition) / CellSize);
-}
-
-int FromCellToCellIndex(int3 cell)
-{
-	if (any(cell < 0) || any(cell >= Resolution))
-		return -1;
-	return cell.x + cell.y * Resolution.x + cell.z * Resolution.x * Resolution.y;
-}
-
-int3 FromCellIndexToCell(int index) {
-	return int3 (index % Resolution.x, index % (Resolution.x * Resolution.y) / Resolution.x, index / (Resolution.x * Resolution.y));
-}
-
-int FromPositionToCellIndex(float3 P) {
-	return FromCellToCellIndex(FromPositionToCell(P));
-}
+#include "../../CommonGI/ScatteringTools.h"
+#include "SHCommon.h"
 
 // Perform photon gathering
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
 
-	float radius = PHOTON_RADIUS;// 4 * max(CellSize.x, max(CellSize.y, CellSize.z));
+	float radius = PHOTON_RADIUS;
 
 	int3 begCell = FromPositionToCell(surfel.P - radius);
 	int3 endCell = FromPositionToCell(surfel.P + radius);
@@ -111,46 +79,43 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	float3 totalLighting = material.Emissive;
 
 	for (int dz = begCell.z; dz <= endCell.z; dz++)
-	for (int dy = begCell.y; dy <= endCell.y; dy++)
-	for (int dx = begCell.x; dx <= endCell.x; dx++)
-	{
-		int cellIndexToQuery = FromCellToCellIndex(int3(dx, dy, dz));
+		for (int dy = begCell.y; dy <= endCell.y; dy++)
+			for (int dx = begCell.x; dx <= endCell.x; dx++)
+			{
+				int cellIndexToQuery = FromCellToCellIndex(int3(dx, dy, dz));
 
-		if (cellIndexToQuery != -1) // valid coordinates
-		{
-			int currentPhotonPtr = HeadBuffer[cellIndexToQuery];
+				int currentPhotonPtr = HashTable[cellIndexToQuery];
 
-			while (currentPhotonPtr != -1) {
+				while (currentPhotonPtr != -1) {
 
-				Photon p = Photons[currentPhotonPtr];
+					Photon p = Photons[currentPhotonPtr];
 
-				float NdotL = dot(surfel.N, -p.Direction);
-				
-				float photonDistance = length(p.Position - surfel.P);
+					float NdotL = dot(surfel.N, -p.Direction);
 
-				// Aggregate current Photon contribution if inside radius
-				if (photonDistance < radius && NdotL > 0.001)
-				{
-					// Lambert Diffuse component (normalized dividing by pi)
-					float3 DiffuseRatio = DiffuseBRDF(V, -p.Direction, surfel.N, NdotL, material);
-					// Blinn Specular component (normalized multiplying by (2+n)/(2pi)
-					//float3 SpecularRatio = SpecularBRDF(V, -p.Direction, surfel.N, NdotL, material);
+					float photonDistance = length(p.Position - surfel.P);
 
-					float kernel = 2 * (1 - photonDistance / radius);
+					// Aggregate current Photon contribution if inside radius
+					if (photonDistance < radius && NdotL > 0.001)
+					{
+						// Lambert Diffuse component (normalized dividing by pi)
+						float3 DiffuseRatio = DiffuseBRDF(V, -p.Direction, surfel.N, NdotL, material);
+						// Blinn Specular component (normalized multiplying by (2+n)/(2pi)
+						//float3 SpecularRatio = SpecularBRDF(V, -p.Direction, surfel.N, NdotL, material);
 
-					float3 BRDF =
-						material.Roulette.x * material.Diffuse / pi;// *DiffuseRatio;
-						//+ material.Roulette.y * SpecularRatio;
+						float kernel = 2 * (1 - photonDistance / radius);
 
-					totalLighting += NdotL * kernel * p.Intensity * BRDF;
+						float3 BRDF =
+							material.Roulette.x * material.Diffuse / pi;// *DiffuseRatio;
+							//+ material.Roulette.y * SpecularRatio;
+
+						totalLighting += NdotL * kernel * p.Intensity * BRDF;
+					}
+
+					currentPhotonPtr = NextBuffer[currentPhotonPtr];
 				}
-
-				currentPhotonPtr = NextBuffer[currentPhotonPtr];
 			}
-		}
-	}
 
-	return totalLighting / (100000*pi*radius*radius);
+	return totalLighting / (100000 * pi*radius*radius);
 }
 
 // Gets true if current surfel is lit by the light source
@@ -174,7 +139,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 
 	// Adding Emissive
 	total += material.Emissive;
-	
+
 	// Adding direct lighting
 	float NdotV;
 	bool invertNormal;
@@ -266,36 +231,13 @@ void RTMainRays()
 	AugmentMaterialWithTextureMapping(surfel, material);
 
 	// Write the raytraced color to the output texture.
-	Output[DispatchRaysIndex().xy] = (Output[DispatchRaysIndex().xy] * CurrentPass + RaytracingScattering(V, surfel, material, RAY_TRACING_MAX_BOUNCES)) / (CurrentPass + 1);
+	Output[DispatchRaysIndex().xy] = RaytracingScattering(V, surfel, material, RAY_TRACING_MAX_BOUNCES);
 }
 
-void GetHitInfo(in MyAttributes attr, out Vertex surfel, out Material material)
-{
-	float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
-	uint triangleIndex = objectInfo.TriangleOffset + PrimitiveIndex();
-	uint materialIndex = objectInfo.MaterialIndex;
-
-	Vertex v1 = vertices[triangleIndex * 3 + 0];
-	Vertex v2 = vertices[triangleIndex * 3 + 1];
-	Vertex v3 = vertices[triangleIndex * 3 + 2];
-	Vertex s = {
-		v1.P * barycentrics.x + v2.P * barycentrics.y + v3.P * barycentrics.z,
-		v1.N * barycentrics.x + v2.N * barycentrics.y + v3.N * barycentrics.z,
-		v1.C * barycentrics.x + v2.C * barycentrics.y + v3.C * barycentrics.z,
-		v1.T * barycentrics.x + v2.T * barycentrics.y + v3.T * barycentrics.z,
-		v1.B * barycentrics.x + v2.B * barycentrics.y + v3.B * barycentrics.z
-	};
-
-	surfel = Transform(s, ObjectToWorld4x3());
-
-	material = materials[materialIndex];
-
-	AugmentHitInfoWithTextureMapping(surfel, material);
-}
 
 [shader("closesthit")]
-void RTScattering(inout RayPayload payload, in MyAttributes attr)
+void RTScattering(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
 	Vertex surfel;
 	Material material;

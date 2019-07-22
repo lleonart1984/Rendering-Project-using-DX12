@@ -49,6 +49,17 @@
     <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial12.h" />
     <ClInclude Include="Techniques\CommonGI\Parameters.h" />
+    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHCommon.h" />
+    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHPhotonMapTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMapping\GPM\GPMCommon.h" />
+    <ClInclude Include="Techniques\PhotonMapping\CommonTracingBindings.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonRTScenes.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonShadowMaping.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonDeferred.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonOutput.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonProgressive.h" />
+    <ClInclude Include="Techniques\Pathtracing\Hybrid\IterativePathtracer.h" />
+    <ClInclude Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -77,23 +88,13 @@
     <FxCompile Include="Techniques\Tutorials\Shaders\ShowComplexity_PS.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\DX_RTX_Sample_RT.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\DX_RTX_Basic_RT.hlsl" />
-    <FxCompile Include="Techniques\DXR_Raytracer\DXR_RTX_Basic_RT.hlsl" />
     <FxCompile Include="Techniques\DeferredShading\DeferredShading_VS.hlsl" />
     <FxCompile Include="Techniques\DeferredShading\DeferredShading_PS.hlsl" />
     <FxCompile Include="Techniques\DeferredShading\DeferredLighting_PS.hlsl" />
-    <FxCompile Include="Techniques\RASTER_DXR_Photontracer\DeferredHybridShading_PS.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\DXR_ProceduralGeometrySample_RT.hlsl" />
-    <FxCompile Include="Techniques\AccPathtracing\AccPathtracer_RT.hlsl" />
-    <FxCompile Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotonTracing_RT.hlsl" />
-    <FxCompile Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotonGathering_RT.hlsl" />
-    <FxCompile Include="Techniques\FULL_DXR_PhotonMap2\FullDXRPhotonTracing2_RT.hlsl" />
-    <FxCompile Include="Techniques\FULL_DXR_PhotonMap2\FullDXRRTWithDeferedGathering2_RT.hlsl" />
-    <FxCompile Include="Techniques\ItAccPathtracing\ItAccPathtracer_RT.hlsl" />
-    <FxCompile Include="Techniques\DXR_Photontracer\DXR_PhotonMapping_RT.hlsl" />
-    <FxCompile Include="Techniques\RASTER_DXR_Photontracer\HPhotonTracer_RT.hlsl" />
-    <FxCompile Include="Techniques\RASTER_DXR_Photontracer\HPhotonGrathering_RT.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\UpdateAABBs_PS.hlsl" />
-    <FxCompile Include="Techniques\SHPM\SHPhotonTracer_RT.hlsl" />
+    <FxCompile Include="Techniques\Pathtracing\Hybrid\IterativePathtracer_RT.hlsl" />
+    <FxCompile Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Techniques\Tutorials\Tutorials.rm" />
