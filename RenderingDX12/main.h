@@ -8,7 +8,7 @@
 #define SANMIGUEL_OBJ 4
 
 
-#define USE_SCENE SPONZA_OBJ
+#define USE_SCENE SIBENIK_OBJ
 
 #define MOVE_LIGHT false
 
@@ -48,8 +48,8 @@
 //gObj<FullDXRPhotonTracer> technique;
 
 //----- Pathtracing approaches on the GPU using RT cores
-//gObj<IterativePathtracer> technique;
-gObj<RecursivePathtracer> technique;
+gObj<IterativePathtracer> technique;
+//gObj<RecursivePathtracer> technique;
 
 
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------

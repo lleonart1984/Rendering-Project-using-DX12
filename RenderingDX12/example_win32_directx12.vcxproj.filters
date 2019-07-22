@@ -1,19 +1,39 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="imgui">
-      <UniqueIdentifier>{fb3d294f-51ec-478e-a627-25831c80fefd}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="sources">
-      <UniqueIdentifier>{4f33ddea-9910-456d-b868-4267eb3c2b19}</UniqueIdentifier>
-    </Filter>
+    <FxCompile Include="Techniques\DeferredShading\DeferredLighting_PS.hlsl" />
+    <FxCompile Include="Techniques\DeferredShading\DeferredShading_PS.hlsl" />
+    <FxCompile Include="Techniques\DeferredShading\DeferredShading_VS.hlsl" />
+    <FxCompile Include="Techniques\Pathtracing\Hybrid\IterativePathtracer_RT.hlsl" />
+    <FxCompile Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer_RT.hlsl" />
+    <FxCompile Include="Techniques\RetainedBasic\RetainedRendering_PS.hlsl" />
+    <FxCompile Include="Techniques\RetainedBasic\RetainedRendering_VS.hlsl" />
+    <FxCompile Include="Techniques\Sample\Sample_PS.hlsl" />
+    <FxCompile Include="Techniques\Sample\Sample_VS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\BasicSampling2D_PS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\DXR_ProceduralGeometrySample_RT.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\DX_RTX_Basic_RT.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\DX_RTX_Sample_RT.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\GrabDepthComplexity_PS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\NoTransforms_VS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\PassPositionAndCoordinates_VS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\ShowComplexity_PS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\SimpleColor_PS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\SimplePhongShading_PS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\SimpleTransform_VS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\TransformToViewSpace_VS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\UpdateAABBs_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Techniques\Sample\Sample.h" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="Techniques\Common\RetainedSceneLoader.h" />
-    <ClInclude Include="Techniques\RetainedBasic\RetainedBasicRenderer.h" />
-    <ClInclude Include="Techniques\Common\ConstantBuffers.h" />
+    <ClCompile Include="Imgui\imgui.cpp" />
+    <ClCompile Include="Imgui\imgui_demo.cpp" />
+    <ClCompile Include="Imgui\imgui_draw.cpp" />
+    <ClCompile Include="Imgui\imgui_impl_dx12.cpp" />
+    <ClCompile Include="Imgui\imgui_impl_win32.cpp" />
+    <ClCompile Include="Imgui\imgui_widgets.cpp" />
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="Imgui\imconfig.h" />
     <ClInclude Include="Imgui\imgui.h" />
     <ClInclude Include="Imgui\imgui_impl_dx12.h" />
@@ -22,87 +42,57 @@
     <ClInclude Include="Imgui\imstb_rectpack.h" />
     <ClInclude Include="Imgui\imstb_textedit.h" />
     <ClInclude Include="Imgui\imstb_truetype.h" />
+    <ClInclude Include="main.h" />
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="Techniques\AccPathtracing\DXRPathtracer.h" />
+    <ClInclude Include="Techniques\CommonGI\Definitions.h" />
+    <ClInclude Include="Techniques\CommonGI\Parameters.h" />
+    <ClInclude Include="Techniques\CommonGI\ScatteringTools.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonDeferred.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonOutput.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonProgressive.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonRTScenes.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonShadowMaping.h" />
+    <ClInclude Include="Techniques\Common\ConstantBuffers.h" />
+    <ClInclude Include="Techniques\Common\RetainedSceneLoader.h" />
+    <ClInclude Include="Techniques\DeferredShading\DeferredLighting.h" />
+    <ClInclude Include="Techniques\DeferredShading\GBufferConstruction.h" />
+    <ClInclude Include="Techniques\DXR_Photontracer\DXRPhotonMapping.h" />
+    <ClInclude Include="Techniques\DXR_Raytracer\DXRRaytracer.h" />
+    <ClInclude Include="Techniques\FULL_DXR_PhotonMap2\FullDXRPhotontracerTechnique2.h" />
+    <ClInclude Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotontracerTechnique.h" />
+    <ClInclude Include="Techniques\GUI_Traits.h" />
+    <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
+    <ClInclude Include="Techniques\Pathtracing\Hybrid\IterativePathtracer.h" />
+    <ClInclude Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer.h" />
+    <ClInclude Include="Techniques\PhotonMapping\CommonTracingBindings.h" />
+    <ClInclude Include="Techniques\PhotonMapping\GPM\GPMCommon.h" />
+    <ClInclude Include="Techniques\Randoms\RandomHLSL.h" />
+    <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HybridPhotonTracer.h" />
+    <ClInclude Include="Techniques\RetainedBasic\RetainedBasicRenderer.h" />
+    <ClInclude Include="Techniques\Sample\Sample.h" />
+    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHCommon.h" />
+    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHPhotonMapTechnique.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial1.h" />
+    <ClInclude Include="Techniques\Tutorials\Tutorial10.h" />
+    <ClInclude Include="Techniques\Tutorials\Tutorial11.h" />
+    <ClInclude Include="Techniques\Tutorials\Tutorial12.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial2.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial3.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial4.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial5.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial6.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial7.h" />
-    <ClInclude Include="main.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial8.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial9.h" />
-    <ClInclude Include="Techniques\Tutorials\Tutorial10.h" />
-    <ClInclude Include="Techniques\GUI_Traits.h" />
-    <ClInclude Include="Techniques\DXR_Raytracer\DXRRaytracer.h" />
-    <ClInclude Include="Techniques\DXR_Photontracer\DXRPhotonMapping.h" />
-    <ClInclude Include="Techniques\DeferredShading\GBufferConstruction.h" />
-    <ClInclude Include="Techniques\DeferredShading\DeferredLighting.h" />
-    <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HybridPhotonTracer.h" />
-    <ClInclude Include="Techniques\Tutorials\Tutorial11.h" />
-    <ClInclude Include="Techniques\AccPathtracing\DXRPathtracer.h" />
-    <ClInclude Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotontracerTechnique.h" />
-    <ClInclude Include="Techniques\FULL_DXR_PhotonMap2\FullDXRPhotontracerTechnique2.h" />
-    <ClInclude Include="Techniques\Randoms\RandomHLSL.h" />
-    <ClInclude Include="Techniques\CommonGI\Definitions.h" />
-    <ClInclude Include="Techniques\CommonGI\ScatteringTools.h" />
-    <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
-    <ClInclude Include="Techniques\Tutorials\Tutorial12.h" />
-    <ClInclude Include="Techniques\CommonGI\Parameters.h" />
-    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHCommon.h" />
-    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHPhotonMapTechnique.h" />
-    <ClInclude Include="Techniques\PhotonMapping\GPM\GPMCommon.h" />
-    <ClInclude Include="Techniques\PhotonMapping\CommonTracingBindings.h" />
-    <ClInclude Include="Techniques\CommonRT\CommonRTScenes.h" />
-    <ClInclude Include="Techniques\CommonRT\CommonShadowMaping.h" />
-    <ClInclude Include="Techniques\CommonRT\CommonDeferred.h" />
-    <ClInclude Include="Techniques\CommonRT\CommonOutput.h" />
-    <ClInclude Include="Techniques\CommonRT\CommonProgressive.h" />
-    <ClInclude Include="Techniques\Pathtracing\Hybrid\IterativePathtracer.h" />
-    <ClInclude Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>sources</Filter>
-    </ClCompile>
-    <ClCompile Include="Imgui\imgui.cpp" />
-    <ClCompile Include="Imgui\imgui_demo.cpp" />
-    <ClCompile Include="Imgui\imgui_draw.cpp" />
-    <ClCompile Include="Imgui\imgui_impl_dx12.cpp" />
-    <ClCompile Include="Imgui\imgui_impl_win32.cpp" />
-    <ClCompile Include="Imgui\imgui_widgets.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="Techniques\Sample\Sample_PS.hlsl" />
-    <FxCompile Include="Techniques\Sample\Sample_VS.hlsl" />
-    <FxCompile Include="Techniques\RetainedBasic\RetainedRendering_VS.hlsl" />
-    <FxCompile Include="Techniques\RetainedBasic\RetainedRendering_PS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\NoTransforms_VS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\SimpleColor_PS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\SimpleTransform_VS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\PassPositionAndCoordinates_VS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\BasicSampling2D_PS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\TransformToViewSpace_VS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\SimplePhongShading_PS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\GrabDepthComplexity_PS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\ShowComplexity_PS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\DX_RTX_Sample_RT.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\DX_RTX_Basic_RT.hlsl" />
-    <FxCompile Include="Techniques\DeferredShading\DeferredShading_VS.hlsl" />
-    <FxCompile Include="Techniques\DeferredShading\DeferredShading_PS.hlsl" />
-    <FxCompile Include="Techniques\DeferredShading\DeferredLighting_PS.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\DXR_ProceduralGeometrySample_RT.hlsl" />
-    <FxCompile Include="Techniques\Tutorials\Shaders\UpdateAABBs_PS.hlsl" />
-    <FxCompile Include="Techniques\Pathtracing\Hybrid\IterativePathtracer_RT.hlsl" />
-    <FxCompile Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer_RT.hlsl" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Techniques\Tutorials\Tutorials.rm" />
     <None Include="..\Readme.md" />
-    <None Include="packages.config" />
     <None Include="..\tools\x64\dxrfallbackcompiler.dll" />
     <None Include="..\tools\x64\PostbuildCopy.bat" />
     <None Include="..\tools\x64\PrebuildCheck.bat" />
+    <None Include="packages.config" />
+    <None Include="Techniques\Tutorials\Tutorials.rm" />
     <None Include="..\tools\x64\version.txt" />
   </ItemGroup>
 </Project>
