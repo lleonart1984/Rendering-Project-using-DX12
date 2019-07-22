@@ -1,13 +1,13 @@
 #pragma once
 
-#include "../../../Techniques/GUI_Traits.h"
-#include "../../DeferredShading/GBufferConstruction.h"
-#include "../../CommonGI/Parameters.h"
+#include "../../Techniques/GUI_Traits.h"
+#include "../DeferredShading/GBufferConstruction.h"
+#include "../CommonGI/Parameters.h"
 
-struct RecursivePathtracer : public Technique, public IHasScene, public IHasLight, public IHasCamera {
+struct IterativePathtracer : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
 
-	~RecursivePathtracer() {
+	~IterativePathtracer() {
 	}
 
 	// Scene loading process to retain scene on the GPU
@@ -26,7 +26,7 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\Pathtracing\\Hybrid\\RecursivePathtracer_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\Pathtracing\\Hybrid\\IterativePathtracer_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -37,8 +37,8 @@ public:
 
 		struct DXR_RT_Program : public RTProgram<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(7 * 4); // 2 float3 + 1int
-				_ gSet StackSize(PATH_TRACING_MAX_BOUNCES); // recursion needed!
+				_ gSet Payload(4 * 3 * 4 + 4); // 4 float3
+				_ gSet StackSize(1); // No recursion needed!
 				_ gLoad Shader(Context()->PTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
 				_ gCreate HitGroup(Context()->PTMaterial, Context()->PTScattering, nullptr, nullptr);

@@ -130,6 +130,7 @@
       <ObjectFileOutput>$(ProjectDir)$(Configuration)\%(RelativeDir)%(Filename).cso</ObjectFileOutput>
       <AssemblerOutput>AssemblyCode</AssemblerOutput>
       <AssemblerOutputFile>$(ProjectDir)$(Configuration)\%(RelativeDir)%(Filename).asm</AssemblerOutputFile>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderingDX12\Techniques\CommonGI;$(SolutionDir)RenderingDX12\Techniques\CommonRT;$(SolutionDir)RenderingDX12\Techniques\PhotonMapping;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </FxCompile>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir)tools\x64\"</Command>
@@ -177,6 +178,7 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
       <ObjectFileOutput>$(ProjectDir)$(Configuration)\%(RelativeDir)%(Filename).cso</ObjectFileOutput>
       <AssemblerOutput>AssemblyCode</AssemblerOutput>
       <AssemblerOutputFile>$(ProjectDir)$(Configuration)\%(RelativeDir)%(Filename).asm</AssemblerOutputFile>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderingDX12\Techniques\CommonGI;$(SolutionDir)RenderingDX12\Techniques\CommonRT;$(SolutionDir)RenderingDX12\Techniques\PhotonMapping;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </FxCompile>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir)tools\x64\"</Command>
@@ -216,16 +218,31 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotontracerTechnique.h" />
     <ClInclude Include="Techniques\GUI_Traits.h" />
     <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
-    <ClInclude Include="Techniques\Pathtracing\Hybrid\IterativePathtracer.h" />
-    <ClInclude Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer.h" />
-    <ClInclude Include="Techniques\PhotonMapping\CommonTracingBindings.h" />
-    <ClInclude Include="Techniques\PhotonMapping\GPM\GPMCommon.h" />
+    <ClInclude Include="Techniques\Pathtracing\IterativePathtracer.h" />
+    <ClInclude Include="Techniques\Pathtracing\RecursivePathtracer.h" />
+    <ClInclude Include="Techniques\PhotonMapping\CommonDeferredGathering.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMapping\CommonDeferredTracing.hlsl.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+    </ClInclude>
+    <ClInclude Include="Techniques\PhotonMapping\CommonGatheringSpatialHashGrid.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMapping\CommonSpatialHashing.hlsl.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+    </ClInclude>
+    <ClInclude Include="Techniques\PhotonMapping\CommonTracingSpatialHashGrid.hlsl.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+    </ClInclude>
+    <ClInclude Include="Techniques\PhotonMapping\GridPhotonMapping\GPhotonMappingTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMapping\GridPhotonMapping\GPMCommon.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMapping\PhotonDefinition.h" />
     <ClInclude Include="Techniques\Randoms\RandomHLSL.h" />
     <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HybridPhotonTracer.h" />
     <ClInclude Include="Techniques\RetainedBasic\RetainedBasicRenderer.h" />
     <ClInclude Include="Techniques\Sample\Sample.h" />
-    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHCommon.h" />
-    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHPhotonMapTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPMCommon.h" />
+    <ClInclude Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPhotonMapTechnique.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial1.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial10.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial11.h" />
@@ -279,7 +296,7 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Geometry</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
     </FxCompile>
-    <FxCompile Include="Techniques\Pathtracing\Hybrid\IterativePathtracer_RT.hlsl">
+    <FxCompile Include="Techniques\Pathtracing\IterativePathtracer_RT.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
@@ -297,7 +314,7 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </EntryPointName>
     </FxCompile>
-    <FxCompile Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer_RT.hlsl">
+    <FxCompile Include="Techniques\Pathtracing\RecursivePathtracer_RT.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
@@ -314,6 +331,58 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
       </EntryPointName>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </EntryPointName>
+    </FxCompile>
+    <FxCompile Include="Techniques\PhotonMapping\GridPhotonMapping\GPhotonGather_RT.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='HLSL|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='HLSL|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='HLSL|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='HLSL|x64'">4.0</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </EntryPointName>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </EntryPointName>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)RenderingDX12\Techniques\CommonGI;$(SolutionDir)RenderingDX12\Techniques\CommonRT;$(SolutionDir)RenderingDX12\Techniques\PhotonMapping;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)RenderingDX12\Techniques\CommonGI;$(SolutionDir)RenderingDX12\Techniques\CommonRT;$(SolutionDir)RenderingDX12\Techniques\PhotonMapping;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </FxCompile>
+    <FxCompile Include="Techniques\PhotonMapping\GridPhotonMapping\GPhotonTracer_RT.hlsl">
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)RenderingDX12\Techniques\CommonGI;$(SolutionDir)RenderingDX12\Techniques\CommonRT;$(SolutionDir)RenderingDX12\Techniques\PhotonMapping;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)RenderingDX12\Techniques\CommonGI;$(SolutionDir)RenderingDX12\Techniques\CommonRT;$(SolutionDir)RenderingDX12\Techniques\PhotonMapping;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </FxCompile>
+    <FxCompile Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPhotonGathering_RT.hlsl">
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPhotonTracer_RT.hlsl">
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
     </FxCompile>
     <FxCompile Include="Techniques\RetainedBasic\RetainedRendering_PS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>

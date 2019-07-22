@@ -1,20 +1,16 @@
 #pragma once
 
-// Spatial Hash Photon Map Technique Implementation
-
+#pragma once
 
 #include "../../../Techniques/GUI_Traits.h"
 #include "../../DeferredShading/GBufferConstruction.h"
 #include "../../CommonGI/Parameters.h"
 
-struct SHPhotonTracer : public Technique, public IHasScene, public IHasLight, public IHasCamera {
+struct SHPhotonMappingTechnique : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
 
-	~SHPhotonTracer() {
+	~SHPhotonMappingTechnique() {
 	}
-
-// Number of photons will be Q since we are using Russian roulette with Spatial Hash Photon map as well.
-#define NUMBER_OF_PHOTONS (PHOTON_DIMENSION*PHOTON_DIMENSION)
 
 	// Scene loading process to retain scene on the GPU
 	gObj<RetainedSceneLoader> sceneLoader;
@@ -34,7 +30,7 @@ public:
 
 		class DXR_PT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\SHPM\\SHPhotonTracer_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\SpatialHashPhotonMapping\\SHPhotonTracer_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->PhotonMiss, L"PhotonMiss");
@@ -46,7 +42,7 @@ public:
 		struct DXR_PT_Program : public RTProgram<DXR_PT_Pipeline> {
 			void Setup() {
 				_ gSet Payload(16);
-				_ gSet StackSize(PHOTON_TRACE_MAX_BOUNCES + 1);
+				_ gSet StackSize(PHOTON_TRACE_MAX_BOUNCES);
 				_ gLoad Shader(Context()->PTMainRays);
 				_ gLoad Shader(Context()->PhotonMiss);
 				_ gCreate HitGroup(Context()->PhotonMaterial, Context()->PhotonScattering, nullptr, nullptr);
@@ -67,9 +63,10 @@ public:
 
 			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
+			gObj<Buffer> ProgressivePass;
 
 			// Photon map binding objects
-			gObj<Buffer> HashTable; // hash table with pointers to linked lists heads
+			gObj<Buffer> HashtableBuffer; // head ptrs of linked lists
 			gObj<Buffer> Photons; // Photon map in a lineal buffer
 			gObj<Buffer> NextBuffer; // Reference to next element in each linked list node
 
@@ -79,8 +76,8 @@ public:
 			} CurrentObjectInfo;
 
 			void Globals() {
-				UAV(0, HashTable);
-				UAV(1, Photons);
+				UAV(0, Photons);
+				UAV(1, HashtableBuffer);
 				UAV(2, NextBuffer);
 
 				ADS(0, Scene);
@@ -98,10 +95,11 @@ public:
 
 				CBV(0, CameraCB);
 				CBV(1, LightingCB);
+				CBV(2, ProgressivePass);
 			}
 
 			void HitGroup_Locals() {
-				CBV(2, CurrentObjectInfo);
+				CBV(3, CurrentObjectInfo);
 			}
 		};
 		gObj<DXR_PT_Program> _Program;
@@ -122,7 +120,7 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_RT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\SHPM\\SHPhotonGathering_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\SpatialHashPhotonMapping\\SHPhotonGathering_RT.cso"));
 
 				_ gLoad Shader(Context()->RTMainRays, L"RTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -134,7 +132,7 @@ public:
 		struct DXR_RT_Program : public RTProgram<DXR_RT_Pipeline> {
 			void Setup() {
 				_ gSet Payload(16);
-				_ gSet StackSize(RAY_TRACING_MAX_BOUNCES + 1);
+				_ gSet StackSize(RAY_TRACING_MAX_BOUNCES);
 				_ gLoad Shader(Context()->RTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
 				_ gCreate HitGroup(Context()->RTMaterial, Context()->RTScattering, nullptr, nullptr);
@@ -153,8 +151,8 @@ public:
 			gObj<Texture2D> LightPositions;
 
 			// Photon map binding objects (now as readonly-resources)
-			gObj<Buffer> HashTable; // hash table with pointers to linked lists heads
 			gObj<Buffer> Photons; // Photon map in a lineal buffer
+			gObj<Buffer> HashtableBuffer; // head ptrs of linked lists
 			gObj<Buffer> NextBuffer; // Reference to next element in each linked list node
 
 			gObj<Texture2D> *Textures;
@@ -163,7 +161,8 @@ public:
 			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
 			gObj<Buffer> LightTransforms;
-			
+			gObj<Buffer> ProgressivePass;
+
 			gObj<Texture2D> Output;
 
 
@@ -186,9 +185,9 @@ public:
 
 				SRV(7, LightPositions);
 
-				SRV(8, HashTable);
-				SRV(9, Photons);
-				SRV(10, NextBuffer);
+				SRV(8, HashtableBuffer);
+				SRV(9, NextBuffer);
+				SRV(10, Photons);
 
 				SRV_Array(11, Textures, TextureCount);
 
@@ -197,11 +196,12 @@ public:
 
 				CBV(0, CameraCB);
 				CBV(1, LightingCB);
-				CBV(2, LightTransforms);
+				CBV(2, ProgressivePass);
+				CBV(3, LightTransforms);
 			}
 
 			void HitGroup_Locals() {
-				CBV(3, CurrentObjectInfo);
+				CBV(4, CurrentObjectInfo);
 			}
 		};
 		gObj<DXR_RT_Program> _Program;
@@ -251,19 +251,10 @@ public:
 		perform(CreateSceneOnGPU);
 	}
 
-	struct SpaceInfo {
-		float3 MinimumPosition; float pad0;
-		float3 BoxSize; float pad1;
-		float3 CellSize; float pad2;
-		int3 Resolution; float pad3;
-	};
-
-	struct Photon {
-		float3 Position;
-		float3 Direction;
-		float3 Intensity;
-	};
-
+#define PHOTON_WITH_DIRECTION
+#define PHOTON_WITH_NORMAL
+#define PHOTON_WITH_POSITION
+#include "../PhotonDefinition.h"
 
 	void CreatingAssets(gObj<CopyingManager> manager) {
 
@@ -288,9 +279,9 @@ public:
 		// CBs will be updated every frame
 		dxrPTPipeline->_Program->CameraCB = _ gCreate ConstantBuffer<float4x4>();
 		dxrPTPipeline->_Program->LightingCB = _ gCreate ConstantBuffer<Lighting>();
-		dxrPTPipeline->_Program->HashTable = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
-		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(NUMBER_OF_PHOTONS);
-		dxrPTPipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(NUMBER_OF_PHOTONS);
+		dxrPTPipeline->_Program->HashtableBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
+		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+		dxrPTPipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 #pragma endregion
 
 #pragma region DXR Photon gathering Pipeline Objects
@@ -306,9 +297,11 @@ public:
 		// Reused CBs from dxrPTPipeline
 		dxrRTPipeline->_Program->LightingCB = dxrPTPipeline->_Program->LightingCB;
 
+		dxrRTPipeline->_Program->ProgressivePass = dxrPTPipeline->_Program->ProgressivePass = _ gCreate ConstantBuffer<int>();
+
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		// Bind now as SRVs
-		dxrRTPipeline->_Program->HashTable = dxrPTPipeline->_Program->HashTable;
+		dxrRTPipeline->_Program->HashtableBuffer = dxrPTPipeline->_Program->HashtableBuffer;
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 		dxrRTPipeline->_Program->NextBuffer = dxrPTPipeline->_Program->NextBuffer;
 #pragma endregion
@@ -373,6 +366,8 @@ public:
 		if (CameraIsDirty)
 			FrameIndex = 0;
 
+		manager gCopy ValueData(dxrPTPipeline->_Program->ProgressivePass, FrameIndex);
+
 		FrameIndex++;
 
 		auto ptRTProgram = dxrPTPipeline->_Program;
@@ -395,7 +390,7 @@ public:
 		// Activate program with main shaders
 		manager gSet Program(ptRTProgram);
 
-		manager gClear UAV(ptRTProgram->HashTable, (unsigned int)-1); // reset head buffer to null for every list
+		manager gClear UAV(ptRTProgram->HashtableBuffer, (unsigned int)-1); // reset head buffer to null for every list
 
 		int startTriangle;
 

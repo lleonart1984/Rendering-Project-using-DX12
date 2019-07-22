@@ -134,6 +134,17 @@ int main(int, char**)
 			lightSource->Intensity = float3(400, 400, 400);
 			MixGlassMaterial(&scene->Materials()[5], 1);
 			break;
+		case CORNELL_OBJ:
+			filePath = desktop_directory();
+			strcat(filePath, "\\Models\\CornellWithSphere\\sphereBoxScene.obj");
+			//strcat(filePath, "\\Models\\CornellBox\\BoxBox.obj");
+			scene = new Scene(filePath);
+			camera->Position = float3(0, 0, 1.8f);
+			camera->Target = float3(0, 0, 0);
+			lightSource->Position = float3(0, 0.4, 0);
+			lightSource->Intensity = float3(240, 240, 240);
+			MixGlassMaterial(&scene->Materials()[5], 1);
+			break;
 		case RING_OBJ:
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\weddingRing\\ring.obj");
@@ -142,8 +153,8 @@ int main(int, char**)
 			camera->Target = float3(0, 0.1f, 0);
 			lightSource->Position = float3(0.1, 0.4, 0.2);
 			lightSource->Intensity = float3(240, 240, 240);
-			MixMirrorMaterial(&scene->Materials()[0], 1);
-			//MixGlassMaterial(&scene->Materials()[0], 1);
+			//MixMirrorMaterial(&scene->Materials()[0], 1);
+			MixGlassMaterial(&scene->Materials()[0], 1);
 			break;
 		case SPONZA_OBJ:
 			filePath = desktop_directory();

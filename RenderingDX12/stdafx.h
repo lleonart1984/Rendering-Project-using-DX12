@@ -31,7 +31,10 @@ using namespace CA4G;
 //#include "Techniques/FULL_DXR_PhotonMap2/FullDXRPhotontracerTechnique2.h"
 //#include "Techniques/PhotonMapping/SHPM/SHPhotonMapTechnique.h"
 
-#include "Techniques/Pathtracing/Hybrid/IterativePathtracer.h"
-#include "Techniques/Pathtracing/Hybrid/RecursivePathtracer.h"
+#include "Techniques/PhotonMapping/GridPhotonMapping/GPhotonMappingTechnique.h"
+#include "Techniques/PhotonMapping/SpatialHashPhotonMapping/SHPhotonMapTechnique.h"
+
+#include "Techniques/Pathtracing/IterativePathtracer.h"
+#include "Techniques/Pathtracing/RecursivePathtracer.h"
 
 #include "main.h"

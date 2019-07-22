@@ -2,18 +2,19 @@
 #include "stdafx.h"
 
 #define BUNNY_OBJ 0
-#define RING_OBJ 1
-#define SPONZA_OBJ 2
-#define SIBENIK_OBJ 3
-#define SANMIGUEL_OBJ 4
+#define CORNELL_OBJ 1
+#define RING_OBJ 2
+#define SPONZA_OBJ 3
+#define SIBENIK_OBJ 4
+#define SANMIGUEL_OBJ 5
 
 
-#define USE_SCENE SPONZA_OBJ
+#define USE_SCENE RING_OBJ
 
-#define MOVE_LIGHT false
+#define MOVE_LIGHT true
 
 // Change this to force every frame camera dirty
-#define PERMANENT_CAMERA_DIRTY false
+#define PERMANENT_CAMERA_DIRTY true
 
 
 // Uncomment this to use warp device for unsupported DX12 functionalities in your device
@@ -49,9 +50,10 @@
 
 //----- Pathtracing approaches on the GPU using RT cores
 //gObj<IterativePathtracer> technique;
-gObj<RecursivePathtracer> technique;
+//gObj<RecursivePathtracer> technique;
 
 
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
 
-//gObj<SHPhotonTracer> technique;
+//gObj<GPhotonMappingTechnique> technique;
+gObj<SHPhotonMappingTechnique> technique;
