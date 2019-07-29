@@ -78,7 +78,7 @@ cbuffer AccumulativeInfo : register(ACCUMULATIVE_CB_REG) {
 #include "..\CommonGI\ScatteringTools.h"
 
 /// When implemented allows to change or add photon information depending on ray payload
-void OnAddPhoton(inout Photon photon, PTPayload payload, int photonIndex);
+void OnAddPhoton(inout Photon photon, Vertex surfel, PTPayload payload, int photonIndex);
 
 /// When implemented allows to change photon ray payload depending on scattering
 void OnPhotonScatter(float3 direction, Vertex surfel, Material material, float3 ratio, float pdf, float3 scatterDir, inout PTPayload payload);
@@ -87,8 +87,8 @@ void ClearPhoton(int photonIndex) {
 	Photons[photonIndex].Intensity = 0;
 }
 
-void AddPhoton(Photon photon,  PTPayload payload, int photonIndex) {
-	OnAddPhoton(photon, payload, photonIndex);
+void AddPhoton(Photon photon, Vertex surfel, PTPayload payload, int photonIndex) {
+	OnAddPhoton(photon, surfel, payload, photonIndex);
 	Photons[photonIndex] = photon;
 }
 
@@ -194,7 +194,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 #ifdef PHOTON_WITH_DIRECTION
 			p.Direction = WorldRayDirection();
 #endif
-			AddPhoton(p, payload, rayId);
+			AddPhoton(p, surfel, payload, rayId);
 		}
 	}
 	else

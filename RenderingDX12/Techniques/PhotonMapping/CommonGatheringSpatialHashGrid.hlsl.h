@@ -7,7 +7,11 @@ StructuredBuffer<int> NextBuffer		: register(LINKED_LIST_NEXT_REG);
 StructuredBuffer<Photon> Photons		: register(PHOTON_BUFFER_REG);
 
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
-	float radius = PHOTON_RADIUS;// 4 * max(CellSize.x, max(CellSize.y, CellSize.z));
+#ifdef PHOTON_WITH_RADIUS
+	float radius = p.Radius;
+#else
+	float radius = PHOTON_RADIUS;
+#endif
 
 	int3 begCell = FromPositionToCell(surfel.P - radius);
 	int3 endCell = FromPositionToCell(surfel.P + radius);
