@@ -2,7 +2,7 @@
 /// Primary rays and shadow cast use GBuffer optimization
 /// Path-tracing with next-event estimation.
 
-#include "../../CommonGI/Definitions.h"
+#include "../CommonGI/Definitions.h"
 
 // Top level structure with the scene
 RaytracingAccelerationStructure Scene : register(t0, space0);
@@ -27,23 +27,29 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define ACCUMULATIVE_CB_REG			b3
 #define OBJECT_CB_REG				b4
 
-#include "../../CommonRT/CommonDeferred.h"
-#include "../../CommonRT/CommonShadowMaping.h"
-#include "../../CommonRT/CommonProgressive.h"
-#include "../../CommonRT/CommonOutput.h"
-#include "../../CommonGI/ScatteringTools.h"
+#include "../CommonRT/CommonDeferred.h"
+#include "../CommonRT/CommonShadowMaping.h"
+#include "../CommonRT/CommonProgressive.h"
+#include "../CommonRT/CommonOutput.h"
+#include "../CommonGI/ScatteringTools.h"
+
+struct Ray {
+	float3 Position;
+	float3 Direction;
+};
 
 struct RayPayload
 {
 	float3 Importance;
 	float3 AccRadiance;
+	Ray ScatteredRay;
 	int bounce;
 };
 
 // Represents a single bounce of path tracing
 // Will accumulate emissive and direct lighting modulated by the carrying importance
 // Will update importance with scattered ratio divided by pdf
-// Will Trace next ray to continue with if necessary
+// Will output scattered ray to continue with
 void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPayload payload)
 {
 	// Adding emissive and direct lighting
@@ -61,34 +67,40 @@ void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPaylo
 
 	float3 ratio;
 	float3 direction;
-
-	RandomScatterRay(V, fN, R, T, material, ratio, direction);
+	float pdf;
+	RandomScatterRay(V, fN, R, T, material, ratio, direction, pdf);
 
 	// Update gathered Importance to the viewer
 	payload.Importance *= ratio;// / (1 - russianRoulette);
-	payload.bounce--;
-
-	if (payload.bounce > 0)
-	{
-		// Trace new ray
-		RayDesc newRay;
-		newRay.Origin = surfel.P + sign(dot(direction, fN))*0.001*fN;
-		newRay.Direction = direction;
-		newRay.TMin = 0.001;
-		newRay.TMax = 10.0;
-		TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, payload);
-	}
+	// Update scattered ray
+	payload.ScatteredRay.Direction = direction;
+	payload.ScatteredRay.Position = surfel.P + sign(dot(direction, fN))*0.001*fN;
 }
 
 float3 ComputePath(float3 V, Vertex surfel, Material material, int bounces)
 {
 	RayPayload payload = (RayPayload)0;
 	payload.Importance = 1;
-	payload.bounce = bounces;
 
 	// initial scatter (primary rays)
 	SurfelScattering(V, surfel, material, payload);
-	
+
+	[loop]
+	for (int bounce = 1; bounce < bounces; bounce++)
+	{
+		RayDesc newRay;
+		newRay.Origin = payload.ScatteredRay.Position;
+		newRay.Direction = payload.ScatteredRay.Direction;
+		newRay.TMin = 0.001;
+		newRay.TMax = 10.0;
+
+		if (any(payload.Importance > 0.001))
+		{
+			payload.bounce = bounce;
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, payload);
+		}
+	}
+
 	return payload.AccRadiance;
 }
 
@@ -115,9 +127,9 @@ void PTMainRays()
 	}
 
 	StartRandomSeedForRay(raysDimensions, PATH_TRACING_MAX_BOUNCES, raysIndex, 0, PassCount);
-
+	
 	float3 color = ComputePath(V, surfel, material, PATH_TRACING_MAX_BOUNCES);
-
+	
 	AccumulateOutput(raysIndex, color);
 }
 

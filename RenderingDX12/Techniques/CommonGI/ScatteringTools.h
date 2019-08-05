@@ -260,7 +260,8 @@ float3 ComputeDirectLighting(
 // This method overload can use precomputed Reflectance (R) and Transmittance (T) vectors
 void RandomScatterRay(float3 V, float3 fN, float4 R, float4 T, Material material,
 	out float3 ratio,
-	out float3 direction
+	out float3 direction,
+	out float pdf
 	) {
 	float NdotD;
 	float3 D = randomHSDirection(fN, NdotD);
@@ -295,6 +296,7 @@ void RandomScatterRay(float3 V, float3 fN, float4 R, float4 T, Material material
 
 	ratio = mul(selectionMask, ratios);
 	direction = mul(selectionMask, directions);
+	pdf = dot(selectionMask, roulette);
 }
 
 // Scatters a ray randomly using the material roulette information
@@ -302,7 +304,8 @@ void RandomScatterRay(float3 V, float3 fN, float4 R, float4 T, Material material
 // the inverse of pdf value is already multiplied in ratio
 void RandomScatterRay(float3 V, Vertex surfel, Material material,
 	out float3 ratio,
-	out float3 direction
+	out float3 direction,
+	out float pdf
 ) {
 	// compute cosine of angle to viewer respect to the surfel Normal
 	float NdotV = dot(V, surfel.N);
@@ -327,7 +330,7 @@ void RandomScatterRay(float3 V, Vertex surfel, Material material,
 	R.w = material.Roulette.z + R.w * material.Roulette.w;
 	T.w *= material.Roulette.w;
 
-	RandomScatterRay(V, fN, R, T, material, ratio, direction);
+	RandomScatterRay(V, fN, R, T, material, ratio, direction, pdf);
 }
 
 void ComputeImpulses(float3 V, Vertex surfel, Material material,
