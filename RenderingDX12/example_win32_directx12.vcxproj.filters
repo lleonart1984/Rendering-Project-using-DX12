@@ -111,8 +111,18 @@
     <ClInclude Include="Techniques\CommonRT\CommonDeferred.h" />
     <ClInclude Include="Techniques\CommonRT\CommonOutput.h" />
     <ClInclude Include="Techniques\CommonRT\CommonProgressive.h" />
-    <ClInclude Include="Techniques\Pathtracing\Hybrid\IterativePathtracer.h" />
-    <ClInclude Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer.h" />
+    <ClInclude Include="Techniques\PhotonMapping\PhotonDefinition.h" />
+    <ClInclude Include="Techniques\PhotonMapping\CommonDeferredTracing.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMapping\CommonSpatialHashing.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMapping\CommonTracingSpatialHashGrid.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMapping\CommonDeferredGathering.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMapping\CommonGatheringSpatialHashGrid.hlsl.h" />
+    <ClInclude Include="Techniques\Pathtracing\IterativePathtracer.h" />
+    <ClInclude Include="Techniques\Pathtracing\RecursivePathtracer.h" />
+    <ClInclude Include="Techniques\PhotonMapping\GridPhotonMapping\GPhotonMappingTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMapping\GridPhotonMapping\GPMCommon.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPhotonMapTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPMCommon.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -146,8 +156,12 @@
     <FxCompile Include="Techniques\DeferredShading\DeferredLighting_PS.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\DXR_ProceduralGeometrySample_RT.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\UpdateAABBs_PS.hlsl" />
-    <FxCompile Include="Techniques\Pathtracing\Hybrid\IterativePathtracer_RT.hlsl" />
-    <FxCompile Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer_RT.hlsl" />
+    <FxCompile Include="Techniques\Pathtracing\IterativePathtracer_RT.hlsl" />
+    <FxCompile Include="Techniques\Pathtracing\RecursivePathtracer_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\GridPhotonMapping\GPhotonGather_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\GridPhotonMapping\GPhotonTracer_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPhotonTracer_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPhotonGathering_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Readme.md" />

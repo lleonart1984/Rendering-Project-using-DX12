@@ -11905,6 +11905,15 @@ namespace CA4G {
 		}
 	};
 
+	struct ComputePipelineBindings : public PipelineBindings <
+		DebugStateManager,
+		ComputeShaderStageStateManager,
+		NodeMaskStateManager,
+		RootSignatureStateManager
+	> {
+	};
+
+
 	struct GraphicsPipelineBindings : public PipelineBindings <
 		DebugStateManager,
 		VertexShaderStageStateManager,
@@ -13777,7 +13786,9 @@ namespace CA4G {
 		gObj<RTPipelineManager> currentPipeline1 = nullptr;
 		gObj<IRTProgram> activeRTProgram = nullptr;
 
-		ComputeManager(gObj<DeviceManager> manager, DX_CommandList cmdList) : CopyingManager(manager, cmdList), setting(new Setter(this))
+		ComputeManager(gObj<DeviceManager> manager, DX_CommandList cmdList) : CopyingManager(manager, cmdList), 
+			setting(new Setter(this)),
+			dispatcher(new Dispatcher(this))
 		{
 		}
 	public:
@@ -13787,7 +13798,7 @@ namespace CA4G {
 			Setter(ComputeManager* manager) :manager(manager) {
 			}
 			// Sets a graphics pipeline
-			Setter* Pipeline(IPipelineBindings * pipeline) {
+			Setter* Pipeline(gObj<IPipelineBindings> pipeline) {
 				manager->currentPipeline = pipeline;
 				manager->cmdList->SetPipelineState(pipeline->pso);
 				manager->cmdList->SetComputeRootSignature(pipeline->rootSignature);
@@ -13796,6 +13807,22 @@ namespace CA4G {
 			}
 
 		} *const setting;
+
+		class Dispatcher {
+			ComputeManager *manager;
+		public:
+			Dispatcher(ComputeManager* manager) :manager(manager) {
+			}
+
+			// Draws a primitive using a specific number of vertices
+			void Threads(int dimx, int dimy = 1, int dimz = 1) {
+				// Grant this cmdlist is active before use it
+				if (manager->currentPipeline.isNull())
+					return;
+
+				manager->cmdList->Dispatch(dimx, dimy, dimz);
+			}
+		}*const dispatcher;
 
 	};
 
