@@ -9,7 +9,7 @@
 #define SANMIGUEL_OBJ 5
 
 
-#define USE_SCENE RING_OBJ
+#define USE_SCENE SPONZA_OBJ
 
 #define MOVE_LIGHT true
 
@@ -55,5 +55,5 @@
 
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
 
-//gObj<GPhotonMappingTechnique> technique;
-gObj<SHPhotonMappingTechnique> technique;
+gObj<GPhotonMappingTechnique> technique;
+//gObj<SHPhotonMappingTechnique> technique;
