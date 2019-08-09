@@ -58,7 +58,7 @@ public:
 			gObj<Texture2D> Coordinates;
 			gObj<Texture2D> MaterialIndices;
 
-			gObj<Texture2D> *Textures;
+			gObj<Texture2D>* Textures;
 			int TextureCount;
 
 			gObj<Buffer> CameraCB;
@@ -155,7 +155,7 @@ public:
 			gObj<Buffer> HashtableBuffer; // head ptrs of linked lists
 			gObj<Buffer> NextBuffer; // Reference to next element in each linked list node
 
-			gObj<Texture2D> *Textures;
+			gObj<Texture2D>* Textures;
 			int TextureCount;
 
 			gObj<Buffer> CameraCB;
@@ -346,13 +346,15 @@ public:
 #pragma endregion
 		}
 
+		if (LightSourceIsDirty) {
 #pragma region Construct GBuffer from light
-		lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
-		lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
-		gBufferFromLight->ViewMatrix = lightView;
-		gBufferFromLight->ProjectionMatrix = lightProj;
-		ExecuteFrame(gBufferFromLight);
+			lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
+			lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
+			gBufferFromLight->ViewMatrix = lightView;
+			gBufferFromLight->ProjectionMatrix = lightProj;
+			ExecuteFrame(gBufferFromLight);
 #pragma endregion
+		}
 
 		perform(Photontracing);
 
@@ -395,26 +397,29 @@ public:
 		int startTriangle;
 
 #pragma region Photon Trace Stage
+		static bool firstTime = true;
 
-		// Set Miss in slot 0
-		manager gSet Miss(dxrPTPipeline->PhotonMiss, 0);
+		if (firstTime) {
+			// Set Miss in slot 0
+			manager gSet Miss(dxrPTPipeline->PhotonMiss, 0);
 
-		// Setup a simple hitgroup per object
-		// each object knows the offset in triangle buffer
-		// and the material index for further light scattering
-		startTriangle = 0;
-		for (int i = 0; i < Scene->ObjectsCount(); i++)
-		{
-			auto sceneObject = Scene->Objects()[i];
+			// Setup a simple hitgroup per object
+			// each object knows the offset in triangle buffer
+			// and the material index for further light scattering
+			startTriangle = 0;
+			for (int i = 0; i < Scene->ObjectsCount(); i++)
+			{
+				auto sceneObject = Scene->Objects()[i];
 
-			ptRTProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
-			ptRTProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
+				ptRTProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
+				ptRTProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-			manager gSet HitGroup(dxrPTPipeline->PhotonMaterial, i);
+				manager gSet HitGroup(dxrPTPipeline->PhotonMaterial, i);
 
-			startTriangle += sceneObject.vertexesCount / 3;
+				startTriangle += sceneObject.vertexesCount / 3;
+			}
+			firstTime = false;
 		}
-
 		// Setup a raygen shader
 		manager gSet RayGeneration(dxrPTPipeline->PTMainRays);
 
@@ -455,24 +460,28 @@ public:
 		int startTriangle;
 
 #pragma region Raytrace Stage
+		static bool firstTime = true;
 
-		// Set Miss in slot 0
-		manager gSet Miss(dxrRTPipeline->EnvironmentMap, 0);
+		if (firstTime) {
+			// Set Miss in slot 0
+			manager gSet Miss(dxrRTPipeline->EnvironmentMap, 0);
 
-		// Setup a simple hitgroup per object
-		// each object knows the offset in triangle buffer
-		// and the material index for further light scattering
-		startTriangle = 0;
-		for (int i = 0; i < Scene->ObjectsCount(); i++)
-		{
-			auto sceneObject = Scene->Objects()[i];
+			// Setup a simple hitgroup per object
+			// each object knows the offset in triangle buffer
+			// and the material index for further light scattering
+			startTriangle = 0;
+			for (int i = 0; i < Scene->ObjectsCount(); i++)
+			{
+				auto sceneObject = Scene->Objects()[i];
 
-			rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
-			rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
+				rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
+				rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-			manager gSet HitGroup(dxrRTPipeline->RTMaterial, i);
+				manager gSet HitGroup(dxrRTPipeline->RTMaterial, i);
 
-			startTriangle += sceneObject.vertexesCount / 3;
+				startTriangle += sceneObject.vertexesCount / 3;
+			}
+			firstTime = false;
 		}
 
 		// Setup a raygen shader

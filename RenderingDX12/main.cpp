@@ -128,11 +128,11 @@ int main(int, char**)
 			//strcat(filePath, "\\Models\\CornellWithSphere\\sphereBoxScene.obj");
 			//strcat(filePath, "\\Models\\CornellBox\\BoxBox.obj");
 			scene = new Scene(filePath);
-			camera->Position = float3(0, 0, 1.8f);
+			camera->Position = float3(0.1f, 0.2f, 0.8f);
 			camera->Target = float3(0, 0, 0);
 			lightSource->Position = float3(0, 0.4, 0);
 			lightSource->Intensity = float3(400, 400, 400);
-			MixGlassMaterial(&scene->Materials()[5], 1);
+			MixGlassMaterial(&scene->Materials()[0], 1);
 			break;
 		case CORNELL_OBJ:
 			filePath = desktop_directory();
@@ -153,14 +153,14 @@ int main(int, char**)
 			camera->Target = float3(0, 0.1f, 0);
 			lightSource->Position = float3(0.1, 0.4, 0.2);
 			lightSource->Intensity = float3(240, 240, 240);
-			//MixMirrorMaterial(&scene->Materials()[0], 1);
-			MixGlassMaterial(&scene->Materials()[0], 1);
+			MixMirrorMaterial(&scene->Materials()[0], 1);
+			//MixGlassMaterial(&scene->Materials()[0], 1);
 			break;
 		case SPONZA_OBJ:
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			//MixMirrorMaterial(&scene->Materials()[9], 0.4); // floor
+			MixMirrorMaterial(&scene->Materials()[9], 0.4); // floor
 			camera->Position = float3(0.3f, 0.05f, -0.028);
 			camera->Target = float3(0, 0.07f, 0);
 			lightSource->Position = float3(0.2, 0.45, 0);
@@ -298,6 +298,9 @@ int main(int, char**)
 
 				if (asCameraRenderer != nullptr)
 					asCameraRenderer->CameraIsDirty = cameraChanged || firstFrame || PERMANENT_CAMERA_DIRTY;
+
+				if (asLightRenderer != nullptr)
+					asLightRenderer->LightSourceIsDirty = firstFrame || MOVE_LIGHT;
 			}
         }
 

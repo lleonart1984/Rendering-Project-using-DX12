@@ -296,11 +296,10 @@ public:
 		perform(CreateSceneOnGPU);
 	}
 
-	struct Photon {
-		float3 Position;
-		float3 Direction;
-		float3 Intensity;
-	};
+#define PHOTON_WITH_DIRECTION
+#define PHOTON_WITH_NORMAL
+#define PHOTON_WITH_POSITION
+#include "../PhotonDefinition.h"
 
 	double doubleRand() {
 		return double(rand()) / (double(RAND_MAX) + 1.0);
@@ -320,8 +319,8 @@ public:
 		dxrPTPipeline->_Program->CameraCB = _ gCreate ConstantBuffer<float4x4>();
 		dxrPTPipeline->_Program->LightingCB = _ gCreate ConstantBuffer<Lighting>();
 		dxrPTPipeline->_Program->ProgressiveCB = _ gCreate ConstantBuffer<int>();
-		dxrPTPipeline->_Program->HashTable = _ gCreate StructuredBuffer<int>(sceneLoader->VertexBuffer->ElementCount / 3); // number of triangles
-		dxrPTPipeline->_Program->NextBuffer = _ gCreate StructuredBuffer<int>(PHOTON_DIMENSION*PHOTON_DIMENSION); // Number of photons
+		dxrPTPipeline->_Program->HashTable = _ gCreate RWStructuredBuffer<int>(sceneLoader->VertexBuffer->ElementCount / 3); // number of triangles
+		dxrPTPipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION*PHOTON_DIMENSION); // Number of photons
 		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION*PHOTON_DIMENSION);
 #pragma endregion
 
@@ -387,16 +386,19 @@ public:
 #pragma endregion
 		}
 
+		if (LightSourceIsDirty)
+		{
 #pragma region Construct GBuffer from light
-		lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
-		lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
-		gBufferFromLight->ViewMatrix = lightView;
-		gBufferFromLight->ProjectionMatrix = lightProj;
-		ExecuteFrame(gBufferFromLight);
+			lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
+			lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
+			gBufferFromLight->ViewMatrix = lightView;
+			gBufferFromLight->ProjectionMatrix = lightProj;
+			ExecuteFrame(gBufferFromLight);
 #pragma endregion
+		}
 
 		perform(Photontracing);
-
+		
 		perform(ComputeAABBs);
 
 		static bool firstTime = true;
@@ -467,9 +469,10 @@ public:
 #pragma endregion
 	}
 
-	void ComputeAABBs(gObj<ComputeManager> manager) {
+	void ComputeAABBs(gObj<GraphicsManager> manager) {
 		manager gSet Pipeline(computeAABBsPipeline);
-		manager gDispatch Threads(sceneLoader->VertexBuffer->ElementCount / 3);
+
+		manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(sceneLoader->VertexBuffer->ElementCount / 3);
 	}
 
 

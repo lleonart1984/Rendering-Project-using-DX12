@@ -135,7 +135,7 @@ public:
 
 		struct DXR_RT_Program : public RTProgram<DXR_RT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(4 * (3 + 3 + 3)); // 3- Normal, 3- Albedo, 3- Accum
+				_ gSet Payload(4 * (3 + 3)); // 3- Normal, 3- Accum
 				_ gSet StackSize(RAY_TRACING_MAX_BOUNCES + 1); //  +1 is due to the last trace function call for photon gathering
 				_ gSet MaxHitGroupIndex(1 + 1000); // 1000 == max number of geometries
 				_ gLoad Shader(Context()->RTMainRays);
@@ -266,11 +266,10 @@ public:
 		perform(CreateSceneOnGPU);
 	}
 
-	struct Photon {
-		float3 Position;
-		float3 Direction;
-		float3 Intensity;
-	};
+#define PHOTON_WITH_DIRECTION
+#define PHOTON_WITH_NORMAL
+#define PHOTON_WITH_POSITION
+#include "../PhotonDefinition.h"
 
 	double doubleRand() {
 		return double(rand()) / (double(RAND_MAX) + 1.0);
@@ -349,13 +348,16 @@ public:
 #pragma endregion
 		}
 
+		if (LightSourceIsDirty)
+		{
 #pragma region Construct GBuffer from light
-		lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
-		lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
-		gBufferFromLight->ViewMatrix = lightView;
-		gBufferFromLight->ProjectionMatrix = lightProj;
-		ExecuteFrame(gBufferFromLight);
+			lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
+			lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
+			gBufferFromLight->ViewMatrix = lightView;
+			gBufferFromLight->ProjectionMatrix = lightProj;
+			ExecuteFrame(gBufferFromLight);
 #pragma endregion
+		}
 
 		perform(Photontracing);
 
@@ -397,24 +399,29 @@ public:
 		int startTriangle;
 
 #pragma region Photon Trace Stage
+		static bool firstTime = true;
 
-		// Set Miss in slot 0
-		manager gSet Miss(dxrPTPipeline->PhotonMiss, 0);
+		if (firstTime) {
+			// Set Miss in slot 0
+			manager gSet Miss(dxrPTPipeline->PhotonMiss, 0);
 
-		// Setup a simple hitgroup per object
-		// each object knows the offset in triangle buffer
-		// and the material index for further light scattering
-		startTriangle = 0;
-		for (int i = 0; i < Scene->ObjectsCount(); i++)
-		{
-			auto sceneObject = Scene->Objects()[i];
+			// Setup a simple hitgroup per object
+			// each object knows the offset in triangle buffer
+			// and the material index for further light scattering
+			startTriangle = 0;
+			for (int i = 0; i < Scene->ObjectsCount(); i++)
+			{
+				auto sceneObject = Scene->Objects()[i];
 
-			ptRTProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
-			ptRTProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
+				ptRTProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
+				ptRTProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-			manager gSet HitGroup(dxrPTPipeline->PhotonMaterial, i);
+				manager gSet HitGroup(dxrPTPipeline->PhotonMaterial, i);
 
-			startTriangle += sceneObject.vertexesCount / 3;
+				startTriangle += sceneObject.vertexesCount / 3;
+			}
+
+			firstTime = false;
 		}
 
 		// Setup a raygen shader
@@ -433,6 +440,7 @@ public:
 		geomUpdater gSet AABBs(PhotonsAABBs);
 		geomUpdater gLoad Geometry(0, PHOTON_DIMENSION*PHOTON_DIMENSION);
 		PhotonsAABBsOnTheGPU = geomUpdater gCreate RebuiltGeometry();
+		//PhotonsAABBsOnTheGPU = geomUpdater gCreate UpdatedGeometry();
 #pragma endregion
 
 		// Creates a single instance to refer all static objects in bottom level acc ds.
@@ -446,7 +454,7 @@ public:
 		auto geomUpdater = manager gCreate ProceduralGeometries();
 		geomUpdater gSet AABBs(PhotonsAABBs);
 		geomUpdater gLoad Geometry(0, PHOTON_DIMENSION*PHOTON_DIMENSION);
-		PhotonsAABBsOnTheGPU = geomUpdater gCreate BakedGeometry();
+		PhotonsAABBsOnTheGPU = geomUpdater gCreate BakedGeometry(false, false);
 #pragma endregion
 
 		// Creates a single instance to refer all static objects in bottom level acc ds.
@@ -480,6 +488,9 @@ public:
 		dxrRTPipeline->_Program->Coordinates = gBufferFromViewer->pipeline->GBuffer_C;
 		dxrRTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
 		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
+
+		if (CameraIsDirty)
+			manager gClear UAV(rtProgram->Output, 0u);
 
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrRTPipeline);

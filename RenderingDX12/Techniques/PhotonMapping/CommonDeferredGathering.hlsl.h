@@ -2,6 +2,10 @@
 
 #include "PhotonDefinition.h"
 
+#ifndef RAY_CONTRIBUTION_TO_HITGROUPS
+#define RAY_CONTRIBUTION_TO_HITGROUPS 0
+#endif
+
 // Top level structure with the scene
 RaytracingAccelerationStructure Scene : register(t0, space0);
 
@@ -111,7 +115,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 	// Get indirect diffuse light compute using photon map
 	total += ComputeDirectLightInWorldSpace(surfel, material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
 
-	if (bounces > 0)
+	if (bounces > 0 && any(material.Specular))
 	{
 		if (R.w > 0.01) {
 			// Trace the ray.
@@ -122,7 +126,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			reflectionRay.TMin = 0.001;
 			reflectionRay.TMax = 10000.0;
 			RTPayload reflectionPayload = { float3(0, 0, 0), bounces - 1 };
-			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, reflectionRay, reflectionPayload);
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, RAY_CONTRIBUTION_TO_HITGROUPS, 1, 0, reflectionRay, reflectionPayload);
 			total += R.w * material.Specular * reflectionPayload.Accumulation; /// Mirror and fresnel reflection
 		}
 
@@ -135,7 +139,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			refractionRay.TMin = 0.001;
 			refractionRay.TMax = 10000.0;
 			RTPayload refractionPayload = { float3(0, 0, 0), bounces - 1 };
-			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, refractionRay, refractionPayload);
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, RAY_CONTRIBUTION_TO_HITGROUPS, 1, 0, refractionRay, refractionPayload);
 			total += T.w * material.Specular * refractionPayload.Accumulation;
 		}
 	}

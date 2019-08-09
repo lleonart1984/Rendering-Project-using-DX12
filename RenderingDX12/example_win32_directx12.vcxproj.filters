@@ -4,8 +4,6 @@
     <FxCompile Include="Techniques\DeferredShading\DeferredLighting_PS.hlsl" />
     <FxCompile Include="Techniques\DeferredShading\DeferredShading_PS.hlsl" />
     <FxCompile Include="Techniques\DeferredShading\DeferredShading_VS.hlsl" />
-    <FxCompile Include="Techniques\Pathtracing\Hybrid\IterativePathtracer_RT.hlsl" />
-    <FxCompile Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer_RT.hlsl" />
     <FxCompile Include="Techniques\RetainedBasic\RetainedRendering_PS.hlsl" />
     <FxCompile Include="Techniques\RetainedBasic\RetainedRendering_VS.hlsl" />
     <FxCompile Include="Techniques\Sample\Sample_PS.hlsl" />
@@ -23,6 +21,17 @@
     <FxCompile Include="Techniques\Tutorials\Shaders\SimpleTransform_VS.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\TransformToViewSpace_VS.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\UpdateAABBs_PS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\AdaptiveBoxPerGeometry\ABPGAABBConstruction_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\AdaptiveBoxPerGeometry\ABPGPhotonGather_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\AdaptiveBoxPerPhoton\ABPPPhotonGather_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\AdaptiveBoxPerPhoton\ABPPPhotonTracer_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\BoxPerGeometry\BPGAABBConstruction_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\BoxPerGeometry\BPGPhotonGather_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\BoxPerGeometry\BPGPhotonTracer_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\BoxPerPhoton\BPPPhotonGather_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\BoxPerPhoton\BPPPhotonTracer_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\AdaptiveRadiusCompute_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMapping\RadiusAndBoxCompute_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -63,16 +72,10 @@
     <ClInclude Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotontracerTechnique.h" />
     <ClInclude Include="Techniques\GUI_Traits.h" />
     <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
-    <ClInclude Include="Techniques\Pathtracing\Hybrid\IterativePathtracer.h" />
-    <ClInclude Include="Techniques\Pathtracing\Hybrid\RecursivePathtracer.h" />
-    <ClInclude Include="Techniques\PhotonMapping\CommonTracingBindings.h" />
-    <ClInclude Include="Techniques\PhotonMapping\GPM\GPMCommon.h" />
     <ClInclude Include="Techniques\Randoms\RandomHLSL.h" />
     <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HybridPhotonTracer.h" />
     <ClInclude Include="Techniques\RetainedBasic\RetainedBasicRenderer.h" />
     <ClInclude Include="Techniques\Sample\Sample.h" />
-    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHCommon.h" />
-    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHPhotonMapTechnique.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial1.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial10.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial11.h" />
@@ -123,6 +126,10 @@
     <ClInclude Include="Techniques\PhotonMapping\GridPhotonMapping\GPMCommon.hlsl.h" />
     <ClInclude Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPhotonMapTechnique.h" />
     <ClInclude Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPMCommon.h" />
+    <ClInclude Include="Techniques\PhotonMapping\AdaptiveBoxPerGeometry\ABPGPhotonMappingTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMapping\AdaptiveBoxPerPhoton\ABPPPhotonMappingTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMapping\BoxPerGeometry\BPGPhotonMappingTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMapping\BoxPerPhoton\BPPPhotonMappingTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

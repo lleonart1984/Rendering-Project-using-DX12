@@ -89,18 +89,23 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in GeometryHitAttribu
 
 	int currentNode = HashTable[geometryIndex];
 
-	while (currentNode != null)
+	while (currentNode != -1)
 	{
 		Photon p = Photons[currentNode];
+#ifdef PHOTON_WITH_RADIUS
+		float radius = p.Radius;
+#else
+		float radius = Radii[currentNode];
+#endif
 
-		float3 ab = saturate(abs(surfelPosition - p.Position) / p.Radius);
+		float3 ab = saturate(abs(surfelPosition - p.Position) / radius);
 		float d = max(ab.x, max(ab.y, ab.z));// distance(surfelPosition, p.Position);
 
 		float kernel = pow(d, 180);// 2 - 2 * d / p.Radius;
 		if (any(p.Intensity))
-			payload.OutDiffuseAccum += kernel * 0.01 * float3(0, 0, 1);
+			payload.Accum += kernel * 0.01 * float3(0, 0, 1);
 		else
-			payload.OutDiffuseAccum += kernel * 0.05 * float3(1, 0, 0);
+			payload.Accum += kernel * 0.05 * float3(1, 0, 0);
 
 		currentNode = NextBuffer[currentNode];
 	}
@@ -160,6 +165,13 @@ void PhotonGatheringIntersection() {
 	GeometryHitAttributes att;
 	att.GeometryIdx = index;
 	ReportHit(0.001, 0, att);
+}
+
+[shader("miss")]
+void PhotonGatheringMiss(inout PhotonRayPayload payload)
+{
+	// Do nothing (obscure surface)
+	//payload.OutDiffuseAccum = float3(1, 0, 0);
 }
 
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {

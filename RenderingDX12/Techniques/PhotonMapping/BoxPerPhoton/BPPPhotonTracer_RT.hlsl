@@ -36,5 +36,9 @@ void InitializePayload(uint2 photonRay, uint2 emissionImageDimensions, float3 em
 {
 	int photonIndex = photonRay.x + photonRay.y * emissionImageDimensions.x;
 	// Degenerate unused box
-	PhotonAABBs[photonIndex] = (AABB)0;
+	/*AABB  rndBox = {
+		float3 (random() * 2 - 1, random() * 2 - 1, random() * 2 - 1), 0, 0, 0 };
+	rndBox.maximum = rndBox.minimum + 2 * PHOTON_RADIUS;*/
+	//PhotonAABBs[photonIndex] = rndBox;
+	//PhotonAABBs[photonIndex] = (AABB)0;
 }

@@ -8,14 +8,12 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-
 #define USE_SCENE SPONZA_OBJ
 
-#define MOVE_LIGHT true
+#define MOVE_LIGHT false
 
 // Change this to force every frame camera dirty
 #define PERMANENT_CAMERA_DIRTY true
-
 
 // Uncomment this to use warp device for unsupported DX12 functionalities in your device
 //#define WARP
@@ -55,5 +53,11 @@
 
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
 
-gObj<GPhotonMappingTechnique> technique;
-//gObj<SHPhotonMappingTechnique> technique;
+//gObj<GPhotonMappingTechnique> technique; // Volume Grid Technique
+//gObj<SHPhotonMappingTechnique> technique; // Spatial Hash Technique
+//gObj<BPPPhotonMappingTechnique> technique; // Box Per Photon Technique
+gObj<ABPPPhotonMappingTechnique> technique;
+
+
+// --- Discarded implementation
+//gObj<BPGPhotonMappingTechnique> technique; // Box Per Geometry Technique

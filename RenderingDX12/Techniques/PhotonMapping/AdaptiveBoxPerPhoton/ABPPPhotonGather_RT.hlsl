@@ -34,6 +34,7 @@
 #define TEXTURES_REG				t11
 #endif
 
+#define RAY_CONTRIBUTION_TO_HITGROUPS 1
 #include "../CommonDeferredGathering.hlsl.h"
 
 struct AABB {
@@ -76,14 +77,39 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 
 	Photon p = Photons[attr.PhotonIdx];
 
-	float3 ab = saturate(abs(surfelPosition - p.Position) / p.Radius);
+#ifdef PHOTON_WITH_RADIUS
+	float radius = p.Radius;
+#else
+	float radius = Radii[attr.PhotonIdx];
+#endif
+
+	float3 ab = saturate(abs(surfelPosition - p.Position) / radius);
 	float d = max(ab.x, max(ab.y, ab.z));// distance(surfelPosition, p.Position);
 
 	float kernel = pow(d, 180);// 2 - 2 * d / p.Radius;
+	if (attr.PhotonIdx % 1000 == 0)
 	if (any(p.Intensity))
-		payload.OutDiffuseAccum += kernel * 0.01 * float3(0, 0, 1);
+	{
+		switch (attr.PhotonIdx/1000 % 5) {
+		case 0:
+			payload.Accum += kernel * 0.1 * float3(1, 0, 0);
+			break;
+		case 1:
+			payload.Accum += kernel * 0.1 * float3(1, 1, 0);
+			break;
+		case 2:
+			payload.Accum += kernel * 0.1 * float3(0, 1, 0);
+			break;
+		case 3:
+			payload.Accum += kernel * 0.1 * float3(0, 1, 1);
+			break;
+		case 4:
+			payload.Accum += kernel * 0.1 * float3(0, 0, 1);
+			break;
+		}
+	}
 	else
-		payload.OutDiffuseAccum += kernel * 0.05 * float3(1, 0, 0);
+		payload.Accum += kernel * 0.05 * float3(0, 0, 0);
 
 	IgnoreHit(); // Continue search to accumulate other photons
 }
@@ -115,7 +141,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 		float kernel = 2 * (1 - photonDistance / radius);
 
 		float3 BRDF =
-			p.Intensity * NdotN * payload.Albedo / area / 100000;// *DiffuseRatio;
+			NdotN * payload.Albedo / area / 100000;// *DiffuseRatio;
 			//+ material.Roulette.y * SpecularRatio;
 
 		payload.Accum += kernel * p.Intensity * BRDF;
@@ -133,6 +159,12 @@ void PhotonGatheringIntersection() {
 	ReportHit(0.001, 0, att);
 }
 
+[shader("miss")]
+void PhotonGatheringMiss(inout PhotonRayPayload payload)
+{
+	// Do nothing (obscure surface)
+	//payload.OutDiffuseAccum = float3(1, 0, 0);
+}
 
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
 	PhotonRayPayload photonGatherPayload = {

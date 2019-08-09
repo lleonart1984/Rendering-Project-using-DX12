@@ -109,6 +109,7 @@ public:
 
 		// UAVs
 		gObj<Buffer> Radii;
+		gObj<Buffer> AABBs;
 
 		void Setup() override {
 			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\AdaptiveRadiusCompute_CS.cso"));
@@ -117,25 +118,48 @@ public:
 		void Globals() override {
 			SRV(0, Photons, ShaderType_Any);
 			UAV(0, Radii, ShaderType_Any);
+			UAV(1, AABBs, ShaderType_Any);
 		}
 	};
 
-	struct ComputeAABBsPipeline : public ComputePipelineBindings {
-		gObj<Buffer> Photons;
-		gObj<Buffer> Radii;
+	struct DXR_Compute_Pipeline : public RTPipelineManager {
+		
+		gObj<RayGenerationHandle> RTMainProgram;
 
-		// UAVs
-		gObj<Buffer> AABBs;
+		class DXR_RT_IL : public DXIL_Library<DXR_Compute_Pipeline> {
+			void Setup() {
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\RadiusAndBoxCompute_RT.cso"));
 
-		void Setup() override {
-			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\AdaptiveBoxPerPhoton\\ABPPAABBConstruction_CS.cso"));
-		}
+				_ gLoad Shader(Context()->RTMainProgram, L"RTMainProgram");
+			}
+		};
+		gObj<DXR_RT_IL> _Library;
 
-		void Globals() override {
-			SRV(0, Photons, ShaderType_Any);
-			SRV(1, Radii, ShaderType_Any);
+		struct DXR_RT_Program : public RTProgram<DXR_Compute_Pipeline> {
+			void Setup() {
+				_ gSet Payload(0); // 3- Normal, 3- Albedo, 3- Accum
+				_ gSet StackSize(0); //  +1 is due to the last trace function call for photon gathering
+				_ gSet MaxHitGroupIndex(0); // 1000 == max number of geometries
+				_ gLoad Shader(Context()->RTMainProgram);
+			}
 
-			UAV(0, AABBs, ShaderType_Any);
+			gObj<Buffer> Photons;
+			gObj<Buffer> Radii;
+			gObj<Buffer> AABBs;
+
+			void Globals() {
+				UAV(0, Radii);
+				UAV(1, AABBs);
+
+				SRV(0, Photons);
+			}
+		};
+		gObj<DXR_RT_Program> _Program;
+
+		void Setup() override
+		{
+			_ gLoad Library(_Library);
+			_ gLoad Program(_Program);
 		}
 	};
 
@@ -257,8 +281,8 @@ public:
 
 	gObj<Buffer> screenVertices;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
-	gObj<ComputeRadiiPipeline> computeRadiiPipeline;
-	gObj<ComputeAABBsPipeline> computeAABBsPipeline;
+	//gObj<ComputeRadiiPipeline> computeRadiiPipeline;
+	gObj<DXR_Compute_Pipeline> computePipeline;
 	gObj<DXR_RT_Pipeline> dxrRTPipeline;
 
 	// AABBs buffer for photon map
@@ -294,9 +318,14 @@ public:
 		flush_all_to_gpu;
 
 		_ gLoad Pipeline(dxrPTPipeline);
-		_ gLoad Pipeline(computeRadiiPipeline);
-		_ gLoad Pipeline(computeAABBsPipeline);
+		_ gLoad Pipeline(computePipeline);
 		_ gLoad Pipeline(dxrRTPipeline);
+
+		flush_all_to_gpu;
+
+		//_ gLoad Pipeline(computeRadiiPipeline);
+		
+		//flush_all_to_gpu;
 
 		// Load assets to render the deferred lighting image
 		perform(CreatingAssets);
@@ -306,11 +335,10 @@ public:
 		perform(CreateSceneOnGPU);
 	}
 
-	struct Photon {
-		float3 Position;
-		float3 Direction;
-		float3 Intensity;
-	};
+#define PHOTON_WITH_DIRECTION
+#define PHOTON_WITH_NORMAL
+#define PHOTON_WITH_POSITION
+#include "../PhotonDefinition.h"
 
 	double doubleRand() {
 		return double(rand()) / (double(RAND_MAX) + 1.0);
@@ -334,15 +362,9 @@ public:
 #pragma endregion
 
 #pragma region Compute Radii shader pipeline objects
-		computeRadiiPipeline->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION*PHOTON_DIMENSION);;
-		computeRadiiPipeline->Photons = dxrPTPipeline->_Program->Photons;
-#pragma endregion
-
-
-#pragma region Compute shader pipeline objects
-		computeAABBsPipeline->AABBs = PhotonsAABBs;
-		computeAABBsPipeline->Radii = computeRadiiPipeline->Radii;
-		computeAABBsPipeline->Photons = dxrPTPipeline->_Program->Photons;
+		computePipeline->_Program->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION*PHOTON_DIMENSION);;
+		computePipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
+		computePipeline->_Program->AABBs = PhotonsAABBs;
 #pragma endregion
 
 #pragma region DXR Photon gathering Pipeline Objects
@@ -362,7 +384,7 @@ public:
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		// Bind now Photon map as SRVs
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
-		dxrRTPipeline->_Program->Radii = computeRadiiPipeline->Radii;
+		dxrRTPipeline->_Program->Radii = computePipeline->_Program->Radii;
 #pragma endregion
 	}
 
@@ -410,7 +432,7 @@ public:
 #pragma endregion
 
 		perform(Photontracing);
-
+		
 		perform(ComputeRadiiAndAABBs);
 
 		static bool firstTime = true;
@@ -450,24 +472,28 @@ public:
 		int startTriangle;
 
 #pragma region Photon Trace Stage
+		static bool firstTime = true;
 
-		// Set Miss in slot 0
-		manager gSet Miss(dxrPTPipeline->PhotonMiss, 0);
+		if (firstTime) {
+			// Set Miss in slot 0
+			manager gSet Miss(dxrPTPipeline->PhotonMiss, 0);
 
-		// Setup a simple hitgroup per object
-		// each object knows the offset in triangle buffer
-		// and the material index for further light scattering
-		startTriangle = 0;
-		for (int i = 0; i < Scene->ObjectsCount(); i++)
-		{
-			auto sceneObject = Scene->Objects()[i];
+			// Setup a simple hitgroup per object
+			// each object knows the offset in triangle buffer
+			// and the material index for further light scattering
+			startTriangle = 0;
+			for (int i = 0; i < Scene->ObjectsCount(); i++)
+			{
+				auto sceneObject = Scene->Objects()[i];
 
-			ptRTProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
-			ptRTProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
+				ptRTProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
+				ptRTProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-			manager gSet HitGroup(dxrPTPipeline->PhotonMaterial, i);
+				manager gSet HitGroup(dxrPTPipeline->PhotonMaterial, i);
 
-			startTriangle += sceneObject.vertexesCount / 3;
+				startTriangle += sceneObject.vertexesCount / 3;
+			}
+			firstTime = false;
 		}
 
 		// Setup a raygen shader
@@ -479,12 +505,16 @@ public:
 #pragma endregion
 	}
 
-	void ComputeRadiiAndAABBs(gObj<ComputeManager> manager) {
-		manager gSet Pipeline(computeRadiiPipeline);
-		manager gDispatch Threads(PHOTON_DIMENSION*PHOTON_DIMENSION);
+	void ComputeRadiiAndAABBs(gObj<DXRManager> manager) {
+		//manager.Dynamic_Cast<ComputeManager>() gSet Pipeline(computeRadiiPipeline);
+		//manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(PHOTON_DIMENSION*PHOTON_DIMENSION);
+
+		auto rtProgram = computePipeline->_Program;
 		
-		manager gSet Pipeline(computeAABBsPipeline);
-		manager gDispatch Threads(PHOTON_DIMENSION*PHOTON_DIMENSION);
+		manager gSet Pipeline(computePipeline);
+		manager gSet Program(rtProgram);
+		manager gSet RayGeneration(computePipeline->RTMainProgram);
+		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
 	}
 
 
@@ -508,7 +538,7 @@ public:
 		auto geomUpdater = manager gCreate ProceduralGeometries();
 		geomUpdater gSet AABBs(PhotonsAABBs);
 		geomUpdater gLoad Geometry(0, PHOTON_DIMENSION*PHOTON_DIMENSION);
-		PhotonsAABBsOnTheGPU = geomUpdater gCreate BakedGeometry();
+		PhotonsAABBsOnTheGPU = geomUpdater gCreate BakedGeometry(false, false);
 #pragma endregion
 
 		// Creates a single instance to refer all static objects in bottom level acc ds.
@@ -541,6 +571,9 @@ public:
 		dxrRTPipeline->_Program->Coordinates = gBufferFromViewer->pipeline->GBuffer_C;
 		dxrRTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
 		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
+
+		if (CameraIsDirty)
+			manager gClear UAV(rtProgram->Output, 0u);
 
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrRTPipeline);

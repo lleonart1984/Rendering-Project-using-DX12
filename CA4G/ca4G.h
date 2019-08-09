@@ -11505,6 +11505,8 @@ namespace CA4G {
 		// When pipeline setting is closed, the pipeline state object is created and stored.
 		ID3D12PipelineState *pso = nullptr;
 
+		virtual bool IsComputePipeline() = 0;
+
 		virtual void __OnSet(ComputeManager* manager) = 0;
 
 		virtual void __OnDraw(ComputeManager* manager) = 0;
@@ -11611,6 +11613,11 @@ namespace CA4G {
 				&& ((ComputeShaderStageStateManager*)this->setting)->_Description.pShaderBytecode != nullptr;
 		}
 #pragma endregion
+
+		bool IsComputePipeline() {
+			return Using_CS();
+		}
+
 
 		void __OnInitialization(gObj<DeviceManager> manager) {
 			this->manager = manager;
@@ -13855,7 +13862,10 @@ namespace CA4G {
 			Setter* Pipeline(gObj<IPipelineBindings> pipeline) {
 				manager->currentPipeline = pipeline;
 				manager->cmdList->SetPipelineState(pipeline->pso);
-				manager->cmdList->SetGraphicsRootSignature(pipeline->rootSignature);
+				if (pipeline->IsComputePipeline ())
+					manager->cmdList->SetComputeRootSignature(pipeline->rootSignature);
+				else
+					manager->cmdList->SetGraphicsRootSignature(pipeline->rootSignature);
 				pipeline->__OnSet(manager);
 				return this;
 			}
@@ -15553,7 +15563,10 @@ namespace CA4G {
 					switch (binding.type)
 					{
 					case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-						resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_GENERIC_READ);
+						if (IsComputePipeline())
+							resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_COMMON);
+						else
+							resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_GENERIC_READ);
 						break;
 					case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
 						resource->ChangeStateToUAV(cmdList);
@@ -15571,7 +15584,10 @@ namespace CA4G {
 			manager->dstDescriptorRangeLengths.add(count);
 			int startIndex = this->manager->descriptors->gpu_csu->Malloc(count);
 			manager->dstDescriptors.add(this->manager->descriptors->gpu_csu->getCPUVersion(startIndex));
-			cmdList->SetGraphicsRootDescriptorTable(startRootParameter + i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
+			if(IsComputePipeline())
+				cmdList->SetComputeRootDescriptorTable(startRootParameter + i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
+			else
+				cmdList->SetGraphicsRootDescriptorTable(startRootParameter + i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
 		}
 	}
 
@@ -15591,7 +15607,9 @@ namespace CA4G {
 		if (!(DepthBufferField == nullptr || !(*DepthBufferField)))
 			depthHandle = (*DepthBufferField)->getDSVHandle();
 
-		cmdList->OMSetRenderTargets(RenderTargetMax, RenderTargetDescriptors, FALSE, (DepthBufferField == nullptr || !(*DepthBufferField)) ? nullptr : &depthHandle);
+		if (!this->IsComputePipeline ())
+			cmdList->OMSetRenderTargets(RenderTargetMax, RenderTargetDescriptors, FALSE, (DepthBufferField == nullptr || !(*DepthBufferField)) ? nullptr : &depthHandle);
+
 		ID3D12DescriptorHeap* heaps[] = { this->manager->descriptors->gpu_csu->getInnerHeap(), this->manager->descriptors->gpu_smp->getInnerHeap() };
 		cmdList->SetDescriptorHeaps(2, heaps);
 

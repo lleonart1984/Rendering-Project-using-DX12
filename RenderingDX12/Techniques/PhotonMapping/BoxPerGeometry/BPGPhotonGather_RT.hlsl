@@ -34,6 +34,8 @@
 #define TEXTURES_REG				t12
 #endif
 
+#define RAY_CONTRIBUTION_TO_HITGROUPS 1
+
 #include "../CommonDeferredGathering.hlsl.h"
 
 struct AABB {
@@ -84,18 +86,23 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in GeometryHitAttribu
 
 	int currentNode = HashTable[geometryIndex];
 
-	while (currentNode != null)
+	while (currentNode != -1)
 	{
 		Photon p = Photons[currentNode];
+#ifdef PHOTON_WITH_RADIUS
+		float radius = p.Radius;
+#else
+		float radius = PHOTON_RADIUS;
+#endif
 
-		float3 ab = saturate(abs(surfelPosition - p.Position) / p.Radius);
+		float3 ab = saturate(abs(surfelPosition - p.Position) / radius);
 		float d = max(ab.x, max(ab.y, ab.z));// distance(surfelPosition, p.Position);
 
 		float kernel = pow(d, 180);// 2 - 2 * d / p.Radius;
 		if (any(p.Intensity))
-			payload.OutDiffuseAccum += kernel * 0.01 * float3(0, 0, 1);
+			payload.Accum += kernel * 0.01 * float3(0, 0, 1);
 		else
-			payload.OutDiffuseAccum += kernel * 0.05 * float3(1, 0, 0);
+			payload.Accum += kernel * 0.05 * float3(1, 0, 0);
 
 		currentNode = NextBuffer[currentNode];
 	}
@@ -182,4 +189,11 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	TraceRay(PhotonMap, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 0, 1, ray, photonGatherPayload);
 
 	return photonGatherPayload.Accum;// +material.Specular * photonGatherPayload.OutSpecularAccum;
+}
+
+[shader("miss")]
+void PhotonGatheringMiss(inout PhotonRayPayload payload)
+{
+	// Do nothing (obscure surface)
+	//payload.OutDiffuseAccum = float3(1, 0, 0);
 }
