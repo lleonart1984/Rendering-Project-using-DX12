@@ -92,6 +92,32 @@ struct RTPayload
 // Perform photon gathering
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V);
 
+float3 GetColor(int complexity) {
+
+	if (complexity == 0)
+		return 0;// float3(1, 1, 1);
+
+	//return float3(1,1,1);
+
+	float level = log(complexity)/log(4);
+	float3 stopPoints[8] = {
+		float3(0,0,0.1), // 1
+		float3(0,0,1), // 4
+		float3(0,1,1), // 16
+		float3(0,1,0), // 64
+		float3(1,1,0), // 256
+		float3(1,0,0), // 1024
+		float3(1,0,1), // 4096
+		float3(1,1,1) // 16000
+	};
+
+	if (level >= 7)
+		return stopPoints[7];
+
+	return lerp(stopPoints[(int)level], stopPoints[(int)level + 1], level % 1);
+}
+
+
 float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int bounces)
 {
 	float3 total = float3(0, 0, 0);
@@ -104,6 +130,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 	bool invertNormal;
 	float3 fN;
 	float4 R, T;
+#ifndef DEBUG_PHOTONS
 	total += ComputeDirectLighting(
 		V,
 		surfel,
@@ -111,9 +138,16 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 		LightPosition,
 		LightIntensity,
 		/*Out*/ NdotV, invertNormal, fN, R, T);
+#endif
+
+	float3 gatheredLighting = ComputeDirectLightInWorldSpace(surfel, material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
 
 	// Get indirect diffuse light compute using photon map
-	total += ComputeDirectLightInWorldSpace(surfel, material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
+#ifndef DEBUG_PHOTONS
+	total += gatheredLighting;
+#else
+	total += GetColor(gatheredLighting);
+#endif
 
 	if (bounces > 0 && any(material.Specular))
 	{

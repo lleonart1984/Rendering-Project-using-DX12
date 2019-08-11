@@ -27,8 +27,8 @@ float MediaAsMedianEstimationBox(int index) {
 	int row = index / PHOTON_DIMENSION;
 	int col = index % PHOTON_DIMENSION;
 	// will be considered approx (2*radius+1)^2 / 2 nearest photons
-	int radius = 5; // 3 -> ~25, 4 -> ~40
-
+	int radius = 20; // 3 -> ~25, 4 -> ~40
+	float power = ADAPTIVE_POWER;
 	int minR = max(0, row - radius);
 	int maxR = min(PHOTON_DIMENSION - 1, row + radius);
 	int minC = max(0, col - radius);
@@ -47,12 +47,13 @@ float MediaAsMedianEstimationBox(int index) {
 			if (any(Photons[adj].Intensity)) // only consider valid photons
 			{
 				count++;
-				total += sqrt(d);
+				float kernel = 2 * (1 - saturate(d / PHOTON_RADIUS));
+				total += kernel * d;
 			}
 		}
-	if (count < 4)
+	if (count < 20)
 		return PHOTON_RADIUS;
-	return pow(total / count,2);
+	return total / count;
 	//((maxC - minC + 1)*(maxR - minR + 1));
 }
 
@@ -79,7 +80,7 @@ void RTMainProgram()
 		}
 
 		// clamp shrinking to the quarter, and the enlarging to the fourth times
-		radius = clamp(radius, 0.001, 4*PHOTON_RADIUS);
+		radius = clamp(radius, 0.0000001, PHOTON_RADIUS);
 		radii[index] = radius;
 
 		AABB box = (AABB)0;
