@@ -41,4 +41,6 @@ using namespace CA4G;
 #include "Techniques/Pathtracing/IterativePathtracer.h"
 #include "Techniques/Pathtracing/RecursivePathtracer.h"
 
+#include "Techniques/PhotonMaps/GridPhotonMapTechnique.h"
+
 #include "main.h"
