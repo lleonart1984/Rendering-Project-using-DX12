@@ -53,10 +53,10 @@
 
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
 
-//gObj<GPhotonMappingTechnique> technique; // Volume Grid Technique
+gObj<GPhotonMappingTechnique> technique; // Volume Grid Technique
 //gObj<SHPhotonMappingTechnique> technique; // Spatial Hash Technique
 //gObj<BPPPhotonMappingTechnique> technique; // Box Per Photon Technique
-gObj<ABPPPhotonMappingTechnique> technique;
+//gObj<ABPPPhotonMappingTechnique> technique;
 
 
 // --- Discarded implementation

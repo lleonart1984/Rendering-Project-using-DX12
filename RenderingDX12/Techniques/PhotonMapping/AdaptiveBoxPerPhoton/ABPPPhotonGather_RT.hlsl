@@ -87,7 +87,8 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	float d = max(ab.x, max(ab.y, ab.z));// distance(surfelPosition, p.Position);
 
 	float kernel = 1;// pow(d, 180);// 2 - 2 * d / p.Radius;
-	payload.Accum += kernel;
+	if (distance(surfelPosition, p.Position) < radius)
+		payload.Accum += kernel;
 
 	IgnoreHit(); // Continue search to accumulate other photons
 }

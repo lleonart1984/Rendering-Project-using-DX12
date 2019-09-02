@@ -12208,7 +12208,7 @@ namespace CA4G {
 						throw CA4GException("Can not change the number of geometries during updates.");
 					manager->geometries[manager->currentGeometry].AABBs.AABBs = D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE
 					{
-						manager->boundAABBs->resource->GetGPUVirtualAddress() + startBox * manager->boundAABBs->Stride,
+						manager->boundAABBs->resource->GetGPUVirtualAddress() + (LONG)startBox * (LONG)manager->boundAABBs->Stride,
 						manager->boundAABBs->Stride
 					};
 					manager->currentGeometry++;
@@ -12216,11 +12216,12 @@ namespace CA4G {
 				else {
 					D3D12_RAYTRACING_GEOMETRY_DESC desc{ };
 					desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE::D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
-					desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION;
+					desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+					///desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAGS::D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION;
 					desc.AABBs.AABBCount = count;
 					desc.AABBs.AABBs = D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE
 					{
-						manager->boundAABBs->resource->GetGPUVirtualAddress() + startBox * manager->boundAABBs->Stride,
+						manager->boundAABBs->resource->GetGPUVirtualAddress() + (LONG)startBox * (LONG)manager->boundAABBs->Stride,
 						manager->boundAABBs->Stride
 					};
 					manager->geometries->add(desc);

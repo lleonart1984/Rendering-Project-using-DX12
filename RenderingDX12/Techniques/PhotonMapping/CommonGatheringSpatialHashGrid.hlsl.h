@@ -13,6 +13,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	float radius = PHOTON_RADIUS;
 #endif
 
+#ifndef DEBUG_PHOTONS
 	int3 begCell = FromPositionToCell(surfel.P - radius);
 	int3 endCell = FromPositionToCell(surfel.P + radius);
 
@@ -60,6 +61,36 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 			}
 
 	return totalLighting / (100000 * pi * radius * radius);
+#else
+	int3 begCell = FromPositionToCell(surfel.P - radius);
+	int3 endCell = FromPositionToCell(surfel.P + radius);
+
+	float3 totalLighting = 0;
+
+	for (int dz = begCell.z; dz <= endCell.z; dz++)
+		for (int dy = begCell.y; dy <= endCell.y; dy++)
+			for (int dx = begCell.x; dx <= endCell.x; dx++)
+			{
+				int cellIndexToQuery = GetHashIndex(int3(dx, dy, dz));
+
+				if (cellIndexToQuery != -1) // valid coordinates
+				{
+					int currentPhotonPtr = HashTableBuffer[cellIndexToQuery];
+
+					while (currentPhotonPtr != -1) {
+
+						Photon p = Photons[currentPhotonPtr];
+
+						if (distance(p.Position, surfel.P) < PHOTON_RADIUS)
+							totalLighting += 1;
+						
+						currentPhotonPtr = NextBuffer[currentPhotonPtr];
+					}
+				}
+			}
+
+	return totalLighting;
+#endif
 }
 
 

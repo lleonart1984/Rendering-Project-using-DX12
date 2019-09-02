@@ -9,6 +9,9 @@
 void OnAddPhoton(inout Photon photon, Vertex surfel, PTPayload payload, int photonIndex) {
 }
 
+void StorePhoton(Photon photon, int photonIndex) {
+}
+
 /// Nothing relevant during photon scattering
 void OnPhotonScatter(float3 direction, Vertex surfel, Material material, float3 ratio, float pdf, float3 scatterDir, inout PTPayload payload)
 {

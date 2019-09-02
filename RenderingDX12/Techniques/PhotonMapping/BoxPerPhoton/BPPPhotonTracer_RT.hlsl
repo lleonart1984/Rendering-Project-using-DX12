@@ -17,10 +17,13 @@ struct AABB {
 RWStructuredBuffer<AABB> PhotonAABBs : register(PHOTON_AABBS_REG);
 
 void OnAddPhoton(inout Photon photon, Vertex surfel, PTPayload payload, int photonIndex) {
+}
 
+void StorePhoton(Photon photon, int photonIndex)
+{
 	AABB box = {
-		surfel.P - PHOTON_RADIUS,
-		surfel.P + PHOTON_RADIUS
+		photon.Position - PHOTON_RADIUS,
+		photon.Position + PHOTON_RADIUS
 	};
 
 	PhotonAABBs[photonIndex] = box;

@@ -80,6 +80,9 @@ cbuffer AccumulativeInfo : register(ACCUMULATIVE_CB_REG) {
 /// When implemented allows to change or add photon information depending on ray payload
 void OnAddPhoton(inout Photon photon, Vertex surfel, PTPayload payload, int photonIndex);
 
+/// When implemented allows to store the final photon in a map if necessary
+void StorePhoton(inout Photon photon, int photonIndex);
+
 /// When implemented allows to change photon ray payload depending on scattering
 void OnPhotonScatter(float3 direction, Vertex surfel, Material material, float3 ratio, float pdf, float3 scatterDir, inout PTPayload payload);
 
@@ -152,6 +155,9 @@ void PTMainRays() {
 		if (any(payload.PhotonIntensity))
 			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, ray, payload); // Will be used with Photon scattering function
 	}
+
+	if (any(Photons[photonIndex].Intensity))
+		StorePhoton(Photons[photonIndex], photonIndex);
 }
 
 [shader("miss")]
@@ -176,25 +182,31 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 
 	float NdotV = dot(V, surfel.N);
 
+	Photon p = (Photon)0;
+	p.Intensity = payload.PhotonIntensity;
+#ifdef PHOTON_WITH_POSITION
+	p.Position = surfel.P;
+#endif
+#ifdef PHOTON_WITH_NORMAL
+	p.Normal = surfel.N;
+#endif
+#ifdef PHOTON_WITH_DIRECTION
+	p.Direction = WorldRayDirection();
+#endif
+	p.Intensity = payload.PhotonIntensity;
+
+	if (NdotV > 0.001 && material.Roulette.x > 0)
+		AddPhoton(p, surfel, payload, rayId); // Adds or updates the photon stored in rayId position
+	
 	float russianRoulette = random();
 	float stopPdf = material.Roulette.x * 0.5;// *0.002;
-
+	
 	if (russianRoulette < stopPdf) // photon stay here
 	{
 		if (NdotV > 0.001)
 		{
-			Photon p = (Photon)0;
-			p.Intensity = payload.PhotonIntensity * (1 / stopPdf);
-#ifdef PHOTON_WITH_POSITION
-			p.Position = surfel.P;
-#endif
-#ifdef PHOTON_WITH_NORMAL
-			p.Normal = surfel.N;
-#endif
-#ifdef PHOTON_WITH_DIRECTION
-			p.Direction = WorldRayDirection();
-#endif
-			AddPhoton(p, surfel, payload, rayId);
+			// Update intensity and stop here...
+			Photons[rayId].Intensity *= (1 / stopPdf);
 		}
 	}
 	else
