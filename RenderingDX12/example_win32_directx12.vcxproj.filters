@@ -136,6 +136,7 @@
     <ClInclude Include="Techniques\PhotonMaps\PhotonDefinition.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap2Technique.h" />
     <ClInclude Include="Techniques\PhotonMaps\CommonHashing_RT.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMaps\DXR_PhotonTracing_Pipeline.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
