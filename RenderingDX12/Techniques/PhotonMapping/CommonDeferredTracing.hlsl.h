@@ -93,7 +93,7 @@ void AddPhoton(Photon photon, Vertex surfel, PTPayload payload, int photonIndex)
 }
 
 /// Will be executed for every primary ray traced using GBuffer information
-void InitializePayload(uint2 photonRay, uint2 emissionImageDimensions, float3 emissionPoint, inout PTPayload payload);
+void InitializePayload(uint2 photonRay, uint2 emissionImageDimensions, inout PTPayload payload);
 
 // Photon trace stage
 // Photon rays has the origin in light source and select a random direction (point source)
@@ -101,10 +101,19 @@ void InitializePayload(uint2 photonRay, uint2 emissionImageDimensions, float3 em
 void PTMainRays() {
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
+	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, PHOTON_TRACE_MAX_BOUNCES, PassCount);
+	float2 coord = float2((raysIndex.x + random()) / raysDimensions.x, (raysIndex.y + random()) / raysDimensions.y);
 
 	Vertex surfel;
 	Material material;
-	float3 L; // L is the viewer here
+	// L is the viewer here
+	float3 L;
+	
+	if (!GetPrimaryIntersection(raysIndex, coord, L, surfel, material))
+		// no photon hit
+		return;
+
+	float fact = length(float3(coord, 1));
 
 	int photonIndex = raysIndex.x + raysIndex.y * raysDimensions.x;
 
@@ -112,15 +121,6 @@ void PTMainRays() {
 
 	if (PHOTON_TRACE_MAX_BOUNCES == 0) // no photon trace
 		return;
-
-	if (!GetPrimaryIntersection(raysIndex, L, surfel, material))
-		// no photon hit
-		return; 
-
-	float3 emissionPoint = float3((raysIndex.x+0.5)*2.0 / raysDimensions.x - 1, -1, (raysIndex.y + 0.5)*2.0 / raysDimensions.y - 1);
-	float fact = length(emissionPoint);
-
-	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, PHOTON_TRACE_MAX_BOUNCES, PassCount);
 
 	PTPayload payload = (PTPayload)0;
 	payload.PhotonIntensity = // Photon Intensity
@@ -130,7 +130,7 @@ void PTMainRays() {
 	payload.PhotonBounce = // Photon Bounce Left
 		PHOTON_TRACE_MAX_BOUNCES - 1;
 
-	InitializePayload(raysIndex, raysDimensions, emissionPoint, payload);
+	InitializePayload(raysIndex, raysDimensions, payload);
 
 	float3 direction, ratio;
 	float pdf;

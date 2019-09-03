@@ -20,7 +20,7 @@ cbuffer ViewToWorldTransform : register(VIEWTOWORLD_CB_REG) {
 	row_major matrix ViewToWorld;
 }
 
-bool GetPrimaryIntersection(uint2 screenCoordinates, out float3 V, out Vertex surfel, out Material material) {
+/*bool GetPrimaryIntersection(uint2 screenCoordinates, out float3 V, out Vertex surfel, out Material material) {
 	
 	V = float3(0, 0, 0);
 
@@ -38,6 +38,34 @@ bool GetPrimaryIntersection(uint2 screenCoordinates, out float3 V, out Vertex su
 	}
 
 	V = mul(float4(-normalize(surfel.P), 0), ViewToWorld).xyz;
+
+	surfel = Transform(surfel, ViewToWorld);
+
+	// only update material, Normal is affected with bump map from gbuffer construction
+	AugmentMaterialWithTextureMapping(surfel, material);
+
+	return true;
+}*/
+
+
+bool GetPrimaryIntersection(uint2 screenCoordinates, float2 coordinates, out float3 V, out Vertex surfel, out Material material) {
+	surfel.P = Positions[screenCoordinates];
+	V = normalize(-surfel.P);
+	//surfel.N = Normals[screenCoordinates];
+	surfel.N = Normals.SampleGrad(gSmp, coordinates, 0, 0.001, 0.001);// [screenCoordinates];
+
+	surfel.C = Coordinates[screenCoordinates];
+	surfel.T = float3(1, 0, 0);
+	surfel.B = cross(surfel.N, surfel.T);
+
+	material = materials[MaterialIndices[screenCoordinates]];
+
+	if (!any(surfel.P)) // force miss execution
+	{
+		return false;
+	}
+
+	V = mul(float4(V, 0), ViewToWorld).xyz;
 
 	surfel = Transform(surfel, ViewToWorld);
 
