@@ -35,7 +35,6 @@
     <FxCompile Include="Techniques\PhotonMaps\PhotonTracing_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\GridPhotonMapConstruction_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\GridPhotonGather_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMaps\CommonHashing_RT.hlsl.h" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonGather2_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonMapConstruction_RT.hlsl" />
   </ItemGroup>
@@ -136,6 +135,7 @@
     <ClInclude Include="Techniques\PhotonMaps\GridPhotonMapTechnique.h" />
     <ClInclude Include="Techniques\PhotonMaps\PhotonDefinition.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap2Technique.h" />
+    <ClInclude Include="Techniques\PhotonMaps\CommonHashing_RT.hlsl.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

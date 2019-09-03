@@ -8,7 +8,7 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE BUNNY_OBJ
+#define USE_SCENE SPONZA_OBJ
 
 #define MOVE_LIGHT false
 
@@ -52,7 +52,7 @@
 
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
 
-gObj<GPhotonMappingTechnique> technique; // Volume Grid Technique
+//gObj<GPhotonMappingTechnique> technique; // Volume Grid Technique
 //gObj<SHPhotonMappingTechnique> technique; // Spatial Hash Technique
 //gObj<BPPPhotonMappingTechnique> technique; // Box Per Photon Technique
 //gObj<ABPPPhotonMappingTechnique> technique;
