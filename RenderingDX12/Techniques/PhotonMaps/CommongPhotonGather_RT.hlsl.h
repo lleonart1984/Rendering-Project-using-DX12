@@ -161,7 +161,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			reflectionRay.TMin = 0.001;
 			reflectionRay.TMax = 10000.0;
 			RTPayload reflectionPayload = { float3(0, 0, 0), bounces - 1 };
-			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xEF, RAY_CONTRIBUTION_TO_HITGROUPS, 1, 0, reflectionRay, reflectionPayload);
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 1, RAY_CONTRIBUTION_TO_HITGROUPS, 1, 0, reflectionRay, reflectionPayload);
 			total += R.w * material.Specular * reflectionPayload.Accumulation; /// Mirror and fresnel reflection
 		}
 
@@ -174,7 +174,7 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			refractionRay.TMin = 0.001;
 			refractionRay.TMax = 10000.0;
 			RTPayload refractionPayload = { float3(0, 0, 0), bounces - 1 };
-			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xEF, RAY_CONTRIBUTION_TO_HITGROUPS, 1, 0, refractionRay, refractionPayload);
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 1, RAY_CONTRIBUTION_TO_HITGROUPS, 1, 0, refractionRay, refractionPayload);
 			total += T.w * material.Specular * refractionPayload.Accumulation;
 		}
 	}
@@ -195,9 +195,10 @@ void RTMainRays()
 
 	Vertex surfel;
 	Material material;
-	float3 V; // V is the viewer here
+	float3 V;
+	float2 coord = (raysIndex + 0.5) / raysDimensions;
 
-	if (!GetPrimaryIntersection(raysIndex, V, surfel, material))
+	if (!GetPrimaryIntersection(raysIndex, coord, V, surfel, material))
 		// no primary ray hit
 		return;
 

@@ -87,26 +87,26 @@ cbuffer AccumulativeInfo : register(ACCUMULATIVE_CB_REG) {
 void PTMainRays() {
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
+	
+	if (PHOTON_TRACE_MAX_BOUNCES == 0) // no photon trace
+		return;
+
+	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, PHOTON_TRACE_MAX_BOUNCES, PassCount);
 
 	Vertex surfel;
 	Material material;
-	float3 L; // L is the viewer here
+	// L is the viewer here
+	float3 L;
+	float2 coord = float2((raysIndex.x + random()) / raysDimensions.x, (raysIndex.y + random()) / raysDimensions.y);
+	float fact = length(float3(coord, 1));
 
 	int photonIndex = raysIndex.x + raysIndex.y * raysDimensions.x;
 
 	Photons[photonIndex].Intensity = 0;
 
-	if (PHOTON_TRACE_MAX_BOUNCES == 0) // no photon trace
-		return;
-
-	if (!GetPrimaryIntersection(raysIndex, L, surfel, material))
+	if (!GetPrimaryIntersection(raysIndex, coord, L, surfel, material))
 		// no photon hit
 		return;
-
-	float3 emissionPoint = float3((raysIndex.x + 0.5)*2.0 / raysDimensions.x - 1, -1, (raysIndex.y + 0.5)*2.0 / raysDimensions.y - 1);
-	float fact = length(emissionPoint);
-
-	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, PHOTON_TRACE_MAX_BOUNCES, PassCount);
 
 	PTPayload payload = (PTPayload)0;
 	payload.PhotonIntensity = // Photon Intensity

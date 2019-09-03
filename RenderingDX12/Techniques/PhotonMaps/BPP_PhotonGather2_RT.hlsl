@@ -49,7 +49,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	// Aggregate current Photon contribution if inside radius
 	if (photonDistance < radius && NdotL > 0.001 && NdotN > 0.001)
 	{
-		float kernel = 2 * (1 - photonDistance / PHOTON_RADIUS);
+		float kernel = 2 * (1 - photonDistance / radius);
 		payload.Accum += kernel * p.Intensity * NdotN / area;
 	}
 
@@ -76,8 +76,8 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 		///*OutSpecularAccum*/		float3(0,0,0)
 	};
 	RayDesc ray;
-	float3 dir = (float3(0, 0.000002, 0));
-	ray.Origin = surfel.P;// -dir * 0.000001;
+	float3 dir = normalize(float3(1,1,1))*0.0002;
+	ray.Origin = surfel.P - dir * 0.5;
 	ray.Direction = dir;// *0.000002;
 	ray.TMin = 0.1;
 	ray.TMax = 1;
@@ -90,7 +90,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// 1 : Miss index for PhotonGatheringMiss shader
 	// ray
 	// raypayload
-	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, 0x80, 0, 0, 1, ray, photonGatherPayload);
+	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, 2, 0, 0, 1, ray, photonGatherPayload);
 
 #ifdef DEBUG_PHOTONS
 	return photonGatherPayload.Accum;

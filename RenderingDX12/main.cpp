@@ -130,8 +130,9 @@ int main(int, char**)
 			scene = new Scene(filePath);
 			camera->Position = float3(0.1f, 0.2f, 0.8f);
 			camera->Target = float3(0, 0, 0);
-			lightSource->Position = float3(0, 0.4, 0);
+			lightSource->Position = float3(0.3, 0.4, 0.1);
 			lightSource->Intensity = float3(400, 400, 400);
+			//MixMirrorMaterial(&scene->Materials()[0], 1);
 			MixGlassMaterial(&scene->Materials()[0], 1);
 			break;
 		case CORNELL_OBJ:

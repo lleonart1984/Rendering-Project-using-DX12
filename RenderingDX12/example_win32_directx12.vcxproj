@@ -242,6 +242,7 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="Techniques\PhotonMapping\GridPhotonMapping\GPMCommon.hlsl.h" />
     <ClInclude Include="Techniques\PhotonMapping\PhotonDefinition.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap2Technique.h" />
+    <ClInclude Include="Techniques\PhotonMaps\DXR_PhotonTracing_Pipeline.h" />
     <ClInclude Include="Techniques\PhotonMaps\GridPhotonMapTechnique.h" />
     <ClInclude Include="Techniques\PhotonMaps\PhotonDefinition.h" />
     <ClInclude Include="Techniques\Randoms\RandomHLSL.h" />

@@ -16,8 +16,8 @@ struct AABB {
 
 StructuredBuffer<Photon> Photons		: register (t0);
 
-RWStructuredBuffer<float> radii			: register (u0);
-RWStructuredBuffer<AABB> PhotonAABBs	: register (u1);
+RWStructuredBuffer<AABB> PhotonAABBs	: register (u0);
+RWStructuredBuffer<float> radii			: register (u1);
 
 float NoAdaptiveBox(int index) {
 	return PHOTON_RADIUS;
@@ -27,7 +27,7 @@ float MediaAsMedianEstimationBox(int index) {
 	int row = index / PHOTON_DIMENSION;
 	int col = index % PHOTON_DIMENSION;
 	// will be considered approx (2*radius+1)^2 / 2 nearest photons
-	int radius = 20; // 3 -> ~25, 4 -> ~40
+	int radius = 10; // 3 -> ~25, 4 -> ~40
 	float power = ADAPTIVE_POWER;
 	int minR = max(0, row - radius);
 	int maxR = min(PHOTON_DIMENSION - 1, row + radius);
@@ -35,7 +35,7 @@ float MediaAsMedianEstimationBox(int index) {
 	int maxC = min(PHOTON_DIMENSION - 1, col + radius);
 	float3 currentPosition = Photons[index].Position;
 	float total = 0;
-	int count = 0;
+	float kInt = 0;
 	for (int r = minR; r <= maxR; r++)
 		for (int c = minC; c <= maxC; c++)
 		{
@@ -44,21 +44,22 @@ float MediaAsMedianEstimationBox(int index) {
 			float3 adjPhotonPos = Photons[adj].Position;
 			float d = distance(adjPhotonPos, currentPosition);
 
-			if (any(Photons[adj].Intensity)) // only consider valid photons
+			if (any(Photons[adj].Intensity) && d < 2*PHOTON_RADIUS) // only consider valid photons
 			{
-				count++;
-				float kernel = 2 * (1 - saturate(d / PHOTON_RADIUS));
+				//count++;
+				float kernel = 1 / (1 + d);// 4 * pow(1 - saturate(d / (2 * PHOTON_RADIUS)), 0.25) + 0.1;
+				kInt += kernel;
 				total += kernel * d;
 			}
 		}
-	if (count < 20)
+	if (kInt < 4)
 		return PHOTON_RADIUS;
-	return total / count;
+	return total * 0.5 / kInt;
 	//((maxC - minC + 1)*(maxR - minR + 1));
 }
 
 [shader("raygeneration")]
-void RTMainProgram()
+void Main()
 {
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
@@ -78,7 +79,7 @@ void RTMainProgram()
 		}
 
 		// clamp shrinking to the quarter, and the enlarging to the fourth times
-		radius = clamp(radius, 0.0000001, PHOTON_RADIUS);
+		radius = clamp(radius, 0.0001, PHOTON_RADIUS);
 		radii[index] = radius;
 
 		AABB box = (AABB)0;
@@ -89,7 +90,15 @@ void RTMainProgram()
 	else {
 		radii[index] = 0;// radius;
 
+		float x = raysIndex.x / (float)PHOTON_DIMENSION;
+		float y = raysIndex.y / (float)PHOTON_DIMENSION;
+		float z = (abs(index * 0x888888) % 128) / 128.0;
+
+		float3 pos = 2 * float3(x, y, z) - 1;
+
 		AABB box = (AABB)0;
+		box.minimum = pos - 0.00001;// -radius * 0.0001;
+		box.maximum = pos + 0.00001;// +radius * 0.0001;
 		PhotonAABBs[index] = box;
 	}
 }

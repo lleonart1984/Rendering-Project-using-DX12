@@ -194,9 +194,12 @@ void RTMainRays()
 
 	Vertex surfel;
 	Material material;
-	float3 V; // V is the viewer here
 
-	if (!GetPrimaryIntersection(raysIndex, V, surfel, material))
+	// V is the viewer here
+	float3 V;
+	float2 coord = (raysIndex + 0.5) / raysDimensions;
+
+	if (!GetPrimaryIntersection(raysIndex, coord, V, surfel, material))
 		// no primary ray hit
 		return;
 

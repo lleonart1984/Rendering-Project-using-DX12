@@ -103,18 +103,18 @@ void PTMainRays()
 {
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
+	StartRandomSeedForRay(raysDimensions, PATH_TRACING_MAX_BOUNCES, raysIndex, 0, PassCount);
 
 	Vertex surfel;
 	Material material;
 	float3 V;
+	float2 coord = (raysIndex + 0.5) / raysDimensions;
 
-	if (!GetPrimaryIntersection(raysIndex, V, surfel, material))
+	if (!GetPrimaryIntersection(raysIndex, coord, V, surfel, material))
 	{
 		AccumulateOutput(raysIndex, 0);
 		return;
 	}
-
-	StartRandomSeedForRay(raysDimensions, PATH_TRACING_MAX_BOUNCES, raysIndex, 0, PassCount);
 
 	float3 color = ComputePath(V, surfel, material, PATH_TRACING_MAX_BOUNCES);
 

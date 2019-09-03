@@ -14,90 +14,38 @@ public:
 	// GBuffer process used to build GBuffer data from viewer
 	gObj<GBufferConstruction> gBufferFromViewer;
 
-	// DXR pipeline for photon tracing stage
-	struct DXR_PT_Pipeline : public RTPipelineManager {
-		// Inherited via RTPipelineManager
+#include "DXR_PhotonTracing_Pipeline.h"
 
-		gObj<RayGenerationHandle> PTMainRays;
-		gObj<MissHandle> PhotonMiss;
-		gObj<ClosestHitHandle> PhotonScattering;
-		gObj<HitGroupHandle> PhotonMaterial;
+	// DXR pipeline for AABB construction and Radii population (should be a compute shader)
+	// needs to be fixed asap!
+	struct DXR_PM_Pipeline : public RTPipelineManager {
+		gObj<RayGenerationHandle> Main;
 
-		class DXR_PT_IL : public DXIL_Library<DXR_PT_Pipeline> {
+		class DXR_PM_IL : public DXIL_Library<DXR_PM_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\BoxPerPhoton\\BPPPhotonTracer_RT.cso"));
-
-				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
-				_ gLoad Shader(Context()->PhotonMiss, L"PhotonMiss");
-				_ gLoad Shader(Context()->PhotonScattering, L"PhotonScattering");
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\BPP_PhotonMapConstruction_RT.cso"));
+				_ gLoad Shader(Context()->Main, L"Main");
 			}
 		};
-		gObj<DXR_PT_IL> _Library;
+		gObj<DXR_PM_IL> _Library;
 
-		// DXR Photon trace program wrapper
-		struct DXR_PT_Program : public RTProgram<DXR_PT_Pipeline> {
+		struct DXR_PM_Program : public RTProgram<DXR_PM_Pipeline> {
 			void Setup() {
-				_ gSet Payload(16);
-				_ gSet StackSize(PHOTON_TRACE_MAX_BOUNCES + 1);
-				_ gLoad Shader(Context()->PTMainRays);
-				_ gLoad Shader(Context()->PhotonMiss);
-				_ gCreate HitGroup(Context()->PhotonMaterial, Context()->PhotonScattering, nullptr, nullptr);
+				_ gLoad Shader(Context()->Main);
 			}
 
-			gObj<SceneOnGPU> Scene;
-			gObj<Buffer> Vertices;
-			gObj<Buffer> Materials;
-
-			// GBuffer Information
-			gObj<Texture2D> Positions;
-			gObj<Texture2D> Normals;
-			gObj<Texture2D> Coordinates;
-			gObj<Texture2D> MaterialIndices;
-
-			gObj<Texture2D> *Textures;
-			int TextureCount;
-
-			gObj<Buffer> CameraCB;
-			gObj<Buffer> LightingCB;
-			gObj<Buffer> ProgressiveCB;
-
-			// Photon map binding objects
-			gObj<Buffer> PhotonAABBs; // Buffer with generated photon's aabbs for BVH photon map building
-			gObj<Buffer> Photons; // Buffer with all Photon attributes
-
-			struct ObjInfo {
-				int TriangleOffset;
-				int MaterialIndex;
-				int2 padding;
-			} CurrentObjectInfo;
+			gObj<Buffer> Photons;
+			gObj<Buffer> AABBs;
+			gObj<Buffer> Radii;
 
 			void Globals() {
-				UAV(0, Photons);
-				UAV(1, PhotonAABBs);
+				UAV(0, AABBs);
+				UAV(1, Radii);
 
-				ADS(0, Scene);
-				SRV(1, Vertices);
-				SRV(2, Materials);
-
-				SRV(3, Positions);
-				SRV(4, Normals);
-				SRV(5, Coordinates);
-				SRV(6, MaterialIndices);
-
-				SRV_Array(7, Textures, TextureCount);
-
-				Static_SMP(0, Sampler::Linear());
-
-				CBV(0, CameraCB);
-				CBV(1, LightingCB);
-				CBV(2, ProgressiveCB);
-			}
-
-			void HitGroup_Locals() {
-				CBV(3, CurrentObjectInfo);
+				SRV(0, Photons);
 			}
 		};
-		gObj<DXR_PT_Program> _Program;
+		gObj<DXR_PM_Program> _Program;
 
 		void Setup() override
 		{
@@ -105,7 +53,7 @@ public:
 			_ gLoad Program(_Program);
 		}
 	};
-
+	
 	// DXR pipeline for photon gathering stage
 	struct DXR_RT_Pipeline : public RTPipelineManager {
 		gObj<RayGenerationHandle> RTMainRays;
@@ -120,7 +68,7 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_RT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMapping\\BoxPerPhoton\\BPPPhotonGather_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\BPP_PhotonGather2_RT.cso"));
 
 				_ gLoad Shader(Context()->RTMainRays, L"RTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -137,7 +85,7 @@ public:
 			void Setup() {
 				_ gSet Payload(4 * (3 + 3)); // 3- Normal, 3- Accum
 				_ gSet StackSize(RAY_TRACING_MAX_BOUNCES + 1); //  +1 is due to the last trace function call for photon gathering
-				_ gSet MaxHitGroupIndex(1 + 1000); // 1000 == max number of geometries
+				_ gSet MaxHitGroupIndex(1 + 1000); // 1 == hitgroup index for photons, 1000 == max number of geometries
 				_ gLoad Shader(Context()->RTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
 				_ gLoad Shader(Context()->PhotonGatheringMiss);
@@ -145,9 +93,9 @@ public:
 				_ gCreate HitGroup(Context()->PhotonGatheringMaterial, nullptr, Context()->PhotonGatheringAnyHit, Context()->PhotonGatheringIntersection);
 			}
 
-			gObj<SceneOnGPU> Scene;
-			gObj<SceneOnGPU> PhotonMap;
+			gObj<SceneOnGPU> SceneAndPhotonMap;
 			gObj<Buffer> Photons;
+			gObj<Buffer> Radii;
 
 			gObj<Buffer> Vertices;
 			gObj<Buffer> Materials;
@@ -170,7 +118,6 @@ public:
 
 			gObj<Texture2D> Output;
 
-
 			struct ObjInfo {
 				int TriangleOffset;
 				int MaterialIndex;
@@ -180,21 +127,22 @@ public:
 			void Globals() {
 				UAV(0, Output);
 
-				ADS(0, Scene);
-				ADS(1, PhotonMap);
+				ADS(0, SceneAndPhotonMap);
 
-				SRV(2, Photons);
+				SRV(1, Photons);
 
-				SRV(3, Vertices);
-				SRV(4, Materials);
+				SRV(2, Vertices);
+				SRV(3, Materials);
 
-				SRV(5, Positions);
-				SRV(6, Normals);
-				SRV(7, Coordinates);
-				SRV(8, MaterialIndices);
+				SRV(4, Positions);
+				SRV(5, Normals);
+				SRV(6, Coordinates);
+				SRV(7, MaterialIndices);
 
-				SRV(9, LightPositions);
+				SRV(8, LightPositions);
 
+				SRV(9, Radii);
+				
 				SRV_Array(10, Textures, TextureCount);
 
 				Static_SMP(0, Sampler::Linear());
@@ -221,12 +169,15 @@ public:
 
 	gObj<Buffer> screenVertices;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
+	gObj<DXR_PM_Pipeline> dxrPMPipeline;
 	gObj<DXR_RT_Pipeline> dxrRTPipeline;
 
 	// AABBs buffer for photon map
 	gObj<Buffer> PhotonsAABBs;
 	// Baked photon map used for updates
 	gObj<GeometriesOnGPU> PhotonsAABBsOnTheGPU;
+	// Baked scene geometries used for toplevel instance updates
+	gObj<GeometriesOnGPU> sceneGeometriesOnGPU;
 	// Vertex buffer for scene triangles
 	gObj<Buffer> VB;
 
@@ -256,6 +207,7 @@ public:
 		flush_all_to_gpu;
 
 		_ gLoad Pipeline(dxrPTPipeline);
+		_ gLoad Pipeline(dxrPMPipeline);
 		_ gLoad Pipeline(dxrRTPipeline);
 
 		// Load assets to render the deferred lighting image
@@ -269,7 +221,7 @@ public:
 #define PHOTON_WITH_DIRECTION
 #define PHOTON_WITH_NORMAL
 #define PHOTON_WITH_POSITION
-#include "../PhotonDefinition.h"
+#include "PhotonDefinition.h"
 
 	double doubleRand() {
 		return double(rand()) / (double(RAND_MAX) + 1.0);
@@ -288,9 +240,14 @@ public:
 		// CBs will be updated every frame
 		dxrPTPipeline->_Program->CameraCB = _ gCreate ConstantBuffer<float4x4>();
 		dxrPTPipeline->_Program->LightingCB = _ gCreate ConstantBuffer<Lighting>();
-		dxrPTPipeline->_Program->ProgressiveCB = _ gCreate ConstantBuffer<int>();
-		dxrPTPipeline->_Program->PhotonAABBs = PhotonsAABBs;
+		dxrPTPipeline->_Program->ProgressivePass = _ gCreate ConstantBuffer<int>();
 		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION*PHOTON_DIMENSION);
+#pragma endregion
+
+#pragma region DXR Pipeline for PM construction using AABBs
+		dxrPMPipeline->_Program->AABBs = PhotonsAABBs;
+		dxrPMPipeline->_Program->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION*PHOTON_DIMENSION);
+		dxrPMPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 #pragma endregion
 
 #pragma region DXR Photon gathering Pipeline Objects
@@ -304,12 +261,13 @@ public:
 		dxrRTPipeline->_Program->LightTransforms = _ gCreate ConstantBuffer <Globals>();
 
 		// Reused CBs from dxrPTPipeline
-		dxrRTPipeline->_Program->ProgressiveCB = dxrPTPipeline->_Program->ProgressiveCB;
+		dxrRTPipeline->_Program->ProgressiveCB = dxrPTPipeline->_Program->ProgressivePass;
 		dxrRTPipeline->_Program->LightingCB = dxrPTPipeline->_Program->LightingCB;
 
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		// Bind now Photon map as SRVs
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
+		dxrRTPipeline->_Program->Radii = dxrPMPipeline->_Program->Radii;
 #pragma endregion
 	}
 
@@ -327,11 +285,38 @@ public:
 			auto sceneObj = Scene->Objects()[i];
 			sceneGeometriesBuilder gLoad Geometry(sceneObj.startVertex, sceneObj.vertexesCount);
 		}
-		gObj<GeometriesOnGPU> sceneGeometriesOnGPU = sceneGeometriesBuilder gCreate BakedGeometry();
+		sceneGeometriesOnGPU = sceneGeometriesBuilder gCreate BakedGeometry();
 
 		auto sceneInstances = manager gCreate Instances();
 		sceneInstances gLoad Instance(sceneGeometriesOnGPU);
-		dxrPTPipeline->_Program->Scene = dxrRTPipeline->_Program->Scene = sceneInstances gCreate BakedScene();
+		dxrPTPipeline->_Program->Scene = sceneInstances gCreate BakedScene();
+	}
+
+	void CreateSceneAndPhotonMapOnGPU(gObj<DXRManager> manager) {
+		// Building top-level ADS for SceneAndPhotonMap
+		auto sceneInstances = manager gCreate Instances();
+
+		auto photonMapBuilder = manager gCreate ProceduralGeometries();
+		photonMapBuilder gSet AABBs(PhotonsAABBs);
+		photonMapBuilder gLoad Geometry(0, PHOTON_DIMENSION*PHOTON_DIMENSION);
+		PhotonsAABBsOnTheGPU = photonMapBuilder gCreate BakedGeometry(true, true);
+
+		sceneInstances gLoad Instance(sceneGeometriesOnGPU, 1);
+		sceneInstances gLoad Instance(PhotonsAABBsOnTheGPU, 2);
+
+		dxrRTPipeline->_Program->SceneAndPhotonMap = sceneInstances gCreate BakedScene(true, true);
+	}
+
+	void UpdatePhotonMap(gObj<DXRManager> manager) {
+		auto photonMapBuilder = manager gCreate ProceduralGeometries(PhotonsAABBsOnTheGPU);
+		photonMapBuilder gSet AABBs(PhotonsAABBs);
+		photonMapBuilder gLoad Geometry(0, PHOTON_DIMENSION*PHOTON_DIMENSION);
+		PhotonsAABBsOnTheGPU = photonMapBuilder gCreate RebuiltGeometry(true, true);
+
+		auto sceneInstances = manager gCreate Instances(dxrRTPipeline->_Program->SceneAndPhotonMap);
+		sceneInstances gLoad Instance(sceneGeometriesOnGPU, 1);
+		sceneInstances gLoad Instance(PhotonsAABBsOnTheGPU, 2);
+		dxrRTPipeline->_Program->SceneAndPhotonMap = sceneInstances gCreate UpdatedScene();
 	}
 
 	float4x4 view, proj;
@@ -361,11 +346,11 @@ public:
 
 		perform(Photontracing);
 
+		perform(ConstructPhotonMap);
+
 		static bool firstTime = true;
-
 		if (firstTime) {
-			perform(CreatePhotonMap);
-
+			perform(CreateSceneAndPhotonMapOnGPU);
 			firstTime = false;
 		}
 		else
@@ -377,6 +362,16 @@ public:
 	void Photontracing(gObj<DXRManager> manager) {
 
 		auto ptRTProgram = dxrPTPipeline->_Program;
+
+		static int FrameIndex = 0;
+
+		if (CameraIsDirty)
+			FrameIndex = 0;
+
+		manager gCopy ValueData(ptRTProgram->ProgressivePass, FrameIndex);
+
+		FrameIndex++;
+
 
 		// Update lighting needed for photon tracing
 		manager gCopy ValueData(ptRTProgram->LightingCB, Lighting{
@@ -433,36 +428,14 @@ public:
 #pragma endregion
 	}
 
-	void UpdatePhotonMap(gObj<DXRManager> manager) {
-#pragma region Update Photon Map BVHs in next frames
-		auto geomUpdater = manager gCreate ProceduralGeometries(PhotonsAABBsOnTheGPU);
-		//geomUpdater->PrepareBuffer(PhotonsAABBs);
-		geomUpdater gSet AABBs(PhotonsAABBs);
-		geomUpdater gLoad Geometry(0, PHOTON_DIMENSION*PHOTON_DIMENSION);
-		PhotonsAABBsOnTheGPU = geomUpdater gCreate RebuiltGeometry();
-		//PhotonsAABBsOnTheGPU = geomUpdater gCreate UpdatedGeometry();
-#pragma endregion
+	void ConstructPhotonMap(gObj<DXRManager> manager) {
+		auto rtProgram = dxrPMPipeline->_Program;
 
-		// Creates a single instance to refer all static objects in bottom level acc ds.
-		auto photonMapInstance = manager gCreate Instances(dxrRTPipeline->_Program->PhotonMap);
-		photonMapInstance gLoad Instance(PhotonsAABBsOnTheGPU);
-		dxrRTPipeline->_Program->PhotonMap = photonMapInstance gCreate UpdatedScene();
+		manager gSet Pipeline(dxrPMPipeline);
+		manager gSet Program(rtProgram);
+		manager gSet RayGeneration(dxrPMPipeline->Main);
+		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
 	}
-
-	void CreatePhotonMap(gObj<DXRManager> manager) {
-#pragma region Create Photon Map BVHs in first frame
-		auto geomUpdater = manager gCreate ProceduralGeometries();
-		geomUpdater gSet AABBs(PhotonsAABBs);
-		geomUpdater gLoad Geometry(0, PHOTON_DIMENSION*PHOTON_DIMENSION);
-		PhotonsAABBsOnTheGPU = geomUpdater gCreate BakedGeometry(false, false);
-#pragma endregion
-
-		// Creates a single instance to refer all static objects in bottom level acc ds.
-		auto photonMapInstance = manager gCreate Instances();
-		photonMapInstance gLoad Instance(PhotonsAABBsOnTheGPU);
-		dxrRTPipeline->_Program->PhotonMap = photonMapInstance gCreate BakedScene(true, true);
-	}
-
 
 	void Raytracing(gObj<DXRManager> manager) {
 
