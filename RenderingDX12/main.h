@@ -8,7 +8,7 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE RING_OBJ
+#define USE_SCENE BUNNY_OBJ
 
 #define MOVE_LIGHT false
 
@@ -50,7 +50,6 @@
 //gObj<IterativePathtracer> technique;
 //gObj<RecursivePathtracer> technique;
 
-
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
 
 gObj<GPhotonMappingTechnique> technique; // Volume Grid Technique
@@ -58,6 +57,7 @@ gObj<GPhotonMappingTechnique> technique; // Volume Grid Technique
 //gObj<BPPPhotonMappingTechnique> technique; // Box Per Photon Technique
 //gObj<ABPPPhotonMappingTechnique> technique;
 
+gObj<GridPhotonMapTechnique> technique;
 
 // --- Discarded implementation
 //gObj<BPGPhotonMappingTechnique> technique; // Box Per Geometry Technique

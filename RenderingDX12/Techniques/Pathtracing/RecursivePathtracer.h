@@ -26,7 +26,7 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\Pathtracing\\Hybrid\\RecursivePathtracer_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\Pathtracing\\RecursivePathtracer_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");

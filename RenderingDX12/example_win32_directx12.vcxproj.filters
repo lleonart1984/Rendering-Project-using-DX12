@@ -32,6 +32,12 @@
     <FxCompile Include="Techniques\PhotonMapping\BoxPerPhoton\BPPPhotonTracer_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMapping\AdaptiveRadiusCompute_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMapping\RadiusAndBoxCompute_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PhotonTracing_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\GridPhotonMapConstruction_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\GridPhotonGather_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\CommonHashing_RT.hlsl.h" />
+    <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonGather2_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonMapConstruction_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -105,10 +111,6 @@
     <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial12.h" />
     <ClInclude Include="Techniques\CommonGI\Parameters.h" />
-    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHCommon.h" />
-    <ClInclude Include="Techniques\PhotonMapping\SHPM\SHPhotonMapTechnique.h" />
-    <ClInclude Include="Techniques\PhotonMapping\GPM\GPMCommon.h" />
-    <ClInclude Include="Techniques\PhotonMapping\CommonTracingBindings.h" />
     <ClInclude Include="Techniques\CommonRT\CommonRTScenes.h" />
     <ClInclude Include="Techniques\CommonRT\CommonShadowMaping.h" />
     <ClInclude Include="Techniques\CommonRT\CommonDeferred.h" />
@@ -130,6 +132,10 @@
     <ClInclude Include="Techniques\PhotonMapping\AdaptiveBoxPerPhoton\ABPPPhotonMappingTechnique.h" />
     <ClInclude Include="Techniques\PhotonMapping\BoxPerGeometry\BPGPhotonMappingTechnique.h" />
     <ClInclude Include="Techniques\PhotonMapping\BoxPerPhoton\BPPPhotonMappingTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMaps\CommongPhotonGather_RT.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMaps\GridPhotonMapTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMaps\PhotonDefinition.h" />
+    <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap2Technique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
