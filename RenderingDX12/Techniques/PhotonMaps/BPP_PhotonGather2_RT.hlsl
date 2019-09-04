@@ -22,6 +22,7 @@ struct PhotonRayPayload
 };
 
 #ifdef DEBUG_PHOTONS
+#if DEBUG_STRATEGY == 0
 [shader("anyhit")]
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
 	
@@ -33,6 +34,19 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 
 	IgnoreHit(); // Continue search to accumulate other photons
 }
+#else
+[shader("anyhit")]
+void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
+
+	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection() * 0.5;
+	Photon p = Photons[attr.PhotonIdx];
+	float radius = Radii[attr.PhotonIdx];
+
+	payload.Accum = max(distance(p.Position, surfelPosition), payload.Accum);
+
+	IgnoreHit(); // Continue search to accumulate other photons
+}
+#endif
 #else
 [shader("anyhit")]
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
@@ -93,7 +107,13 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, 2, 0, 0, 1, ray, photonGatherPayload);
 
 #ifdef DEBUG_PHOTONS
+#if DEBUG_STRATEGY == 0
+	// Count photons
 	return photonGatherPayload.Accum;
+#else
+	// Accum is farthest distance
+	return pow(4, 7 * photonGatherPayload.Accum / PHOTON_RADIUS); // to draw radius contraction
+#endif
 #else
 	return photonGatherPayload.Accum * material.Roulette.x * material.Diffuse / pi / 100000;// +material.Specular * photonGatherPayload.OutSpecularAccum;
 #endif

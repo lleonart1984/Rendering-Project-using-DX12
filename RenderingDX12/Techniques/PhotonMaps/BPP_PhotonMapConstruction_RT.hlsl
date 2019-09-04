@@ -27,7 +27,7 @@ float MediaAsMedianEstimationBox(int index) {
 	int row = index / PHOTON_DIMENSION;
 	int col = index % PHOTON_DIMENSION;
 	// will be considered approx (2*radius+1)^2 / 2 nearest photons
-	int radius = 10; // 3 -> ~25, 4 -> ~40
+	int radius = 7; // 3 -> ~25, 4 -> ~40
 	float power = ADAPTIVE_POWER;
 	int minR = max(0, row - radius);
 	int maxR = min(PHOTON_DIMENSION - 1, row + radius);
@@ -36,6 +36,7 @@ float MediaAsMedianEstimationBox(int index) {
 	float3 currentPosition = Photons[index].Position;
 	float total = 0;
 	float kInt = 0;
+	int count = 0;
 	for (int r = minR; r <= maxR; r++)
 		for (int c = minC; c <= maxC; c++)
 		{
@@ -46,13 +47,13 @@ float MediaAsMedianEstimationBox(int index) {
 
 			if (any(Photons[adj].Intensity) && d < 2*PHOTON_RADIUS) // only consider valid photons
 			{
-				//count++;
-				float kernel = 1 / (1 + d);// 4 * pow(1 - saturate(d / (2 * PHOTON_RADIUS)), 0.25) + 0.1;
+				count++;
+				float kernel = 1;// / (1 + 10 * d / PHOTON_RADIUS);// 4 * pow(1 - saturate(d / (2 * PHOTON_RADIUS)), 0.25) + 0.1;
 				kInt += kernel;
 				total += kernel * d;
 			}
 		}
-	if (kInt < 4)
+	if (count < 10)
 		return PHOTON_RADIUS;
 	return total * 0.5 / kInt;
 	//((maxC - minC + 1)*(maxR - minR + 1));
@@ -92,7 +93,7 @@ void Main()
 
 		float x = raysIndex.x / (float)PHOTON_DIMENSION;
 		float y = raysIndex.y / (float)PHOTON_DIMENSION;
-		float z = (abs(index * 0x888888) % 128) / 128.0;
+		float z = 2*(abs(index * 0x888888) % 128) / 128.0 - 1;
 
 		float3 pos = 2 * float3(x, y, z) - 1;
 
