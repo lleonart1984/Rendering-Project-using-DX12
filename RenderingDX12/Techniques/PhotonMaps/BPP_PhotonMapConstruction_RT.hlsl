@@ -27,7 +27,7 @@ float MediaAsMedianEstimationBox(int index) {
 	int row = index / PHOTON_DIMENSION;
 	int col = index % PHOTON_DIMENSION;
 	// will be considered approx (2*radius+1)^2 / 2 nearest photons
-	int radius = 7; // 3 -> ~25, 4 -> ~40
+	int radius = 50; // 3 -> ~25, 4 -> ~40
 	float power = ADAPTIVE_POWER;
 	int minR = max(0, row - radius);
 	int maxR = min(PHOTON_DIMENSION - 1, row + radius);
@@ -53,11 +53,52 @@ float MediaAsMedianEstimationBox(int index) {
 				total += kernel * d;
 			}
 		}
-	if (count < 10)
+	if (count < DESIRED_PHOTONS / 10)
 		return PHOTON_RADIUS;
 	return total * 0.5 / kInt;
 	//((maxC - minC + 1)*(maxR - minR + 1));
 }
+
+#define T 5
+
+float HistogramEstimationBox(int index) {
+	int row = index / PHOTON_DIMENSION;
+	int col = index % PHOTON_DIMENSION;
+	// will be considered approx (2*radius+1)^2 / 2 nearest photons
+	int radius = 7; // 3 -> ~25, 4 -> ~40
+	int minR = max(0, row - radius);
+	int maxR = min(PHOTON_DIMENSION - 1, row + radius);
+	int minC = max(0, col - radius);
+	int maxC = min(PHOTON_DIMENSION - 1, col + radius);
+	float3 currentPosition = Photons[index].Position;
+	int histogram[T];
+	for (int i = 0; i < T; i++)
+		histogram[i] = 0;
+
+	for (int r = minR; r <= maxR; r++)
+		for (int c = minC; c <= maxC; c++)
+		{
+			int adj = r * PHOTON_DIMENSION + c;
+
+			float3 adjPhotonPos = Photons[adj].Position;
+			float d = distance(adjPhotonPos, currentPosition);
+
+			if (any(Photons[adj].Intensity) && d < PHOTON_RADIUS) // only consider valid photons
+			{
+				int idx = min(T - 1, T * d / PHOTON_RADIUS);
+				histogram[idx]++;
+			}
+		}
+	int counting = DESIRED_PHOTONS;
+	for (int i = 0; i < T; i++)
+	{
+		if (counting < histogram[i])
+			return PHOTON_RADIUS * (i / (float)T + (1.0 / T) * counting / (float)histogram[i]);
+		counting -= histogram[i];
+	}
+	return PHOTON_RADIUS;
+}
+
 
 [shader("raygeneration")]
 void Main()
@@ -75,7 +116,7 @@ void Main()
 			radius = NoAdaptiveBox(index);
 			break;
 		case 1: // Media
-			radius = MediaAsMedianEstimationBox(index);
+			radius = HistogramEstimationBox(index);
 			break;
 		}
 

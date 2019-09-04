@@ -146,9 +146,6 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 	// Get indirect diffuse light compute using photon map
 #ifndef DEBUG_PHOTONS
 	total += gatheredLighting;
-#else
-	total += GetColor(gatheredLighting);
-#endif
 
 	if (bounces > 0 && any(material.Specular))
 	{
@@ -178,6 +175,10 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			total += T.w * material.Specular * refractionPayload.Accumulation;
 		}
 	}
+#else
+	total += GetColor((int)gatheredLighting.x);
+#endif
+	
 	return total;
 }
 

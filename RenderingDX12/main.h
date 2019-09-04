@@ -57,7 +57,9 @@
 //gObj<BPPPhotonMappingTechnique> technique; // Box Per Photon Technique
 //gObj<ABPPPhotonMappingTechnique> technique;
 
-gObj<GridPhotonMapTechnique> technique;
+//gObj<GridPhotonMapTechnique> technique;
+
+gObj<BPP_PhotonMap2Technique> technique;
 
 // --- Discarded implementation
 //gObj<BPGPhotonMappingTechnique> technique; // Box Per Geometry Technique

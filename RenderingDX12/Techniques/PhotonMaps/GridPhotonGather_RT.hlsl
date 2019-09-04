@@ -131,22 +131,14 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 				}
 			}
 
-	int limit = 200;
-	int selected = 0;
-	int counting = 0;
+	int counting = DESIRED_PHOTONS;
 	for (int i = 0; i < T; i++)
 	{
-		counting += histogram[i];
-		if (counting > limit)
-		{
-			selected = i;
-			break;
-		}
+		if (counting < histogram[i])
+			return pow(4, (1 - (i / (float)T + (1.0 / T) * counting / (float)histogram[i])) * 7);
+		counting -= histogram[i];
 	}
-
-	float radiusRatio = selected / (float)T + (1.0 / T)*(counting - histogram[selected]) / (float)histogram[selected];
-
-	return pow(4, radiusRatio * 7);
+	return pow(4, 0);
 }
 
 #endif
