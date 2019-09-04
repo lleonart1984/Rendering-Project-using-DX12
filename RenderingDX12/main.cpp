@@ -164,7 +164,7 @@ int main(int, char**)
 			MixMirrorMaterial(&scene->Materials()[9], 0.4); // floor
 			camera->Position = float3(0.3f, 0.05f, -0.028);
 			camera->Target = float3(0, 0.07f, 0);
-			lightSource->Position = float3(0.2, 0.45, 0);
+			lightSource->Position = float3(0, 0.45, 0);
 			lightSource->Intensity = float3(100, 100, 100);
 			break;
 		case SIBENIK_OBJ:
