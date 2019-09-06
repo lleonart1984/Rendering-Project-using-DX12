@@ -150,9 +150,9 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\weddingRing\\ring.obj");
 			scene = new Scene(filePath);
-			camera->Position = float3(.4f, .6f, .3f);
+			camera->Position = float3(.3f, .4f, -.25f);
 			camera->Target = float3(0, 0.1f, 0);
-			lightSource->Position = float3(0.1, 0.4, 0.2);
+			lightSource->Position = float3(0.1, 0.4, -0.2);
 			lightSource->Intensity = float3(240, 240, 240);
 			MixMirrorMaterial(&scene->Materials()[0], 1);
 			//MixGlassMaterial(&scene->Materials()[0], 1);

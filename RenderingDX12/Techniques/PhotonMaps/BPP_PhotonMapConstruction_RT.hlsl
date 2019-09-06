@@ -45,7 +45,7 @@ float MediaAsMedianEstimationBox(int index) {
 			float3 adjPhotonPos = Photons[adj].Position;
 			float d = distance(adjPhotonPos, currentPosition);
 
-			if (any(Photons[adj].Intensity) && d < 2*PHOTON_RADIUS) // only consider valid photons
+			if (any(Photons[adj].Intensity) && d < 8*PHOTON_RADIUS) // only consider valid photons
 			{
 				count++;
 				float kernel = 1;// / (1 + 10 * d / PHOTON_RADIUS);// 4 * pow(1 - saturate(d / (2 * PHOTON_RADIUS)), 0.25) + 0.1;
@@ -53,43 +53,80 @@ float MediaAsMedianEstimationBox(int index) {
 				total += kernel * d;
 			}
 		}
-	if (count < DESIRED_PHOTONS / 10)
+	if (count < DESIRED_PHOTONS / 20)
 		return PHOTON_RADIUS;
-	return total * 0.5 / kInt;
+	return total * 0.25 / kInt;
 	//((maxC - minC + 1)*(maxR - minR + 1));
 }
 
-#define T 5
+#define T 20
+
+shared static uint rng_state;
+
+uint rand_xorshift()
+{
+	// Xorshift algorithm from George Marsaglia's paper
+	rng_state ^= (rng_state << 13);
+	rng_state ^= (rng_state >> 17);
+	rng_state ^= (rng_state << 5);
+	return rng_state;
+}
+
+float random()
+{
+	return rand_xorshift() * (1.0 / 4294967296.0);
+}
+
+float pdf(float d) {
+	float x = min(PHOTON_RADIUS, d)/PHOTON_RADIUS;
+	return 1;// / (1 + x * x) + 0.1;
+}
 
 float HistogramEstimationBox(int index) {
 	int row = index / PHOTON_DIMENSION;
 	int col = index % PHOTON_DIMENSION;
-	// will be considered approx (2*radius+1)^2 / 2 nearest photons
-	int radius = 7; // 3 -> ~25, 4 -> ~40
-	int minR = max(0, row - radius);
-	int maxR = min(PHOTON_DIMENSION - 1, row + radius);
-	int minC = max(0, col - radius);
-	int maxC = min(PHOTON_DIMENSION - 1, col + radius);
+
 	float3 currentPosition = Photons[index].Position;
-	int histogram[T];
+	float2 imagePos = float2(col / (float)PHOTON_DIMENSION, row / (float)PHOTON_DIMENSION);
+
+	rng_state = index;
+	int samples = 10000; 
+
+	float histogram[T];
 	for (int i = 0; i < T; i++)
 		histogram[i] = 0;
 
-	for (int r = minR; r <= maxR; r++)
-		for (int c = minC; c <= maxC; c++)
+	int2 X = int2(col, row); // start metropolis in current photon
+	float dX = 0;
+	float pdfX = pdf(dX); // initial distance is 0.
+	bool isLit = true;
+	int R = 10;
+	for (int i = 0; i < samples; i++)
+	{
+		int2 nX = int2(random()*PHOTON_DIMENSION, random()*PHOTON_DIMENSION);// clamp(X + int2(random() * R - R / 2, random() * R - R / 2), 0, PHOTON_DIMENSION - 1);
+		int adj = nX.y * PHOTON_DIMENSION + nX.x;
+		float3 adjPhotonPos = Photons[adj].Position;
+		float d = distance(adjPhotonPos, currentPosition);
+		bool adjIsLit = any(Photons[adj].Intensity);
+		float npdfX = pdf(d);
+
+		float accept = npdfX >= pdfX ? 1 : npdfX / pdfX;
+		if (random() < accept)
 		{
-			int adj = r * PHOTON_DIMENSION + c;
-
-			float3 adjPhotonPos = Photons[adj].Position;
-			float d = distance(adjPhotonPos, currentPosition);
-
-			if (any(Photons[adj].Intensity) && d < PHOTON_RADIUS) // only consider valid photons
-			{
-				int idx = min(T - 1, T * d / PHOTON_RADIUS);
-				histogram[idx]++;
-			}
+			X = nX;
+			pdfX = npdfX;
+			dX = d;
+			isLit = adjIsLit;
 		}
-	int counting = DESIRED_PHOTONS;
+
+		if (isLit && dX < PHOTON_RADIUS) // only consider valid photons
+		{
+			int idx = min(T - 1, T * dX / PHOTON_RADIUS);
+			histogram[idx] += PHOTON_DIMENSION * PHOTON_DIMENSION / pdfX / samples;
+		}
+	}
+
+	float counting = DESIRED_PHOTONS;
 	for (int i = 0; i < T; i++)
 	{
 		if (counting < histogram[i])
@@ -116,7 +153,7 @@ void Main()
 			radius = NoAdaptiveBox(index);
 			break;
 		case 1: // Media
-			radius = HistogramEstimationBox(index);
+			radius = MediaAsMedianEstimationBox(index);
 			break;
 		}
 

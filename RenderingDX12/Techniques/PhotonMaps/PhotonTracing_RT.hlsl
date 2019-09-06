@@ -161,7 +161,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 	float russianRoulette = random();
 	float stopPdf;
 
-	if (NdotV > 0.001) { // store photon assuming this is the last bounce
+	if (NdotV > 0.001 && material.Roulette.x > 0) { // store photon assuming this is the last bounce
 		Photon p = (Photon)0;
 		p.Intensity = payload.PhotonIntensity;
 		p.Position = surfel.P;

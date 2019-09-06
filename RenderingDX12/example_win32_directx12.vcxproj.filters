@@ -37,6 +37,9 @@
     <FxCompile Include="Techniques\PhotonMaps\GridPhotonGather_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonGather2_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonMapConstruction_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PhotonBitonicSort_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PhotonMortonIndexing_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonMapMortonConstruction_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -137,6 +140,7 @@
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap2Technique.h" />
     <ClInclude Include="Techniques\PhotonMaps\CommonHashing_RT.hlsl.h" />
     <ClInclude Include="Techniques\PhotonMaps\DXR_PhotonTracing_Pipeline.h" />
+    <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap3Technique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

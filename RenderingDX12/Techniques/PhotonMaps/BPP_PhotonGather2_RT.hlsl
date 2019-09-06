@@ -26,10 +26,10 @@ struct PhotonRayPayload
 [shader("anyhit")]
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
 	
-	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection() * 0.5;
+	/*float3 surfelPosition = WorldRayOrigin() + WorldRayDirection() * 0.5;
 	Photon p = Photons[attr.PhotonIdx];
 	float radius = Radii[attr.PhotonIdx];
-	float photonDistance = distance(surfelPosition, p.Position);
+	float photonDistance = distance(surfelPosition, p.Position);*/
 
 	//if (photonDistance < radius) // uncomment this to see really considered photons
 	payload.Accum += float3(1, 1, 1);
@@ -40,7 +40,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 [shader("anyhit")]
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
 
-	float3 surfelPosition = WorldRayOrigin() +WorldRayDirection() * 0.5;
+	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection() * 0.5;
 	Photon p = Photons[attr.PhotonIdx];
 	float radius = Radii[attr.PhotonIdx];
 
@@ -49,8 +49,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	if (photonDistance < radius) {
 		float radiusRatio = radius / PHOTON_RADIUS;// photonDistance / PHOTON_RADIUS;// min(radius, distance(p.Position, surfelPosition)) / PHOTON_RADIUS;
 
-		payload.Accum.x += radiusRatio;// max(radiusRatio, payload.Accum.x);
-		payload.Accum.y++; // counting
+		payload.Accum += float3(radiusRatio, 1, 1);
 	}
 
 	IgnoreHit(); // Continue search to accumulate other photons
@@ -100,7 +99,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	};
 	RayDesc ray;
 	float3 dir = normalize(float3(1,1,1))*0.0002;
-	ray.Origin = surfel.P;// -dir * 0.5;
+	ray.Origin = surfel.P - dir * 0.5;
 	ray.Direction = dir;// *0.000002;
 	ray.TMin = 0.1;
 	ray.TMax = 1;
@@ -121,7 +120,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	return photonGatherPayload.Accum;
 #else
 	if (photonGatherPayload.Accum.y >= DESIRED_PHOTONS)
-		return pow(4, (1 - saturate(photonGatherPayload.Accum.x/ photonGatherPayload.Accum.y)) * 7);
+		return pow(4, (1 - saturate(photonGatherPayload.Accum.x / photonGatherPayload.Accum.y)) * 7);
 	return 1;
 
 	// Accum is farthest distance
