@@ -36,11 +36,9 @@ public:
 
 			gObj<Buffer> Photons;
 			gObj<Buffer> Indices;
-			gObj<Buffer> Permutation;
 
 			void Globals() {
-				UAV(0, Permutation);
-				UAV(1, Indices);
+				UAV(0, Indices);
 
 				SRV(0, Photons);
 			}
@@ -72,16 +70,15 @@ public:
 				_ gLoad Shader(Context()->Main);
 			}
 
+			gObj<Buffer> Photons;
 			gObj<Buffer> Indices;
-			gObj<Buffer> Permutation;
 
 			// CB views
 			gObj<Buffer> Stage;
 
 			void Globals() {
-				SRV(0, Indices);
-
-				UAV(0, Permutation);
+				UAV(0, Photons);
+				UAV(1, Indices);
 
 				CBV(0, Stage);
 			}
@@ -119,7 +116,6 @@ public:
 			}
 
 			gObj<Buffer> Photons;
-			gObj<Buffer> Permutation;
 			gObj<Buffer> AABBs;
 			gObj<Buffer> Radii;
 
@@ -128,7 +124,6 @@ public:
 				UAV(1, Radii);
 
 				SRV(0, Photons);
-				SRV(1, Permutation);
 			}
 		};
 		gObj<DXR_PM_Program> _Program;
@@ -337,18 +332,16 @@ public:
 #pragma region DXR Morton indexing and initialization
 		dxrMortonPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 		dxrMortonPipeline->_Program->Indices = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION*PHOTON_DIMENSION);
-		dxrMortonPipeline->_Program->Permutation = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION*PHOTON_DIMENSION);
 #pragma endregion
 
 #pragma region DXR Sorting with Bitonic
 		dxrSortingPipeline->_Program->Stage = _ gCreate ConstantBuffer<BitonicStage>();
+		dxrSortingPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 		dxrSortingPipeline->_Program->Indices = dxrMortonPipeline->_Program->Indices;
-		dxrSortingPipeline->_Program->Permutation = dxrMortonPipeline->_Program->Permutation;
 #pragma endregion
 
 #pragma region DXR Pipeline for PM construction using AABBs
 		dxrPMPipeline->_Program->AABBs = PhotonsAABBs;
-		dxrPMPipeline->_Program->Permutation = dxrMortonPipeline->_Program->Permutation;
 		dxrPMPipeline->_Program->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION*PHOTON_DIMENSION);
 		dxrPMPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 #pragma endregion
@@ -451,7 +444,13 @@ public:
 
 		perform(MortonPhotons);
 
-		perform(SortPhotons);
+
+		int n = PHOTON_DIMENSION * PHOTON_DIMENSION;
+		for (len = 2; len <= n; len <<= 1)
+			for (dif = len >> 1; dif > 0; dif >>= 1) {
+				perform(SortPhotons);
+				wait_for(signal(flush_all_to_gpu));
+			}
 
 		perform(ConstructPhotonMap);
 
@@ -465,6 +464,8 @@ public:
 
 		perform(Raytracing);
 	}
+
+	int len; int dif;
 
 	void Photontracing(gObj<DXRManager> manager) {
 
@@ -549,13 +550,9 @@ public:
 		manager gSet Program(rtSortingProgram);
 		manager gSet RayGeneration(dxrSortingPipeline->Main);
 
-		int n = PHOTON_DIMENSION * PHOTON_DIMENSION;
-		for (int len = 2; len <= n; len <<= 1)
-			for (int dif = len >> 1; dif > 0; dif >>= 1) {
-				manager gCopy ValueData(rtSortingProgram->Stage, BitonicStage{ len, dif });
-				// Bitonic sort wave
-				manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION / 2);
-			}
+		manager gCopy ValueData(rtSortingProgram->Stage, BitonicStage{ len, dif });
+		// Bitonic sort wave
+		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION / 2);
 	}
 
 	void ConstructPhotonMap(gObj<DXRManager> manager) {

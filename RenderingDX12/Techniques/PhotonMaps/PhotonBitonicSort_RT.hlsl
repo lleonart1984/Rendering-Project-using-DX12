@@ -1,8 +1,12 @@
+#define PHOTON_WITH_DIRECTION
+#define PHOTON_WITH_NORMAL
+#define PHOTON_WITH_POSITION
+#include "PhotonDefinition.h"
 
+// Photons
+RWStructuredBuffer<Photon> Photons		: register (u0);
 // Morton indice for each photon. Used as key to sort.
-StructuredBuffer<int> Indices			: register(t0);
-// Permutation of the sorting.
-RWStructuredBuffer<int> Permutation		: register (u0);
+RWStructuredBuffer<int> Indices			: register(u1);
 
 cbuffer BitonicStage : register(b0) {
 	int len;
@@ -22,17 +26,17 @@ void Main()
 	int i = (index & mask) | ((index & ~mask) << 1);
 	int next = i | dif;
 
-	bool dec = Indices[Permutation[i]] > Indices[Permutation[next]];
+	bool dec = Indices[i] > Indices[next];
 	bool shouldDec = (i & len) != 0;
 	bool swap = ((!shouldDec && dec) || (shouldDec && !dec));
 
 	if (swap) {
-		InterlockedExchange(Permutation[i], Permutation[next], Permutation[next]);
+		Photon p = Photons[i];
+		Photons[i] = Photons[next];
+		Photons[next] = p;
+
+		int temp = Indices[i];
+		Indices[i] = Indices[next];
+		Indices[next] = temp;
 	}
-
-	//int toI = swap ? Permutation[next] : Permutation[i];
-	//int toN = swap ? Permutation[i] : Permutation[next];
-
-	//Permutation[i] = toI;
-	//Permutation[next] = toN;
 }

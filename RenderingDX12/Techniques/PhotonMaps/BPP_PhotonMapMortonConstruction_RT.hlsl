@@ -15,7 +15,6 @@ struct AABB {
 };
 
 StructuredBuffer<Photon> Photons		: register (t0);
-StructuredBuffer<int> Permutation		: register (t1);
 
 RWStructuredBuffer<AABB> PhotonAABBs	: register (u0);
 RWStructuredBuffer<float> radii			: register (u1);
@@ -43,7 +42,7 @@ int morton(int3 pos) {
 }
 
 int mortonf(float3 pos) {
-	return morton(int3(saturate((pos * 0.5) + 0.5)*((1 << 9) - 1)));
+	return morton(int3(saturate((pos * 0.5) + 0.5)*((1 << 10) - 1)));
 }
 
 [shader("raygeneration")]
@@ -54,37 +53,36 @@ void Main()
 
 	int index = raysIndex.y * raysDimensions.x + raysIndex.x;
 	//int rightIndex = min(PHOTON_DIMENSION*PHOTON_DIMENSION - 1, index + DESIRED_PHOTONS);
-	int leftIndex = max(0, index - 1);
+	int leftIndex = max(0, index - DESIRED_PHOTONS / 2);
 
 	float radius = PHOTON_RADIUS;
 
-	Photon currentPhoton = Photons[Permutation[index]];
+	Photon currentPhoton = Photons[index];
 
 	if (any(currentPhoton.Intensity)){
-		Photon leftPhoton = Photons[Permutation[leftIndex]];
-		//Photon rightPhoton = Photons[Permutation[rightIndex]];
+		Photon leftPhoton = Photons[leftIndex];
 
 		int currentMorton = mortonf(currentPhoton.Position);
 		int leftMorton = mortonf(leftPhoton.Position);
 
-		if (leftMorton <= currentMorton)
-			radius = 0.01* PHOTON_RADIUS;// .1*PHOTON_RADIUS;
-		else
-			radius = 1 * PHOTON_RADIUS;
+		//if (leftMorton <= currentMorton)
+		//	radius = 0.01* PHOTON_RADIUS;// .1*PHOTON_RADIUS;
+		//else
+		//	radius = 1 * PHOTON_RADIUS;
 
-		//radius = distance(currentPhoton.Position, leftPhoton.Position)*0.5;
+		radius = distance(currentPhoton.Position, leftPhoton.Position);
 		
 		// clamp shrinking to the quarter, and the enlarging to the fourth times
 		radius = clamp(radius, 0.0001, PHOTON_RADIUS);
-		radii[Permutation[index]] = radius;
+		radii[index] = radius;
 
 		AABB box = (AABB)0;
 		box.minimum = currentPhoton.Position - radius;
 		box.maximum = currentPhoton.Position + radius;
-		PhotonAABBs[Permutation[index]] = box;
+		PhotonAABBs[index] = box;
 	}
 	else {
-		radii[Permutation[index]] = 0;// radius;
+		radii[index] = 0;// radius;
 
 		float x = raysIndex.x / (float)PHOTON_DIMENSION;
 		float y = raysIndex.y / (float)PHOTON_DIMENSION;
@@ -95,6 +93,6 @@ void Main()
 		AABB box = (AABB)0;
 		box.minimum = pos - 0.00001;// -radius * 0.0001;
 		box.maximum = pos + 0.00001;// +radius * 0.0001;
-		PhotonAABBs[Permutation[index]] = box;
+		PhotonAABBs[index] = box;
 	}
 }

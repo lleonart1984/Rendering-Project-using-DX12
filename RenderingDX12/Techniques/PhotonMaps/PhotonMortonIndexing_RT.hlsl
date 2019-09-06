@@ -3,8 +3,7 @@
 #define PHOTON_WITH_POSITION
 #include "PhotonDefinition.h"
 StructuredBuffer<Photon> Photons : register(t0);
-RWStructuredBuffer<int> Permutation : register(u0);
-RWStructuredBuffer<int> Indices : register (u1);
+RWStructuredBuffer<int> Indices : register (u0);
 
 int split3(int value) {
 	
@@ -35,8 +34,7 @@ void Main()
 
 	int index = raysIndex.y * raysDimensions.x + raysIndex.x;
 
-	int3 pos = saturate(Photons[index].Position*0.5 + 0.5) * ((1 << 9) - 1); // map to 1024^3 cells
+	int3 pos = saturate(Photons[index].Position*0.5 + 0.5) * ((1 << 10) - 1); // map to 1024^3 cells
 
 	Indices[index] = any(Photons[index].Intensity) ? morton(pos) : 0x7FFFFFFF;
-	Permutation[index] = index;
 }
