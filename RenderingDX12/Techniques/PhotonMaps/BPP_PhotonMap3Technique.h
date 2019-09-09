@@ -52,6 +52,11 @@ public:
 		}
 	};
 
+	struct BitonicStage {
+		int len;
+		int dif;
+	};
+
 	// DXR pipeline for Morton indexing and permutation initialization (should be a compute shader)
 	// needs to be fixed asap!
 	struct DXR_Sorting_Pipeline : public RTPipelineManager {
@@ -74,12 +79,11 @@ public:
 			gObj<Buffer> Indices;
 
 			// CB views
-			gObj<Buffer> Stage;
+			BitonicStage Stage;
 
 			void Globals() {
 				UAV(0, Photons);
 				UAV(1, Indices);
-
 				CBV(0, Stage);
 			}
 		};
@@ -92,10 +96,6 @@ public:
 		}
 	};
 
-	struct BitonicStage {
-		int len;
-		int dif;
-	};
 
 	// DXR pipeline for AABB construction and Radii population (should be a compute shader)
 	// needs to be fixed asap!
@@ -335,7 +335,6 @@ public:
 #pragma endregion
 
 #pragma region DXR Sorting with Bitonic
-		dxrSortingPipeline->_Program->Stage = _ gCreate ConstantBuffer<BitonicStage>();
 		dxrSortingPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 		dxrSortingPipeline->_Program->Indices = dxrMortonPipeline->_Program->Indices;
 #pragma endregion
@@ -444,13 +443,7 @@ public:
 
 		perform(MortonPhotons);
 
-
-		int n = PHOTON_DIMENSION * PHOTON_DIMENSION;
-		for (len = 2; len <= n; len <<= 1)
-			for (dif = len >> 1; dif > 0; dif >>= 1) {
-				perform(SortPhotons);
-				wait_for(signal(flush_all_to_gpu));
-			}
+		perform(SortPhotons);
 
 		perform(ConstructPhotonMap);
 
@@ -547,12 +540,17 @@ public:
 	void SortPhotons(gObj<DXRManager> manager) {
 		auto rtSortingProgram = dxrSortingPipeline->_Program;
 		manager gSet Pipeline(dxrSortingPipeline);
-		manager gSet Program(rtSortingProgram);
-		manager gSet RayGeneration(dxrSortingPipeline->Main);
 
-		manager gCopy ValueData(rtSortingProgram->Stage, BitonicStage{ len, dif });
-		// Bitonic sort wave
-		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION / 2);
+		int n = PHOTON_DIMENSION * PHOTON_DIMENSION;
+		for (len = 2; len <= n; len <<= 1)
+			for (dif = len >> 1; dif > 0; dif >>= 1)
+			{
+				rtSortingProgram->Stage = BitonicStage{ len, dif };
+				manager gSet Program(rtSortingProgram);
+				manager gSet RayGeneration(dxrSortingPipeline->Main);
+				// Bitonic sort wave
+				manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION / 2);
+			}
 	}
 
 	void ConstructPhotonMap(gObj<DXRManager> manager) {

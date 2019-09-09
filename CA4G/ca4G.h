@@ -14021,6 +14021,7 @@ namespace CA4G {
 
 				if (!currentBindings)
 					return; // Exception?
+
 				D3D12_DISPATCH_RAYS_DESC d;
 				auto rtRayGenShaderTable = currentProgram->raygen_shaderTable;
 				auto rtMissShaderTable = currentProgram->miss_shaderTable;
@@ -14054,6 +14055,11 @@ namespace CA4G {
 				{
 					DispatchRays(manager->cmdList, currentBindings->so, &dispatchDesc);
 				}
+
+				D3D12_RESOURCE_BARRIER b = { };
+				b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+				b.UAV.pResource = nullptr;
+				manager->cmdList->ResourceBarrier(1, &b);
 			}
 		} *const dispatcher;
 

@@ -47,7 +47,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	float photonDistance = distance(surfelPosition, p.Position);
 
 	if (photonDistance < radius) {
-		float radiusRatio = radius / PHOTON_RADIUS;// photonDistance / PHOTON_RADIUS;// min(radius, distance(p.Position, surfelPosition)) / PHOTON_RADIUS;
+		float radiusRatio = saturate(radius / PHOTON_RADIUS);// photonDistance / PHOTON_RADIUS;// min(radius, distance(p.Position, surfelPosition)) / PHOTON_RADIUS;
 
 		payload.Accum += float3(radiusRatio, 1, 1);
 	}
@@ -119,8 +119,8 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// Count photons
 	return photonGatherPayload.Accum;
 #else
-	if (photonGatherPayload.Accum.y >= DESIRED_PHOTONS)
-		return pow(4, (1 - saturate(photonGatherPayload.Accum.x / photonGatherPayload.Accum.y)) * 7);
+	if (photonGatherPayload.Accum.y >= DESIRED_PHOTONS / 2)
+		return pow(4, (1 - min(1, photonGatherPayload.Accum.x / photonGatherPayload.Accum.y)) * 7);
 	return 1;
 
 	// Accum is farthest distance

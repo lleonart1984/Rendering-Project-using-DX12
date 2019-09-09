@@ -108,7 +108,9 @@ namespace CA4G {
 							resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 							break;
 						case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+							resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 							resource->ChangeStateToUAV(cmdList);
+							//resource->BarrierUAV(cmdList);
 							break;
 						}
 					}
