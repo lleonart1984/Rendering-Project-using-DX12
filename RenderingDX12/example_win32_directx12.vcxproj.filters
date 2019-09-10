@@ -141,6 +141,9 @@
     <ClInclude Include="Techniques\PhotonMaps\CommonHashing_RT.hlsl.h" />
     <ClInclude Include="Techniques\PhotonMaps\DXR_PhotonTracing_Pipeline.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap3Technique.h" />
+    <ClInclude Include="Techniques\APIT\APITRaytracing.h" />
+    <ClInclude Include="Techniques\APIT\SceneGeometryConstruction.h" />
+    <ClInclude Include="Techniques\APIT\APIT.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

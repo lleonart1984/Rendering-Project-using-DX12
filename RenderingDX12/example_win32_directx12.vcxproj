@@ -200,6 +200,9 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="main.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="Techniques\AccPathtracing\DXRPathtracer.h" />
+    <ClInclude Include="Techniques\APIT\APIT.h" />
+    <ClInclude Include="Techniques\APIT\APITRaytracing.h" />
+    <ClInclude Include="Techniques\APIT\SceneGeometryConstruction.h" />
     <ClInclude Include="Techniques\CommonGI\Definitions.h" />
     <ClInclude Include="Techniques\CommonGI\Parameters.h" />
     <ClInclude Include="Techniques\CommonGI\ScatteringTools.h" />
