@@ -1,14 +1,13 @@
 #include "../../stdafx.h"
-#define RES 512
 
 class SceneGeometryConstruction : public Technique, public IHasScene {
 public:
     // Scene loading process to retain scene on the GPU
     gObj<RetainedSceneLoader> sceneLoader;
 
-    class SceneGeometryPipeline : public GraphicsPipelineBindings {
+    class SceneGeometryPipeline : public ComputePipelineBindings {
     public:
-        gObj<Texture2D> renderTarget;
+        gObj<Buffer> transformedVertices;
         gObj<Buffer> cameraCB;
 
         // UAV
@@ -18,43 +17,25 @@ public:
         gObj<Buffer> vertices;
         gObj<Buffer> objectIds;
         gObj<Buffer> transforms;
-        gObj<Buffer> materialIndices;
-        gObj<Buffer> materials;
-
-        gObj<Texture2D>* Textures = nullptr;
-        int TextureCount;
 
     protected:
-        void OnSetup() {
-            _ gSet InputLayout(SCENE_VERTEX::Layout());
-            _ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\APIT\\Shaders\\WorldViewTransformVS.cso"));
-            _ gSet GeometryShader(ShaderLoader::FromFile(".\\Techniques\\APIT\\Shaders\\CrumblingGS.cso"));
-            _ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\APIT\\Shaders\\TriangleStorePS.cso"));
+        void Setup() {
+            _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\APIT\\Shaders\\WorldViewTransformCS.cso"));
         }
 
         void Globals() {
-            RTV(0, renderTarget);
+            CBV(0, cameraCB, ShaderType_Any);
+            SRV(0, vertices, ShaderType_Any);
+            SRV(1, objectIds, ShaderType_Any);
+            SRV(2, transforms, ShaderType_Any);
 
-            CBV(0, cameraCB, ShaderType_Vertex);
-            SRV(0, vertices, ShaderType_Vertex);
-            SRV(1, objectIds, ShaderType_Vertex);
-            SRV(2, transforms, ShaderType_Vertex);
-
-            Static_SMP(0, Sampler::Linear(), ShaderType_Pixel);
-            UAV(0, counting, ShaderType_Pixel);
-            SRV(0, materialIndices, ShaderType_Pixel);
-            SRV(1, materials, ShaderType_Pixel);
-            SRV_Array(2, Textures, TextureCount, ShaderType_Pixel);
+            UAV(0, transformedVertices, ShaderType_Any);
         }
     };
-
     gObj<SceneGeometryPipeline> pipeline;
-    const int width, height;
 
-    SceneGeometryConstruction(int width, int height) : width(width), height(height) {
-    }
+    gObj<Buffer> TransformedVertices;
     float4x4 ViewMatrix;
-    float4x4 ProjectionMatrix;
 
 protected:
     void SetScene(gObj<CA4G::Scene> scene) {
@@ -75,33 +56,25 @@ protected:
         // Load and setup pipeline resource
         _ gLoad Pipeline(pipeline);
 
-        pipeline->renderTarget = _ gCreate DrawableTexture2D<float4>(width, height);
-
+        TransformedVertices = _ gCreate RWStructuredBuffer<SCENE_VERTEX>(sceneLoader->VertexBuffer->ElementCount);
         // Create globals VS constant buffer
-        pipeline->cameraCB = _ gCreate ConstantBuffer<Globals>();
-        pipeline->counting = _ gCreate IndexBuffer<int>(1);
+        pipeline->cameraCB = _ gCreate ConstantBuffer<float4x4>();
+        pipeline->transformedVertices = TransformedVertices;
 
-        pipeline->TextureCount = sceneLoader->TextureCount;
-        pipeline->Textures = sceneLoader->Textures;
         pipeline->vertices = sceneLoader->VertexBuffer;
         pipeline->objectIds = sceneLoader->ObjectBuffer;
-        pipeline->materialIndices = sceneLoader->MaterialIndexBuffer;
-        pipeline->materials = sceneLoader->MaterialBuffer;
         pipeline->transforms = sceneLoader->TransformBuffer;
     }
 
-    void Graphics(gObj<GraphicsManager> manager) {
-        manager gCopy ValueData(pipeline->cameraCB, Globals{ ProjectionMatrix, ViewMatrix });
+    void Compute(gObj<GraphicsManager> manager) {
+        manager gCopy ValueData(pipeline->cameraCB, ViewMatrix);
 
-        manager gClear RT(pipeline->renderTarget, float4(0, 0, 0, 0));
-
-        manager gSet Viewport(width, height);
         manager gSet Pipeline(pipeline);
 
-        manager gDispatch Triangles(sceneLoader->VertexBuffer->ElementCount);
+        ((gObj<ComputeManager>) manager) gDispatch Threads(pipeline->vertices->ElementCount);
     }
 
     void Frame() {
-        perform(Graphics);
+        perform(Compute);
     }
 };
