@@ -118,12 +118,14 @@ public:
 			gObj<Buffer> Photons;
 			gObj<Buffer> AABBs;
 			gObj<Buffer> Radii;
+			gObj<Buffer> MortonIndices;
 
 			void Globals() {
 				UAV(0, AABBs);
 				UAV(1, Radii);
 
 				SRV(0, Photons);
+				SRV(1, MortonIndices);
 			}
 		};
 		gObj<DXR_PM_Program> _Program;
@@ -343,6 +345,7 @@ public:
 		dxrPMPipeline->_Program->AABBs = PhotonsAABBs;
 		dxrPMPipeline->_Program->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION*PHOTON_DIMENSION);
 		dxrPMPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
+		dxrPMPipeline->_Program->MortonIndices = dxrMortonPipeline->_Program->Indices;
 #pragma endregion
 
 #pragma region DXR Photon gathering Pipeline Objects

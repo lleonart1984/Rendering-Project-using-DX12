@@ -15,11 +15,12 @@ struct AABB {
 };
 
 StructuredBuffer<Photon> Photons		: register (t0);
+StructuredBuffer<int> Morton			: register (t1);
 
 RWStructuredBuffer<AABB> PhotonAABBs	: register (u0);
 RWStructuredBuffer<float> radii			: register (u1);
 
-#define T 20
+#define T 19
 
 shared static uint rng_state;
 
@@ -37,8 +38,39 @@ float random()
 	return rand_xorshift() * (1.0 / 4294967296.0);
 }
 
+float gaussRandom() {
+	return sqrt(-2.0 * log(random())*cos(3.14159 * 2 * random()));
+}
 
-float HistogramEstimator(in Photon currentPhoton, int index) {
+float manhattanDistance(float3 p)
+{
+	p = abs(p);
+	return max(p.x, max(p.y, p.z));
+}
+
+float MortonEstimator(in Photon currentPhoton, int index) {
+	int l = index - 1;
+	int r = index + 1;
+
+	for (int i = 0; i < 10; i++) {
+		int currentMask = ~((1 << (i * 3)) - 1);
+		int currentBlock = Morton[index] & currentMask;
+		float mortonBlockRadius = ((i + 1.0)*2.0) / 1024.0;
+		if (mortonBlockRadius > PHOTON_RADIUS)
+			return PHOTON_RADIUS;
+		// expand l and r considering all photons inside current block (currentMask)
+		while (l >= 0 && ((Morton[l] & currentMask) == currentBlock))
+			l--;
+		while (r < PHOTON_DIMENSION*PHOTON_DIMENSION - 1 && ((Morton[r] & currentMask) == currentBlock))
+			r++;
+		if ((r - l) >= DESIRED_PHOTONS)
+			return mortonBlockRadius * 1.73 / pow((r - l)/ (float)DESIRED_PHOTONS, 0.5);
+	}
+	return PHOTON_RADIUS;
+}
+
+
+float HistogramEstimator2(in Photon currentPhoton, int index) {
 
 	rng_state = index;
 
@@ -82,6 +114,77 @@ float HistogramEstimator(in Photon currentPhoton, int index) {
 	return PHOTON_RADIUS;
 
 }
+float HistogramEstimator(in Photon currentPhoton, int index) {
+	float histogram[T];
+	for (int i = 0; i < T; i++)
+		histogram[i] = 0;
+
+	histogram[0]++; // same photon
+	float3 minBox = 0;
+	float3 maxBox = 0;
+	int taken = 1;
+
+	int l = index - 1;
+	int r = index + 1;
+	bool canTakeL, canTakeR;
+	canTakeL = l >= 0;
+	canTakeR = r < PHOTON_DIMENSION*PHOTON_DIMENSION - 1 && any(Photons[r].Intensity);
+
+	int pTaken; float dTaken; float mTaken; float maxMTaken = 0;
+	do {
+		float dL = manhattanDistance(Photons[l].Position - currentPhoton.Position);
+		float dR = manhattanDistance(Photons[r].Position - currentPhoton.Position);
+
+		if (canTakeL && (!canTakeR || dL < dR))
+		{
+			pTaken = l;
+			dTaken = dL;
+			l--;
+			canTakeL = l >= 0;
+		}
+		else
+		{
+			pTaken = r;
+			dTaken = dR;
+			r++;
+			canTakeR = (r < PHOTON_DIMENSION*PHOTON_DIMENSION - 1) && any(Photons[r].Intensity);
+		}
+		taken += (dTaken < PHOTON_RADIUS);
+		float3 vec = Photons[pTaken].Position - currentPhoton.Position;
+		mTaken = manhattanDistance(vec);
+		maxMTaken = min(PHOTON_RADIUS, max(mTaken, maxMTaken));
+		minBox = min(minBox, vec);
+		maxBox = max(maxBox, vec);
+
+		int idx = max(0, min(T - 1, (int)(T * (dTaken / PHOTON_RADIUS))));
+		histogram[idx] += (dTaken < PHOTON_RADIUS);
+
+	} while (
+		((mTaken <= PHOTON_RADIUS && taken < DESIRED_PHOTONS) ||
+		(mTaken <= maxMTaken))
+		&& (canTakeL || canTakeR));
+
+	float boxR = max(
+			max(maxBox.x, -minBox.x),
+		max(max(maxBox.y, -minBox.y),
+			max(maxBox.z, -minBox.z))
+	);
+
+	float sx = clamp(max(maxBox.x, -minBox.x)/(maxBox.x - minBox.x), 1, 2);
+	float sy = clamp(max(maxBox.y, -minBox.y)/(maxBox.y - minBox.y), 1, 2);
+	float sz = clamp(max(maxBox.z, -minBox.z)/(maxBox.z - minBox.z), 1, 2);
+
+	float samplingScaling = 1;// pow(sx * sy * sz, 2.0 / 3);
+
+	float counting = DESIRED_PHOTONS / samplingScaling;
+	for (int i = 0; i < T; i++)
+	{
+		if (counting <= histogram[i])
+			return PHOTON_RADIUS * (i + 1.0) / T;
+		counting -= histogram[i];
+	}
+	return PHOTON_RADIUS;
+}
 
 [shader("raygeneration")]
 void Main()
@@ -97,7 +200,7 @@ void Main()
 
 	if (any(currentPhoton.Intensity))
 	{
-		radius = clamp(HistogramEstimator(currentPhoton, index), PHOTON_RADIUS*0.001, PHOTON_RADIUS);
+		radius = clamp(MortonEstimator(currentPhoton, index), PHOTON_RADIUS*0.001, PHOTON_RADIUS);
 
 		box.minimum = currentPhoton.Position - radius;
 		box.maximum = currentPhoton.Position + radius;
