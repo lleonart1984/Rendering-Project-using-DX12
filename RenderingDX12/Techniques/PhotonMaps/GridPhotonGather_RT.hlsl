@@ -214,7 +214,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	int counting = DESIRED_PHOTONS;
 	for (int i = 0; i < T; i++)
 	{
-		if (counting < histogram[i])
+		if (counting <= histogram[i])
 			return pow(4, (1 - (i / (float)T + (1.0 / T) * counting / (float)histogram[i])) * 7);
 		counting -= histogram[i];
 	}

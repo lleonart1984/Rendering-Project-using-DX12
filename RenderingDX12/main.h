@@ -8,7 +8,7 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE RING_OBJ
+#define USE_SCENE SPONZA_OBJ
 
 #define MOVE_LIGHT false
 
@@ -57,10 +57,10 @@
 //gObj<BPPPhotonMappingTechnique> technique; // Box Per Photon Technique
 //gObj<ABPPPhotonMappingTechnique> technique;
 
-gObj<GridPhotonMapTechnique> technique;
+//gObj<GridPhotonMapTechnique> technique;
 
 //gObj<BPP_PhotonMap2Technique> technique;
-//gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
+gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
 
 // --- Discarded implementation
 //gObj<BPGPhotonMappingTechnique> technique; // Box Per Geometry Technique

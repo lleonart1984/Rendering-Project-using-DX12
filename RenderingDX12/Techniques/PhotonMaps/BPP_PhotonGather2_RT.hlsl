@@ -119,7 +119,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// Count photons
 	return photonGatherPayload.Accum;
 #else
-	if (photonGatherPayload.Accum.y >= DESIRED_PHOTONS / 2)
+	if (photonGatherPayload.Accum.y >= DESIRED_PHOTONS / 8)
 		return pow(4, (1 - min(1, photonGatherPayload.Accum.x / photonGatherPayload.Accum.y)) * 7);
 	return 1;
 
