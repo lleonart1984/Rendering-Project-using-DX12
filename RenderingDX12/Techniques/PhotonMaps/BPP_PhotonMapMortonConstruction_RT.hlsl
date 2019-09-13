@@ -55,7 +55,7 @@ float MortonEstimator(in Photon currentPhoton, int index) {
 	for (int i = 0; i < 10; i++) {
 		int currentMask = ~((1 << (i * 3)) - 1);
 		int currentBlock = Morton[index] & currentMask;
-		float mortonBlockRadius = ((i + 1.0)*2.0) / 1024.0;
+		float mortonBlockRadius = (i + 1.0) / 1024.0;
 		if (mortonBlockRadius > PHOTON_RADIUS)
 			return PHOTON_RADIUS;
 		// expand l and r considering all photons inside current block (currentMask)
@@ -63,8 +63,11 @@ float MortonEstimator(in Photon currentPhoton, int index) {
 			l--;
 		while (r < PHOTON_DIMENSION*PHOTON_DIMENSION - 1 && ((Morton[r] & currentMask) == currentBlock))
 			r++;
-		if ((r - l) >= DESIRED_PHOTONS)
-			return mortonBlockRadius * 1.73 / pow((r - l)/ (float)DESIRED_PHOTONS, 0.5);
+		if ((r - l) >= DESIRED_PHOTONS * 4 / 3.14159)
+		{
+			float radiusScale = 
+			return mortonBlockRadius / pow((r - l) / (float)DESIRED_PHOTONS, 0.5);
+		}
 	}
 	return PHOTON_RADIUS;
 }
@@ -212,7 +215,8 @@ void Main()
 		float y = raysIndex.y / (float)PHOTON_DIMENSION;
 		float z = 2 * (abs(index * 0x888888) % 128) / 128.0 - 1;
 
-		float3 pos = Photons[0].Position;// 2 * float3(x, y, z) - 1;
+		//float3 pos = Photons[0].Position;
+		float3 pos = 2 * float3(x, y, z) - 1;
 
 		box.minimum = pos - 0.00001;// -radius * 0.0001;
 		box.maximum = pos + 0.00001;// +radius * 0.0001;
