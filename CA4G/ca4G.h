@@ -14342,13 +14342,16 @@ namespace CA4G {
 			swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 			swapChainDesc.SampleDesc.Count = 1;
 
+            DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullScreenDesc = {};
+            fullScreenDesc.Windowed = !fullScreen;
+
 			IDXGISwapChain1 *tmpSwapChain;
 
 			factory->CreateSwapChainForHwnd(
 				manager->Scheduler->queues[0]->dxQueue,        // Swap chain needs the queue so that it can force a flush on it.
 				hWnd,
 				&swapChainDesc,
-				nullptr,
+				&fullScreenDesc,
 				nullptr,
 				&tmpSwapChain
 			);
