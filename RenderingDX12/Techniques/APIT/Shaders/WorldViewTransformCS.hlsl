@@ -30,9 +30,9 @@ void main(uint3 DTid: SV_DispatchThreadID)
     float4x4 worldView = mul(world, View);
     output.P = mul(float4(v.P, 1), worldView).xyz;
     output.N = normalize(mul(float4(v.N, 0), worldView).xyz);
+    output.C = v.C;
     output.T = normalize(mul(float4(v.T, 0), worldView).xyz);
     output.B = normalize(mul(float4(v.B, 0), worldView).xyz);
-    output.C = v.C;
 
     transformedVertices[vertexId] = output;
 }

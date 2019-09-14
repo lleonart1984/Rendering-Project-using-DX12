@@ -1,72 +1,89 @@
-struct PSInput
+cbuffer ScreenInfo : register (b0) {
+    int Width;
+    int Height;
+
+    int pWidth;
+    int pHeight;
+
+    int Levels;
+}
+
+//RWStructuredBuffer<Fragment> fragments  : register(u0);
+// index of root node of each pixel
+Texture2D<int> firstBuffer            : register(t0);
+// References to next fragment node index for each node in linked list
+StructuredBuffer<int> nextBuffer      : register(t1);
+
+float3 GetColor(int complexity) {
+    if (complexity == 0) {
+        return float3(1, 1, 1);
+    }
+
+    float level = log2(complexity);
+    float3 stopPoints[11] = {
+        float3(0,0,0.5), // 1
+        float3(0,0,1), // 2
+        float3(0,0.5,1), // 4
+        float3(0,1,1), // 8
+        float3(0,1,0.5), // 16
+        float3(0,1,0), // 32
+        float3(0.5,1,0), // 64
+        float3(1,1,0), // 128
+        float3(1,0.5,0), // 256
+        float3(1,0,0), // 512
+        float3(1,0,1) // 1024
+    };
+
+    if (level >= 10) {
+        return stopPoints[10];
+    }
+
+    return lerp(stopPoints[(int)level], stopPoints[(int)level + 1], level % 1);
+}
+
+float4 main(float4 P: SV_POSITION) : SV_TARGET
 {
-    float4 projected : SV_POSITION;
-    float3 position : POSITION;
-    float3 normal : NORMAL;
-    float3 tangent : TANGENT;
-    float3 binormal : BINORMAL;
-    float2 uv : TEXCOORD;
-    int objectId : OBJECTID;
-};
+    float2 pNorm = P.xy / float2(Height, Height);
+    //return float4(P.xy / float2(Width, Height), 0, 1);
+    float fpx = (pNorm.x % 0.3333333) * 3;
+    float fpy = (pNorm.y % 0.25) * 4;
+    int col = pNorm.x * 3;
+    int row = pNorm.y * 4;
 
-cbuffer Lighting : register(b0)
-{
-    float3 LightPosition;
-    float3 LightIntensity;
-};
+    int faceIndex = -1;
+    if (row == 1 && col == 2)
+        faceIndex = 0; // positive x
 
-struct Material
-{
-    float3 Diffuse;
-    float RefractionIndex;
-    float3 Specular;
-    float SpecularSharpness;
-    int4 Texture_Index;
-    float3 Emissive;
-    float4 Roulette;
-};
+    if (row == 1 && col == 0)
+        faceIndex = 1; // negative x
 
-StructuredBuffer<int> MaterialIndexBuffer : register(t0);
-StructuredBuffer<Material> Materials : register(t1);
-Texture2D<float4> Textures[500] : register(t2);
+    if (row == 1 && col == 1)
+        faceIndex = 5; // negative z
 
-SamplerState Sampler : register(s0);
+    if (row == 3 && col == 1)
+        faceIndex = 4; // positive z
 
-float4 main(PSInput input) : SV_TARGET
-{
-    //return float4(input.normal, 1);
-    float3 L = LightPosition - input.position;
-    float d = length(L);
-    L /= d;
+    if (row == 0 && col == 1)
+        faceIndex = 2; // positive y
 
-    int materialIndex = MaterialIndexBuffer[input.objectId];
-    Material material = Materials[materialIndex];
+    if (row == 2 && col == 1)
+        faceIndex = 3; // negative y
 
-    float3 Lin = LightIntensity / (4 * 3.141596 * 3.14159 * 6 * max(0.1, d * d));
+    if (faceIndex == -1)
+        return float4(0, 0, 0, 1);
 
-    float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].Sample(Sampler, input.uv) : float4(1,1,1,1);
-    float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].Sample(Sampler, input.uv) : material.Specular;
-    float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].Sample(Sampler, input.uv) : float3(0.5, 0.5, 1);
-    float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].Sample(Sampler, input.uv) : 1;
+    uint2 coord = uint2(fpx * Width + Width * faceIndex, fpy * Height);
 
-    if (MaskTex.x < 0.5 || DiffTex.a < 0.5)
-        clip(-1);
+    int idx = firstBuffer[coord];
+    int count = 0;
+    while (idx != -1) {
+        count += 1;
+        idx = nextBuffer[idx];
+    }
 
-    float3x3 worldToTangent = { input.tangent, input.binormal, input.normal };
+    if (count == 0) {
+        return float4(0, 0, 0, 1);
+    }
 
-    float3 normal = normalize(mul(BumpTex * 2 - 1, worldToTangent));
-
-    float3 V = normalize(-input.position);
-    float3 H = normalize(V + L);
-
-    float NdotL = max(0, dot(normal, L));
-    float NdotH = NdotL < 0 ? 0 : max(0, dot(normal, H));
-
-    float3 diff = material.Diffuse * DiffTex / 3.14159;
-    float3 spec = max(material.Specular, SpecularTex) * pow(NdotH, material.SpecularSharpness) * (2 + material.SpecularSharpness) / (6.28);
-
-    float3 light = (
-        material.Roulette.x * diff * NdotL +
-        material.Roulette.y * spec) * Lin;
-    return float4(light, 1);
+    return float4(GetColor(count), 1);
 }

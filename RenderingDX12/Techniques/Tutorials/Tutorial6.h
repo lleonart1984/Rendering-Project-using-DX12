@@ -97,7 +97,7 @@ protected:
 					});
 
 		// Load a texture from a file (using DirectXTex project internally)
-		manager gLoad FromFile(Texture, "c:\\Users\\lleonart\\Desktop\\Models\\skybox.dds");
+		manager gLoad FromFile(Texture, "..\\..\\..\\Models\\skybox.dds");
 		//gBind(Texture) _ gCreate From(manager, "c:\\Users\\lleonart\\Desktop\\Models\\seafloor.dds");
 
 		// Compute number of subresources

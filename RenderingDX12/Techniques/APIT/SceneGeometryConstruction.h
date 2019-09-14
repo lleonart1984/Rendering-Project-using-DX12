@@ -71,7 +71,7 @@ protected:
 
         manager gSet Pipeline(pipeline);
 
-        ((gObj<ComputeManager>) manager) gDispatch Threads(pipeline->vertices->ElementCount);
+        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(pipeline->vertices->ElementCount);
     }
 
     void Frame() {

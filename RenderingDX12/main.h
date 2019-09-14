@@ -8,7 +8,7 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE CORNELL_OBJ
+#define USE_SCENE SIBENIK_OBJ
 
 #define MOVE_LIGHT false
 
@@ -60,7 +60,9 @@
 //gObj<GridPhotonMapTechnique> technique;
 
 //gObj<BPP_PhotonMap2Technique> technique;
-gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
-
+//gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate kn 
 // --- Discarded implementation
 //gObj<BPGPhotonMappingTechnique> technique; // Box Per Geometry Technique
+
+// APIT
+gObj<APITRaytracing> technique;

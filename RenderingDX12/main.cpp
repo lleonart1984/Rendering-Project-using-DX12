@@ -119,11 +119,11 @@ int main(int, char**)
 
 	if (asSceneRenderer)
 	{
-		char * filePath;
+		char* filePath = new char[260];
+        strcpy(filePath, "..\\..\\..");
 
 		switch (USE_SCENE) {
 		case BUNNY_OBJ:
-			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
 			//strcat(filePath, "\\Models\\CornellWithSphere\\sphereBoxScene.obj");
 			//strcat(filePath, "\\Models\\CornellBox\\BoxBox.obj");
@@ -136,7 +136,6 @@ int main(int, char**)
 			MixGlassMaterial(&scene->Materials()[0], 1);
 			break;
 		case CORNELL_OBJ:
-			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\CornellWithSphere\\sphereBoxScene.obj");
 			//strcat(filePath, "\\Models\\CornellBox\\BoxBox.obj");
 			scene = new Scene(filePath);
@@ -147,7 +146,6 @@ int main(int, char**)
 			MixGlassMaterial(&scene->Materials()[5], 1);
 			break;
 		case RING_OBJ:
-			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\weddingRing\\ring.obj");
 			scene = new Scene(filePath);
 			camera->Position = float3(.3f, .4f, -.25f);
@@ -158,7 +156,6 @@ int main(int, char**)
 			//MixGlassMaterial(&scene->Materials()[0], 1);
 			break;
 		case SPONZA_OBJ:
-			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
 			MixMirrorMaterial(&scene->Materials()[9], 0.4); // floor
@@ -168,7 +165,6 @@ int main(int, char**)
 			lightSource->Intensity = float3(100, 100, 100);
 			break;
 		case SIBENIK_OBJ:
-			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sibenik\\sibenik.obj");
 			scene = new Scene(filePath);
 			//MixGlassMaterial(&scene->Materials()[1], 0.9f); // window
@@ -179,7 +175,6 @@ int main(int, char**)
 			lightSource->Intensity = float3(50, 50, 50);
 			break;
 		case SANMIGUEL_OBJ:
-			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\san-miguel\\san-miguel.obj");
 			scene = new Scene(filePath);
 			camera->Position = float3(-4, 3, 0);
