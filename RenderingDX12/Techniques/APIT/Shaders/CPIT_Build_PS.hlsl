@@ -56,10 +56,9 @@ int AllocateNode(int parent, int idxFragment, float2 interval)
     return ptrNode;
 }
 
-[numthreads(1, 1, 1)]
-void main(uint3 DTid : SV_DispatchThreadID)
+void main(float4 proj: SV_POSITION)
 {
-    int currentFragmentIdx = rootBuffer[DTid.xy]; // rootBuffer is the first in the linked list at the beginning
+    int currentFragmentIdx = rootBuffer[proj.xy]; // rootBuffer is the first in the linked list at the beginning
 
     int ROOT = NONE; // start with empty tree
 
@@ -108,5 +107,5 @@ void main(uint3 DTid : SV_DispatchThreadID)
         currentFragmentIdx = nextFragmentIdx;
     }
 
-    rootBuffer[DTid.xy] = ROOT;
+    rootBuffer[proj.xy] = ROOT;
 }

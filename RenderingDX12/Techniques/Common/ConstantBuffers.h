@@ -55,3 +55,11 @@ struct PITNode {
 
     float Discriminant;
 };
+
+struct LevelInfo {
+    int Length;
+
+    int Level;
+
+    float2 res;
+};

@@ -103,10 +103,9 @@ void ResolveReferencesToNextNonChildrenInPreorder(int root)
     }
 }
 
-[numthreads(1, 1, 1)]
-void main(uint3 DTid : SV_DispatchThreadID)
+void main(float4 proj : SV_POSITION)
 {
-    uint2 crd = uint2(DTid.xy);
+    uint2 crd = uint2(proj.xy);
 
     int root = RootBuffer[crd];
     if (root != -1)

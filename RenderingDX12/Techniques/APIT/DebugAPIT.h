@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ABuffer.h"
+#include "APITConstruction.h"
 
-class Debug_APITPipeline : public ShowTexturePipeline {
+class DebugAPIT_Pipeline : public ShowTexturePipeline {
 public:
     gObj<Texture2D> renderTarget;
 
@@ -10,29 +10,41 @@ public:
     gObj<Buffer> screenInfo;
 
     // SRVs
-    gObj<Texture2D> firstBuffer;
+    gObj<Texture2D> rootBuffer;
+    gObj<Buffer> firstBuffer;
+    gObj<Buffer> boundaryBuffer;
+    gObj<Buffer> nodeBuffer;
     gObj<Buffer> nextBuffer;
+    gObj<Buffer> preorderBuffer;
+    gObj<Buffer> skipBuffer;
+    gObj<Buffer> depth;
 protected:
     void Setup() {
         ShowTexturePipeline::Setup();
-        _ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\APIT\\Shaders\\TestPS.cso"));
+        _ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\APIT\\Shaders\\DebugAPIT_PS.cso"));
     }
 
     void Globals() {
         RTV(0, renderTarget);
 
         CBV(0, screenInfo, ShaderType_Pixel);
-        SRV(0, firstBuffer, ShaderType_Pixel);
-        SRV(1, nextBuffer, ShaderType_Pixel);
+        SRV(0, rootBuffer, ShaderType_Pixel);
+        SRV(1, firstBuffer, ShaderType_Pixel);
+        SRV(2, boundaryBuffer, ShaderType_Pixel);
+        SRV(3, nodeBuffer, ShaderType_Pixel);
+        SRV(4, nextBuffer, ShaderType_Pixel);
+        SRV(5, preorderBuffer, ShaderType_Pixel);
+        SRV(6, skipBuffer, ShaderType_Pixel);
+        SRV(7, depth, ShaderType_Pixel);
     }
 };
 
-class Debug_APIT : public Technique, public IHasScene, public IHasCamera, public IHasLight, public IHasBackcolor {
+class DebugAPIT : public Technique, public IHasScene, public IHasCamera, public IHasLight, public IHasBackcolor {
 public:
     gObj<RetainedSceneLoader> sceneLoader;
-    gObj<ABuffer> abuffer;
+    gObj<APITConstruction> aPIT;
 
-    gObj<Debug_APITPipeline> pipeline;
+    gObj<DebugAPIT_Pipeline> pipeline;
 
     gObj<Buffer> vertices;
 
@@ -50,19 +62,23 @@ protected:
             _ gLoad Subprocess(sceneLoader);
         }
 
-        abuffer = new ABuffer(render_target->Width, render_target->Height);
-        abuffer->sceneLoader = sceneLoader;
-        _ gLoad Subprocess(abuffer);
+        aPIT = new APITConstruction(7);
+        aPIT->sceneLoader = sceneLoader;
+        _ gLoad Subprocess(aPIT);
 
         // Load and setup pipeline resource
         _ gLoad Pipeline(pipeline);
 
         // Create globals VS constant buffer
-
-        pipeline->screenInfo = abuffer->screenInfo;
-
-        pipeline->firstBuffer = abuffer->firstBuffer;
-        pipeline->nextBuffer = abuffer->nextBuffer;
+        pipeline->screenInfo = aPIT->aBuffer->screenInfo;
+        pipeline->rootBuffer = aPIT->RootBuffer;
+        pipeline->firstBuffer = aPIT->FirstBuffer;
+        pipeline->boundaryBuffer = aPIT->BoundaryBuffer;
+        pipeline->nodeBuffer = aPIT->NodeBuffer;
+        pipeline->nextBuffer = aPIT->NextBuffer;
+        pipeline->preorderBuffer = aPIT->PreorderBuffer;
+        pipeline->skipBuffer = aPIT->SkipBuffer;
+        pipeline->depth = aPIT->Depth;
 
         perform(CreatingAssets);
     }
@@ -88,12 +104,12 @@ protected:
 
         float4x4 view, proj;
         Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
-        abuffer->ViewMatrix = view;
-        ExecuteFrame(abuffer);
+        aPIT->ViewMatrix = view;
+        ExecuteFrame(aPIT);
 
         manager gClear RT(render_target, float4(Backcolor, 1));
 
-        manager gSet Viewport(render_target->Height, render_target->Height);
+        manager gSet Viewport(render_target->Height * 3.0 / 4.0, render_target->Height);
         manager gSet Pipeline(pipeline);
         manager gSet VertexBuffer(vertices);
 

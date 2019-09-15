@@ -8,7 +8,7 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE SIBENIK_OBJ
+#define USE_SCENE SPONZA_OBJ
 
 #define MOVE_LIGHT false
 
@@ -65,4 +65,4 @@
 //gObj<BPGPhotonMappingTechnique> technique; // Box Per Geometry Technique
 
 // APIT
-gObj<APITRaytracing> technique;
+gObj<DebugAPIT> technique;

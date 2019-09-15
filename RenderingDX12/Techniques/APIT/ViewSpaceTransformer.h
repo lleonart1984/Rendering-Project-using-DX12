@@ -16,7 +16,7 @@ public:
         ShaderType PS_Type = ShaderType_Pixel;
 #endif
     public:
-        gObj<Buffer> transformedVertices;
+        gObj<Buffer> viewSpaceVertices;
         gObj<Buffer> cameraCB;
 
         // SRV
@@ -41,12 +41,12 @@ public:
             SRV(1, objectIds, VS_Type);
             SRV(2, transforms, VS_Type);
 
-            UAV(0, transformedVertices, PS_Type);
+            UAV(0, viewSpaceVertices, PS_Type);
         }
     };
     gObj<ViewSpaceTransformerPipeline> pipeline;
 
-    gObj<Buffer> TransformedVertices;
+    gObj<Buffer> ViewSpaceVertices;
     float4x4 ViewMatrix;
 
 protected:
@@ -68,10 +68,10 @@ protected:
         // Load and setup pipeline resource
         _ gLoad Pipeline(pipeline);
 
-        TransformedVertices = _ gCreate RWStructuredBuffer<SCENE_VERTEX>(sceneLoader->VertexBuffer->ElementCount);
+        ViewSpaceVertices = _ gCreate RWStructuredBuffer<SCENE_VERTEX>(sceneLoader->VertexBuffer->ElementCount);
         // Create globals VS constant buffer
         pipeline->cameraCB = _ gCreate ConstantBuffer<float4x4>();
-        pipeline->transformedVertices = TransformedVertices;
+        pipeline->viewSpaceVertices = ViewSpaceVertices;
 
         pipeline->vertices = sceneLoader->VertexBuffer;
         pipeline->objectIds = sceneLoader->ObjectBuffer;

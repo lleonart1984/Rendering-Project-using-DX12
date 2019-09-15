@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SceneGeometryConstruction.h"
+#include "ViewSpaceTransformer.h"
 
 class ABufferPipeline : public GraphicsPipelineBindings {
 public:
@@ -43,23 +43,24 @@ protected:
 class ABuffer : public Technique, public IHasScene {
 public:
     gObj<RetainedSceneLoader> sceneLoader;
-    gObj<SceneGeometryConstruction> sceneGeometry;
+    gObj<ViewSpaceTransformer> viewSpaceTransformer;
 
+    gObj<Buffer> Fragments;
+    gObj<Texture2D> FirstBuffer;
+    gObj<Buffer> NextBuffer;
+    gObj<Buffer> Malloc;
+
+    gObj<Buffer> screenInfo;
     gObj<Buffer> vertices;
-    gObj<Buffer> fragments;
-    gObj<Texture2D> firstBuffer;
-    gObj<Buffer> nextBuffer;
-    gObj<Buffer> malloc;
-
-    gObj<Buffer> screenInfo; // is it necessary?
     gObj<Buffer> layerTransforms;
 
-    gObj<ABufferPipeline> pipeline;
-    const int width, height;
+    const int Width, Height;
     float4x4 ViewMatrix;
 
+    gObj<ABufferPipeline> pipeline;
+
     ABuffer(int width, int height)
-        : width(width), height(height) { }
+        : Width(width), Height(height) { }
 
 protected:
     void SetScene(gObj<CA4G::Scene> scene) {
@@ -77,31 +78,30 @@ protected:
             _ gLoad Subprocess(sceneLoader);
         }
 
-        sceneGeometry = new SceneGeometryConstruction();
-        sceneGeometry->sceneLoader = sceneLoader;
-        _ gLoad Subprocess(sceneGeometry);
+        viewSpaceTransformer = new ViewSpaceTransformer();
+        viewSpaceTransformer->sceneLoader = sceneLoader;
+        _ gLoad Subprocess(viewSpaceTransformer);
 
         // Load and setup pipeline resource
         _ gLoad Pipeline(pipeline);
 
-        vertices = sceneGeometry->TransformedVertices;
-        fragments = _ gCreate RWStructuredBuffer<Fragment>(MAX_NUMBER_OF_FRAGMENTS);
-        firstBuffer = _ gCreate DrawableTexture2D<int>(width * 6, height);
-        nextBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
-        malloc = _ gCreate RWStructuredBuffer<int>(1);
-        screenInfo = _ gCreate ConstantBuffer<ScreenInfo>();
-        layerTransforms = _ gCreate StructuredBuffer<float3x3>(6);
+        vertices = viewSpaceTransformer->ViewSpaceVertices;
+        Fragments = _ gCreate RWStructuredBuffer<Fragment>(MAX_NUMBER_OF_FRAGMENTS);
+        FirstBuffer = _ gCreate DrawableTexture2D<int>(Width * 6, Height);
+        NextBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
+        Malloc = _ gCreate RWStructuredBuffer<int>(1);
 
         // Create globals VS constant buffer
+        screenInfo = _ gCreate ConstantBuffer<ScreenInfo>();
+        layerTransforms = _ gCreate StructuredBuffer<float3x3>(6);
         pipeline->screenInfo = screenInfo;
-
-        pipeline->vertices = vertices;
         pipeline->layerTransforms = layerTransforms;
 
-        pipeline->fragments = fragments;
-        pipeline->firstBuffer = firstBuffer;
-        pipeline->nextBuffer = nextBuffer;
-        pipeline->malloc = malloc;
+        pipeline->vertices = vertices;
+        pipeline->fragments = Fragments;
+        pipeline->firstBuffer = FirstBuffer;
+        pipeline->nextBuffer = NextBuffer;
+        pipeline->malloc = Malloc;
 
         perform(CreatingAssets);
     }
@@ -138,14 +138,14 @@ protected:
     }
 
     void Graphics(gObj<GraphicsManager> manager) {
-        sceneGeometry->ViewMatrix = ViewMatrix;
-        ExecuteFrame(sceneGeometry);
+        viewSpaceTransformer->ViewMatrix = ViewMatrix;
+        ExecuteFrame(viewSpaceTransformer);
 
-        manager gClear  UAV(malloc, 0U);
-        manager gClear  UAV(firstBuffer, (unsigned int)-1);
-        manager gCopy   ValueData(screenInfo, ScreenInfo{ width, height });
+        manager gClear  UAV(Malloc, 0U);
+        manager gClear  UAV(FirstBuffer, (unsigned int)-1);
+        manager gCopy   ValueData(screenInfo, ScreenInfo{ Width, Height });
 
-        manager gSet Viewport(width, height);
+        manager gSet Viewport(Width, Height);
         manager gSet Pipeline(pipeline);
 
         manager gDispatch Triangles(vertices->ElementCount);

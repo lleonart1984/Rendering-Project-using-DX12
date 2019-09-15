@@ -41,11 +41,21 @@
     <FxCompile Include="Techniques\PhotonMaps\PhotonMortonIndexing_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonMapMortonConstruction_RT.hlsl" />
     <FxCompile Include="Techniques\APIT\Shaders\TestVS.hlsl" />
-    <FxCompile Include="Techniques\APIT\Shaders\TestPS.hlsl" />
-    <FxCompile Include="Techniques\APIT\Shaders\WorldViewTransformCS.hlsl" />
     <FxCompile Include="Techniques\APIT\Shaders\CPIT_VS.hlsl" />
     <FxCompile Include="Techniques\APIT\Shaders\CPIT_GS.hlsl" />
     <FxCompile Include="Techniques\APIT\Shaders\CPIT_PS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\CPIT_Build_CS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\CPIT_Link_CS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\DebugAPIT_PS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\CPIT_BuildMips_CS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\CPIT_InitialMip_CS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\CPIT_Build_PS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\CPIT_Link_PS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\CPIT_BuildMips_PS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\CPIT_InitialMip_PS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\ViewSpaceTransform_PS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\ViewSpaceTransform_VS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\ViewSpaceTransform_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -147,11 +157,11 @@
     <ClInclude Include="Techniques\PhotonMaps\CommonHashing_RT.hlsl.h" />
     <ClInclude Include="Techniques\PhotonMaps\DXR_PhotonTracing_Pipeline.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap3Technique.h" />
-    <ClInclude Include="Techniques\APIT\APITRaytracing.h" />
-    <ClInclude Include="Techniques\APIT\SceneGeometryConstruction.h" />
     <ClInclude Include="Techniques\APIT\ABuffer.h" />
     <ClInclude Include="Techniques\APIT\APITConstruction.h" />
-    <ClInclude Include="Techniques\APIT\ABufferTesting.h" />
+    <ClInclude Include="Techniques\APIT\DebugAPIT.h" />
+    <ClInclude Include="Techniques\APIT\APITRaytracing.h" />
+    <ClInclude Include="Techniques\APIT\ViewSpaceTransformer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
