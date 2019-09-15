@@ -1,3 +1,5 @@
+#include "../../Common/CS_Constants.h"
+
 struct PITNode {
     int Parent;
     int Children[2];
@@ -103,7 +105,7 @@ void ResolveReferencesToNextNonChildrenInPreorder(int root)
     }
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(CS_BLOCK_SIZE_2D, CS_BLOCK_SIZE_2D, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint2 crd = uint2(DTid.xy);

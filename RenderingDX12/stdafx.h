@@ -45,7 +45,6 @@ using namespace CA4G;
 #include "Techniques/PhotonMaps/BPP_PhotonMap2Technique.h"
 #include "Techniques/PhotonMaps/BPP_PhotonMap3Technique.h"
 
-//#define USE_COMPUTESHADER
 #include "Techniques/APIT/DebugAPIT.h"
 
 #include "main.h"

@@ -261,7 +261,6 @@ protected:
         initialMipPipeline->morton = Morton;
         initialMipPipeline->boundaryBuffer = BoundaryBuffer;
 
-        //buildMipMapsPipeline->levelInfo = _ gCreate ConstantBuffer<LevelInfo>();
         buildMipMapsPipeline->mipMaps = MipMaps;
         buildMipMapsPipeline->morton = Morton;
         buildMipMapsPipeline->startMipMaps = StartMipMaps;
@@ -321,7 +320,7 @@ protected:
     void DrawScreen(gObj<GraphicsManager> manager, gObj<IPipelineBindings> pipeline, int width, int height) {
 #ifdef USE_COMPUTESHADER
         manager gSet Pipeline(pipeline);
-        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(width, height);
+        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(width / CS_BLOCK_SIZE_2D, height / CS_BLOCK_SIZE_2D);
 #else
         manager gSet Viewport(width, height);
         manager gSet Pipeline(pipeline);

@@ -162,6 +162,8 @@
     <ClInclude Include="Techniques\APIT\DebugAPIT.h" />
     <ClInclude Include="Techniques\APIT\APITRaytracing.h" />
     <ClInclude Include="Techniques\APIT\ViewSpaceTransformer.h" />
+    <ClInclude Include="Techniques\RaymarchRT\RaymarchRT.h" />
+    <ClInclude Include="Techniques\Common\CS_Constants.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

@@ -1,3 +1,5 @@
+#include "../../Common/CS_Constants.h"
+
 Texture2D<int> rootBuffer : register(t0); // first buffer updated to be tree root nodes...
 StructuredBuffer<float4> boundaryBuffer : register(t1);
 StructuredBuffer<int> Morton : register(t2);
@@ -14,7 +16,7 @@ int get_index(int2 px)
     return Morton[px.x % height] + Morton[px.y] * 2 + view * height * height;
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(CS_BLOCK_SIZE_2D, CS_BLOCK_SIZE_2D, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     int2 px = int2(DTid.xy);

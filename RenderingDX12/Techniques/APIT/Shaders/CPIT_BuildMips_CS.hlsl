@@ -1,3 +1,5 @@
+#include "../../Common/CS_Constants.h"
+
 cbuffer BuildingMipsInfo : register(b0) {
     int Resolution;
     int Level;
@@ -14,7 +16,7 @@ int get_index(int2 px, int view, int level)
     return StartMipMaps[level] + Morton[px.x] + Morton[px.y] * 2 + view * res * res;
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(CS_BLOCK_SIZE_2D, CS_BLOCK_SIZE_2D, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     int2 px = int2(DTid.xy);

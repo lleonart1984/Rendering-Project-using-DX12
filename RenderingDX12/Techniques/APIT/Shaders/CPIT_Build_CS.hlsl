@@ -1,3 +1,5 @@
+#include "../../Common/CS_Constants.h"
+
 #define NONE -1
 // Build file
 /*
@@ -56,7 +58,7 @@ int AllocateNode(int parent, int idxFragment, float2 interval)
     return ptrNode;
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(CS_BLOCK_SIZE_2D, CS_BLOCK_SIZE_2D, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     int currentFragmentIdx = rootBuffer[DTid.xy]; // rootBuffer is the first in the linked list at the beginning
