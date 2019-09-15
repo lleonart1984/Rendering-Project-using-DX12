@@ -11807,6 +11807,11 @@ namespace CA4G {
 			__CurrentLoadingCSU->add(SlotBinding{ (D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, slot, D3D12_RESOURCE_DIMENSION_BUFFER, (void*)&resource , nullptr, space });
 		}
 
+		//template<typename T>
+		//void CBV(int slot, T& resource, ShaderType type, int space = 0) {
+		//	__CurrentLoadingCSU->add(SlotBinding{(D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_});
+		//}
+
 		// Binds a shader resource view
 		void SRV(int slot, gObj<Buffer>& resource, ShaderType type, int space = 0) {
 			__CurrentLoadingCSU->add(SlotBinding{ (D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, slot, D3D12_RESOURCE_DIMENSION_BUFFER, (void*)&resource, nullptr, space });
@@ -12578,7 +12583,6 @@ namespace CA4G {
 			this->intersection = other.intersection;
 		}
 	};
-
 
 	struct GlobalRootSignatureManager : public DynamicStateBindingOf<D3D12_GLOBAL_ROOT_SIGNATURE, D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE> {
 		void SetGlobalRootSignature(int index, ID3D12RootSignature *rootSignature) {
@@ -14330,7 +14334,12 @@ namespace CA4G {
 
 			RECT rect;
 			GetClientRect(hWnd, &rect);
+			
+			IDXGISwapChain1 *tmpSwapChain;
 
+			DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullScreenDesc = {};
+			fullScreenDesc.Windowed = !fullScreen;
+			
 			// Describe and create the swap chain.
 			DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 			swapChainDesc.BufferCount = buffers;
@@ -14342,20 +14351,19 @@ namespace CA4G {
 			swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 			swapChainDesc.SampleDesc.Count = 1;
 
-			IDXGISwapChain1 *tmpSwapChain;
 
 			factory->CreateSwapChainForHwnd(
 				manager->Scheduler->queues[0]->dxQueue,        // Swap chain needs the queue so that it can force a flush on it.
 				hWnd,
 				&swapChainDesc,
-				nullptr,
+				&fullScreenDesc,
 				nullptr,
 				&tmpSwapChain
 			);
 
 			swapChain = (IDXGISwapChain3*)tmpSwapChain;
 			swapChain->SetMaximumFrameLatency(buffers);
-
+		
 			// This sample does not support fullscreen transitions.
 			factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
