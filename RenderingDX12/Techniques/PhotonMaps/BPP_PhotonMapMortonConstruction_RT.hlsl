@@ -55,19 +55,19 @@ float MortonEstimator(in Photon currentPhoton, int index) {
 	for (int i = 0; i < 10; i++) {
 		int currentMask = ~((1 << (i * 3)) - 1);
 		int currentBlock = Morton[index] & currentMask;
-		float mortonBlockRadius = (i + 1.0) / 1024.0;
-		if (mortonBlockRadius > PHOTON_RADIUS)
+		float mortonBlockRadius = (1 << i) / 1024.0;
+		if (mortonBlockRadius >= PHOTON_RADIUS)
 			return PHOTON_RADIUS;
 		// expand l and r considering all photons inside current block (currentMask)
 		while (l >= 0 && ((Morton[l] & currentMask) == currentBlock))
 			l--;
 		while (r < PHOTON_DIMENSION*PHOTON_DIMENSION - 1 && ((Morton[r] & currentMask) == currentBlock))
 			r++;
-		if ((r - l) >= DESIRED_PHOTONS * 4 / 3.14159)
+		if ((r - l) >= DESIRED_PHOTONS*2)
 		{
-			float radiusScale = 
-			return mortonBlockRadius / pow((r - l) / (float)DESIRED_PHOTONS, 0.5);
+			return sqrt(4 * mortonBlockRadius*mortonBlockRadius*DESIRED_PHOTONS / (r - l) / 3.14159);
 		}
+			//return mortonBlockRadius * 1.73 / pow((r - l)/ (float)DESIRED_PHOTONS, 0.5);
 	}
 	return PHOTON_RADIUS;
 }
