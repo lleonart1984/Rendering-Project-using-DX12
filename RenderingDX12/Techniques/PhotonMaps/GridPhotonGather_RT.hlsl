@@ -11,7 +11,7 @@
 StructuredBuffer<int> HashTableBuffer	: register(t9);
 StructuredBuffer<int> NextBuffer		: register(t10);
 
-#define T 20
+#define T 10
 
 #ifndef DEBUG_PHOTONS
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
@@ -87,7 +87,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	for (int i = 0; i < maxValueInHist; i++)
 	{
 		float x = (i + 0.5) / (float)maxValueInHist;
-		float kernel = 1;// 2 - 2 * x;
+		float kernel = 2 - 2 * x;
 		totalLighting += kernel * lightHist[i];
 	}
 
