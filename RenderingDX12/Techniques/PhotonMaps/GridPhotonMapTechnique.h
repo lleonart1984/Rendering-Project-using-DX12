@@ -58,6 +58,22 @@ public:
 		}
 	};
 
+	struct PhotonMapConstructionPipeline : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\GridPhotonMapConstruction_CS.cso"));
+		}
+		
+		gObj<Buffer> Photons;
+		gObj<Buffer> HeadBuffer;
+		gObj<Buffer> NextBuffer;
+
+		void Globals() {
+			UAV(0, HeadBuffer, ShaderType_Any);
+			UAV(1, NextBuffer, ShaderType_Any);
+			SRV(0, Photons, ShaderType_Any);
+		}
+	};
+
 	// DXR pipeline for photon gathering stage
 	struct DXR_RT_Pipeline : public RTPipelineManager {
 		gObj<RayGenerationHandle> RTMainRays;
@@ -163,6 +179,7 @@ public:
 	gObj<Buffer> screenVertices;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
 	gObj<DXR_PM_Pipeline> dxrPMPipeline;
+	//gObj<PhotonMapConstructionPipeline> constructingPM;
 	gObj<DXR_RT_Pipeline> dxrRTPipeline;
 
 	void SetScene(gObj<CA4G::Scene> scene) {
@@ -192,6 +209,7 @@ public:
 
 		_ gLoad Pipeline(dxrPTPipeline);
 		_ gLoad Pipeline(dxrPMPipeline);
+		//_ gLoad Pipeline(constructingPM);
 		_ gLoad Pipeline(dxrRTPipeline);
 
 		// Load assets to render the deferred lighting image
@@ -233,12 +251,16 @@ public:
 
 #pragma region DXR Photon map construction pipeline objects
 
+		//constructingPM->Photons = dxrPTPipeline->_Program->Photons;
 		dxrPMPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 #if USE_VOLUME_GRID
+		//constructingPM->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
 		dxrPMPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
 #else
+		//constructingPM->HeadBuffer = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
 		dxrPMPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
 #endif
+		//constructingPM->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 		dxrPMPipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 
 #pragma endregion
@@ -262,7 +284,9 @@ public:
 		// Bind now as SRVs
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 		dxrRTPipeline->_Program->HashtableBuffer = dxrPMPipeline->_Program->HeadBuffer;
+		//dxrRTPipeline->_Program->HashtableBuffer = constructingPM->HeadBuffer;
 		dxrRTPipeline->_Program->NextBuffer = dxrPMPipeline->_Program->NextBuffer;
+		//dxrRTPipeline->_Program->NextBuffer = constructingPM->NextBuffer;
 #pragma endregion
 	}
 
@@ -316,7 +340,7 @@ public:
 		perform(Photontracing);
 
 		perform(PhotonMapConstruction);
-
+		
 		perform(Raytracing);
 	}
 
@@ -388,10 +412,14 @@ public:
 	}
 
 	void PhotonMapConstruction(gObj<DXRManager> manager) {
-		auto rtProgram = dxrPMPipeline->_Program;
+		//auto computeManager = manager.Dynamic_Cast<ComputeManager>();
+		//
+		//computeManager gClear UAV(constructingPM->HeadBuffer, (unsigned int)-1); // reset head buffer to null for every list
+		//computeManager gSet Pipeline(constructingPM);
+		//computeManager gDispatch Threads(PHOTON_DIMENSION/32, PHOTON_DIMENSION/32);
 		
+		auto rtProgram = dxrPMPipeline->_Program;
 		manager gClear UAV(rtProgram->HeadBuffer, (unsigned int)-1); // reset head buffer to null for every list
-
 		manager gSet Pipeline(dxrPMPipeline);
 		manager gSet Program(rtProgram);
 		manager gSet RayGeneration(dxrPMPipeline->Main);

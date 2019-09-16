@@ -17,6 +17,6 @@
 #define DEBUG_STRATEGY 0
 
 #define ADAPTIVE_POWER 0.5
-#define ADAPTIVE_STRATEGY 1
+#define ADAPTIVE_STRATEGY 0
 
 #define USE_VOLUME_GRID true

@@ -15643,12 +15643,15 @@ namespace CA4G {
 						switch (binding.Root_Parameter.DescriptorTable.pDescriptorRanges[0].RangeType)
 						{
 						case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-							resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+							if (IsComputePipeline())
+								resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_COMMON);
+							else
+								resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_GENERIC_READ);
 							break;
 						case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
 							//resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 							resource->ChangeStateToUAV(cmdList);
-							//resource->BarrierUAV(cmdList);
+							resource->BarrierUAV(cmdList);
 							break;
 						}
 					}
