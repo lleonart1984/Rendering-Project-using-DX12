@@ -43,10 +43,15 @@ class DebugAPIT : public Technique, public IHasScene, public IHasCamera, public 
 public:
     gObj<RetainedSceneLoader> sceneLoader;
     gObj<APITConstruction> aPIT;
+    APITDescription aPITDescription;
 
     gObj<DebugAPIT_Pipeline> pipeline;
 
     gObj<Buffer> vertices;
+
+    DebugAPIT(APITDescription description) {
+        this->aPITDescription = description;
+    }
 
 protected:
     void SetScene(gObj<CA4G::Scene> scene) {
@@ -62,7 +67,7 @@ protected:
             _ gLoad Subprocess(sceneLoader);
         }
 
-        aPIT = new APITConstruction(7);
+        aPIT = new APITConstruction(aPITDescription);
         aPIT->sceneLoader = sceneLoader;
         _ gLoad Subprocess(aPIT);
 

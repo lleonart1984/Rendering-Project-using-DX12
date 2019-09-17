@@ -49,9 +49,9 @@ public:
     gObj<Texture2D> FirstBuffer;
     gObj<Buffer> NextBuffer;
     gObj<Buffer> Malloc;
+    gObj<Buffer> Vertices;
 
     gObj<Buffer> screenInfo;
-    gObj<Buffer> vertices;
     gObj<Buffer> layerTransforms;
 
     const int Width, Height;
@@ -85,7 +85,7 @@ protected:
         // Load and setup pipeline resource
         _ gLoad Pipeline(pipeline);
 
-        vertices = viewSpaceTransformer->ViewSpaceVertices;
+        Vertices = viewSpaceTransformer->ViewSpaceVertices;
         Fragments = _ gCreate RWStructuredBuffer<Fragment>(MAX_NUMBER_OF_FRAGMENTS);
         FirstBuffer = _ gCreate DrawableTexture2D<int>(Width * 6, Height);
         NextBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
@@ -97,7 +97,7 @@ protected:
         pipeline->screenInfo = screenInfo;
         pipeline->layerTransforms = layerTransforms;
 
-        pipeline->vertices = vertices;
+        pipeline->vertices = Vertices;
         pipeline->fragments = Fragments;
         pipeline->firstBuffer = FirstBuffer;
         pipeline->nextBuffer = NextBuffer;
@@ -148,7 +148,7 @@ protected:
         manager gSet Viewport(Width, Height);
         manager gSet Pipeline(pipeline);
 
-        manager gDispatch Triangles(vertices->ElementCount);
+        manager gDispatch Triangles(Vertices->ElementCount);
     }
 
     void Frame() {

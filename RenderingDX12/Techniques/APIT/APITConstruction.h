@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ABuffer.h"
+#include "../RaymarchRT/Common_RaymarchRT.h"
 
 class BuildAPIT_Pipeline :
 #ifdef USE_COMPUTESHADER
@@ -155,11 +156,83 @@ protected:
     }
 };
 
-class APITConstruction : public Technique, public IHasScene {
+class TraverseAPIT_Pipeline : public ComputePipelineBindings {
+public:
+    gObj<Buffer> hits;
+    gObj<Texture2D> complexity; // Complexity buffer for debugging
+
+    gObj<Buffer> rays;
+    gObj<Texture2D> rayHeadBuffer;
+    gObj<Buffer> rayNextBuffer;
+
+    gObj<Buffer> vertices;
+
+    gObj<Buffer> fragments;
+
+    gObj<Buffer> firstBuffer;
+    gObj<Buffer> boundaryBuffer;
+    gObj<Texture2D> rootBuffer; // First buffer, then root buffer
+    gObj<Buffer> nextBuffer; // NextBuffer, then per-node next buffer
+    gObj<Buffer> preorderBuffer; // next node in preorder
+    gObj<Buffer> skipBuffer; // next node in preorder skipping current subtree
+    gObj<Buffer> layerTransforms; // view transforms
+
+    gObj<Buffer> morton;
+    gObj<Buffer> startMipMaps;
+    gObj<Buffer> mipMaps;
+
+    // Constant buffers
+    gObj<Buffer> screenInfo;
+    gObj<Buffer> raymarchingInfo;
+protected:
+    void Setup() {
+        _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\APIT\\Shaders\\APITTraversal_CS.cso"));
+    }
+
+    void Globals() {
+        CBV(0, screenInfo, ShaderType_Any);
+        CBV(1, raymarchingInfo, ShaderType_Any);
+
+        SRV(0, rays, ShaderType_Any);
+        SRV(1, rayHeadBuffer, ShaderType_Any);
+        SRV(2, rayNextBuffer, ShaderType_Any);
+
+        SRV(3, vertices, ShaderType_Any);
+        SRV(4, fragments, ShaderType_Any);
+        SRV(5, firstBuffer, ShaderType_Any);
+        SRV(6, boundaryBuffer, ShaderType_Any);
+        SRV(7, rootBuffer, ShaderType_Any);
+        SRV(8, nextBuffer, ShaderType_Any);
+        SRV(9, preorderBuffer, ShaderType_Any);
+        SRV(10, skipBuffer, ShaderType_Any);
+        SRV(11, layerTransforms, ShaderType_Any);
+
+        SRV(12, morton, ShaderType_Any);
+        SRV(13, startMipMaps, ShaderType_Any);
+        SRV(14, mipMaps, ShaderType_Any);
+
+        UAV(0, hits, ShaderType_Any);
+        UAV(1, complexity, ShaderType_Any);
+    }
+};
+
+struct APITDescription {
+    int Power;
+
+    APITDescription() :APITDescription(8) {}
+    APITDescription(int power) : Power(power) {}
+
+    int getResolution() {
+        return 1 << Power;
+    }
+};
+
+class APITConstruction : public Technique, public IHasScene, public DebugRaymarchRT {
 public:
     gObj<RetainedSceneLoader> sceneLoader;
     gObj<ABuffer> aBuffer;
-
+    
+    gObj<Buffer> Vertices;
     gObj<Buffer> Fragments;
     gObj<Buffer> FirstBuffer;
     gObj<Buffer> NodeBuffer;
@@ -180,16 +253,39 @@ public:
     gObj<LinkAPIT_Pipeline> linkPipeline;
     gObj<InitialMipAPIT_Pipeline> initialMipPipeline;
     gObj<BuildMipsAPIT_Pipeline> buildMipMapsPipeline;
+    gObj<TraverseAPIT_Pipeline> traversalPipeline;
 
-    int Power;
+    APITDescription description;
     float4x4 ViewMatrix;
 
-    int getResolution() {
-        return 1 << Power;
+    APITConstruction(APITDescription description) {
+        this->description = description;
     }
 
-    APITConstruction(int power)
-        : Power(power) {}
+    int detectCollisionWidth, detectCollisionHeight;
+    void ComputeCollision(gObj<GraphicsManager> manager) {
+        manager gCopy ValueData(traversalPipeline->raymarchingInfo, RaymarchingDebug{
+                    CountSteps ? 1 : 0,
+                    CountHits ? 1 : 0
+            });
+
+        manager gSet Pipeline(traversalPipeline);
+        manager.Dynamic_Cast<ComputeManager>() gDispatch
+            Threads(detectCollisionWidth / CS_BLOCK_SIZE_2D, detectCollisionHeight / CS_BLOCK_SIZE_2D);
+    }
+
+    void DetectCollision(gObj<Buffer> rays, gObj<Texture2D> rayHeadBuffer, gObj<Buffer> rayNextBuffer, gObj<Buffer> hits, gObj<Texture2D> complexity)
+    {
+        traversalPipeline->rays = rays;
+        traversalPipeline->rayHeadBuffer = rayHeadBuffer;
+        traversalPipeline->rayNextBuffer = rayNextBuffer;
+        traversalPipeline->hits = hits;
+        traversalPipeline->complexity = complexity;
+
+        detectCollisionWidth = rayHeadBuffer->Width;
+        detectCollisionHeight = rayHeadBuffer->Height;
+        perform(ComputeCollision);
+    }
 
 protected:
     void SetScene(gObj<CA4G::Scene> scene) {
@@ -219,7 +315,7 @@ protected:
             _ gLoad Subprocess(sceneLoader);
         }
 
-        aBuffer = new ABuffer(getResolution(), getResolution());
+        aBuffer = new ABuffer(description.getResolution(), description.getResolution());
         aBuffer->sceneLoader = sceneLoader;
         _ gLoad Subprocess(aBuffer);
 
@@ -228,7 +324,9 @@ protected:
         _ gLoad Pipeline(linkPipeline);
         _ gLoad Pipeline(initialMipPipeline);
         _ gLoad Pipeline(buildMipMapsPipeline);
+        _ gLoad Pipeline(traversalPipeline);
 
+        Vertices = aBuffer->Vertices;
         Fragments = aBuffer->Fragments;
         FirstBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         NodeBuffer = _ gCreate RWStructuredBuffer<PITNode>(MAX_NUMBER_OF_FRAGMENTS);
@@ -265,18 +363,33 @@ protected:
         buildMipMapsPipeline->morton = Morton;
         buildMipMapsPipeline->startMipMaps = StartMipMaps;
 
+        traversalPipeline->vertices = Vertices;
+        traversalPipeline->fragments = Fragments;
+        traversalPipeline->firstBuffer = FirstBuffer;
+        traversalPipeline->boundaryBuffer = BoundaryBuffer;
+        traversalPipeline->rootBuffer = RootBuffer;
+        traversalPipeline->nextBuffer = NextBuffer;
+        traversalPipeline->preorderBuffer = PreorderBuffer;
+        traversalPipeline->skipBuffer = SkipBuffer;
+        traversalPipeline->layerTransforms = aBuffer->layerTransforms;
+        traversalPipeline->screenInfo = aBuffer->screenInfo;
+        traversalPipeline->raymarchingInfo = _ gCreate ConstantBuffer<RaymarchingDebug>();
+        traversalPipeline->morton = Morton;
+        traversalPipeline->startMipMaps = StartMipMaps;
+        traversalPipeline->mipMaps = MipMaps;
+
 #ifndef USE_COMPUTESHADER
         perform(TestData);
 #endif
     }
 
 #ifndef USE_COMPUTESHADER
-    gObj<Buffer> vertices;
+    gObj<Buffer> screenVertices;
     void TestData(gObj<CopyingManager> manager) {
-        vertices = _ gCreate VertexBuffer<float2>(6);
+        screenVertices = _ gCreate VertexBuffer<float2>(6);
 
         // Copies a buffer written using an initializer_list
-        manager gCopy ListData(vertices, {
+        manager gCopy ListData(screenVertices, {
                 float2(-1, 1),
                 float2(1, 1),
                 float2(1, -1),
@@ -289,7 +402,7 @@ protected:
 #endif
 
     void CreatingAssets(gObj<CopyingManager> manager) {
-        int resolution = getResolution();
+        int resolution = description.getResolution();
         Morton = _ gCreate StructuredBuffer<int>(resolution);
 
         int* morton = new int[resolution];
@@ -298,45 +411,45 @@ protected:
         manager gCopy PtrData(Morton, morton);
         //delete[] morton;
 
-        int* startMipMaps = new int[Power + 1];
+        int* startMipMaps = new int[description.Power + 1];
         int start = 0;
-        for (int level = 0; level <= Power; level++)
+        for (int level = 0; level <= description.Power; level++)
         {
             startMipMaps[level] = start;
             start += resolution * resolution * 6;
             resolution /= 2;
         }
-        StartMipMaps = _ gCreate StructuredBuffer<int>(Power + 1);
+        StartMipMaps = _ gCreate StructuredBuffer<int>(description.Power + 1);
         manager gCopy PtrData(StartMipMaps, startMipMaps);
         MipMaps = _ gCreate RWStructuredBuffer<float2>(start);
 
-        LevelInfos = new gObj<Buffer>[Power];
-        for (int i = 0; i < Power; i++) {
+        LevelInfos = new gObj<Buffer>[description.Power];
+        for (int i = 0; i < description.Power; i++) {
             LevelInfos[i] = _ gCreate ConstantBuffer<LevelInfo>();
             manager gCopy ValueData(LevelInfos[i], LevelInfo{ resolution, i });
         }
     }
 
-    void DrawScreen(gObj<GraphicsManager> manager, gObj<IPipelineBindings> pipeline, int width, int height) {
+    void DrawScreen(gObj<GraphicsManager> manager, int width, int height) {
 #ifdef USE_COMPUTESHADER
-        manager gSet Pipeline(pipeline);
         manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(width / CS_BLOCK_SIZE_2D, height / CS_BLOCK_SIZE_2D);
 #else
         manager gSet Viewport(width, height);
-        manager gSet Pipeline(pipeline);
         manager gSet VertexBuffer(vertices);
         manager gDispatch Triangles(6);
 #endif
     }
 
     void BuildMipMaps(gObj<GraphicsManager> manager) {
-        int resolution = getResolution();
-        DrawScreen(manager, initialMipPipeline, resolution * 6, resolution);
+        int resolution = description.getResolution();
+        manager gSet Pipeline(buildMipMapsPipeline);
+        DrawScreen(manager, resolution * 6, resolution);
 
-        for (int i = 1; i <= Power; i++)
+        manager gSet Pipeline(buildMipMapsPipeline);
+        for (int i = 1; i <= description.Power; i++)
         {
             buildMipMapsPipeline->levelInfo = LevelInfos[i - 1];
-            DrawScreen(manager, buildMipMapsPipeline, 6 * (resolution >> i), resolution >> i);
+            DrawScreen(manager, 6 * (resolution >> i), resolution >> i);
         }
     }
 
@@ -344,12 +457,14 @@ protected:
         aBuffer->ViewMatrix = ViewMatrix;
         ExecuteFrame(aBuffer);
 
-        int resolution = getResolution();
+        int resolution = description.getResolution();
 
         manager gClear UAV(Malloc, 0U);
-        DrawScreen(manager, buildPipeline, resolution * 6, resolution);
+        manager gSet Pipeline(buildPipeline);
+        DrawScreen(manager, resolution * 6, resolution);
 
-        DrawScreen(manager, linkPipeline, resolution * 6, resolution);
+        manager gSet Pipeline(linkPipeline);
+        DrawScreen(manager, resolution * 6, resolution);
     }
 
     void Frame() {

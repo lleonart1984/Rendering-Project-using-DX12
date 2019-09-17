@@ -11330,7 +11330,8 @@ namespace CA4G {
 			bool enableLogicOperation = false,
 			D3D12_LOGIC_OP logicOperation = D3D12_LOGIC_OP_COPY
 		) {
-			D3D12_RENDER_TARGET_BLEND_DESC d;
+            D3D12_RENDER_TARGET_BLEND_DESC d {};
+            d.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 			d.BlendEnable = enable;
 			d.BlendOp = operation;
 			d.BlendOpAlpha = alphaOperation;
@@ -14869,7 +14870,7 @@ namespace CA4G {
 					continue;
 				}
 
-				if (t.match("Tf "))
+				/*if (t.match("Tf "))
 				{
 					float r, g, b;
 					t.readFloatToken(r);
@@ -14884,7 +14885,7 @@ namespace CA4G {
 					}
 					t.skipCurrentLine();
 					continue;
-				}
+				}*/
 
 				if (t.match("Ni "))
 				{

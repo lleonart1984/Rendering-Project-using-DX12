@@ -56,6 +56,11 @@
     <FxCompile Include="Techniques\APIT\Shaders\ViewSpaceTransform_PS.hlsl" />
     <FxCompile Include="Techniques\APIT\Shaders\ViewSpaceTransform_VS.hlsl" />
     <FxCompile Include="Techniques\APIT\Shaders\ViewSpaceTransform_CS.hlsl" />
+    <FxCompile Include="Techniques\RaymarchRT\Shaders\RT_InitialRays_PS.hlsl" />
+    <FxCompile Include="Techniques\RaymarchRT\Shaders\RT_InitialRays_VS.hlsl" />
+    <FxCompile Include="Techniques\RaymarchRT\Shaders\RT_Bounce_PS.hlsl" />
+    <FxCompile Include="Techniques\RaymarchRT\Shaders\RT_InitialRayDirections_PS.hlsl" />
+    <FxCompile Include="Techniques\APIT\Shaders\APITTraversal_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -164,6 +169,7 @@
     <ClInclude Include="Techniques\APIT\ViewSpaceTransformer.h" />
     <ClInclude Include="Techniques\RaymarchRT\RaymarchRT.h" />
     <ClInclude Include="Techniques\Common\CS_Constants.h" />
+    <ClInclude Include="Techniques\RaymarchRT\Common_RaymarchRT.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

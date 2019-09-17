@@ -65,4 +65,5 @@
 //gObj<BPGPhotonMappingTechnique> technique; // Box Per Geometry Technique
 
 // APIT
-gObj<DebugAPIT> technique;
+//gObj<DebugAPIT> technique;
+gObj<RaymarchRT<APITConstruction, APITDescription>> technique;

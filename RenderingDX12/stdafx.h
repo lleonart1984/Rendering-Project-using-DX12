@@ -46,5 +46,6 @@ using namespace CA4G;
 #include "Techniques/PhotonMaps/BPP_PhotonMap3Technique.h"
 
 #include "Techniques/APIT/DebugAPIT.h"
+#include "Techniques/RaymarchRT/RaymarchRT.h"
 
 #include "main.h"

@@ -63,3 +63,15 @@ struct LevelInfo {
 
     float2 res;
 };
+
+struct RayInfo
+{
+    float3 Position;
+    float3 Direction;
+    float3 AccumulationFactor;
+};
+
+struct RayIntersection {
+    int TriangleIndex;
+    float3 Coordinates;
+};

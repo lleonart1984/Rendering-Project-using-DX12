@@ -109,7 +109,8 @@ int main(int, char**)
 	static Presenter* presenter = new ImGUIPresenter(hWnd);
 #endif
 
-	presenter->Load(technique);
+    presenter->Load(technique, APITDescription{ 8 });
+    //presenter->Load(technique);
 	gObj<IHasBackcolor> asBackcolorRenderer = technique.Dynamic_Cast<IHasBackcolor>();
 	gObj<IHasScene> asSceneRenderer = technique.Dynamic_Cast<IHasScene>();
 	gObj<IHasCamera> asCameraRenderer = technique.Dynamic_Cast<IHasCamera>();
@@ -144,7 +145,7 @@ int main(int, char**)
 			camera->Position = float3(0, 0, 1.8f);
 			camera->Target = float3(0, 0, 0);
 			lightSource->Position = float3(0, 0.4, 0);
-			lightSource->Intensity = float3(240, 240, 240);
+			lightSource->Intensity = float3(150, 150, 150);
 			MixGlassMaterial(&scene->Materials()[5], 1);
 			break;
 		case RING_OBJ:

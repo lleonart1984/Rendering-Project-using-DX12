@@ -52,7 +52,7 @@ float3 GetColor(int complexity) {
     return lerp(stopPoints[(int)level], stopPoints[(int)level + 1], level % 1);
 }
 
-float4 main(float4 P: SV_POSITION, float2 C: TEXCOORD) : SV_TARGET
+float4 main(float4 P: SV_POSITION, float2 C : TEXCOORD) : SV_TARGET
 {
     float2 pNorm = C;
     //return float4(P.xy / float2(Width, Height), 0, 1);
