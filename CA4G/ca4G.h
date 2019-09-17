@@ -10968,6 +10968,8 @@ namespace CA4G {
 
 namespace CA4G {
 
+
+
 	// Represents the shader stage a resource is bound to.
 	enum ShaderType {
 		// Resource is bound to pixel and vertex stages in the same slot.
@@ -10984,6 +10986,33 @@ namespace CA4G {
 		ShaderType_Domain = D3D12_SHADER_VISIBILITY_DOMAIN
 	};
 
+	// Represents a binding of a resource (or resource array) to a shader slot.
+	struct SlotBinding {
+		// Gets or sets the root parameter bound
+		D3D12_ROOT_PARAMETER Root_Parameter;
+
+		union {
+			struct ConstantData {
+				// Gets the pointer to a constant buffer in memory.
+				void* ptrToConstant;
+			} ConstantData;
+			struct DescriptorData
+			{
+				// Determines the dimension of the bound resource
+				D3D12_RESOURCE_DIMENSION Dimension;
+				// Gets the pointer to a resource field (pointer to ResourceView)
+				// or to the array of resources
+				void* ptrToResourceViewArray;
+				// Gets the pointer to the number of resources in array
+				int* ptrToCount;
+			} DescriptorData;
+			struct SceneData {
+				void* ptrToScene;
+			} SceneData;
+		};
+	};
+
+	
 	// Represents the element type of a vertex field.
 	enum VertexElementType {
 		// Each component of this field is a signed integer
@@ -11532,24 +11561,6 @@ namespace CA4G {
 		friend Loading;
 		friend GraphicsManager;
 
-		// Represents a binding of a resource (or resource array) to a shader slot.
-		struct SlotBinding {
-			// Determines wich shader stage this resource is bound to
-			D3D12_SHADER_VISIBILITY visibility;
-			// Determines the type of the resource
-			D3D12_DESCRIPTOR_RANGE_TYPE type;
-			// Determines the slot for binding
-			int slot;
-			// Determines the dimension of the bound resource
-			D3D12_RESOURCE_DIMENSION Dimension;
-			// Gets the pointer to a resource field (pointer to ResourceView)
-			void* ptrToResource;
-			// Gets a pointer to a number if a resource array is bound
-			int* ptrToCount;
-			// Determines the space for binding
-			int space;
-		};
-
 		// Used to collect all global constant, shader or unordered views bindings
 		list<SlotBinding> __GlobalsCSU;
 		// Used to collect all local constant, shader or unordered views bindings
@@ -11671,94 +11682,21 @@ namespace CA4G {
 
 		// Creates the root signature after closing
 		void CreateRootSignature() {
-			D3D12_ROOT_PARAMETER1 * parameters = new D3D12_ROOT_PARAMETER1[__GlobalsCSU.size() + __GlobalsSamplers.size() + __LocalsCSU.size() + __LocalsSamplers.size()];
-			D3D12_DESCRIPTOR_RANGE1 * ranges = new D3D12_DESCRIPTOR_RANGE1[__GlobalsCSU.size() + __GlobalsSamplers.size() + __LocalsCSU.size() + __LocalsSamplers.size()];
+			D3D12_ROOT_PARAMETER * parameters = new D3D12_ROOT_PARAMETER[__GlobalsCSU.size() + __GlobalsSamplers.size() + __LocalsCSU.size() + __LocalsSamplers.size()];
 			int index = 0;
 			for (int i = 0; i < __GlobalsCSU.size(); i++)
-			{
-				D3D12_DESCRIPTOR_RANGE1 range = { };
-				range.RangeType = __GlobalsCSU[i].type;
-				range.BaseShaderRegister = __GlobalsCSU[i].slot;
-				range.NumDescriptors = __GlobalsCSU[i].ptrToCount == nullptr ? 1 : -1;
-				range.RegisterSpace = 0;
-				range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-				//range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
-				ranges[index] = range;
-
-				D3D12_ROOT_PARAMETER1 p = { };
-				p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-				p.DescriptorTable.NumDescriptorRanges = 1;
-				p.DescriptorTable.pDescriptorRanges = &ranges[index];
-				p.ShaderVisibility = __GlobalsCSU[i].visibility;
-				parameters[index] = p;
-
-				index++;
-			}
+				parameters[index++] = __GlobalsCSU[i].Root_Parameter;
 
 			for (int i = 0; i < __GlobalsSamplers.size(); i++)
-			{
-				D3D12_DESCRIPTOR_RANGE1 range = { };
-				range.RangeType = __GlobalsSamplers[i].type;
-				range.BaseShaderRegister = __GlobalsSamplers[i].slot;
-				range.NumDescriptors = __GlobalsSamplers[i].ptrToCount == nullptr ? 1 : -1;
-				range.RegisterSpace = 0;
-				range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-				//range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
-				ranges[index] = range;
-
-				D3D12_ROOT_PARAMETER1 p = { };
-				p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-				p.DescriptorTable.NumDescriptorRanges = 1;
-				p.DescriptorTable.pDescriptorRanges = &ranges[index];
-				p.ShaderVisibility = __GlobalsSamplers[i].visibility;
-				parameters[index] = p;
-
-				index++;
-			}
+				parameters[index++] = __GlobalsSamplers[i].Root_Parameter;
 
 			for (int i = 0; i < __LocalsCSU.size(); i++)
-			{
-				D3D12_DESCRIPTOR_RANGE1 range = { };
-				range.RangeType = __LocalsCSU[i].type;
-				range.BaseShaderRegister = __LocalsCSU[i].slot;
-				range.NumDescriptors = __LocalsCSU[i].ptrToCount == nullptr ? 1 : -1;
-				range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-				range.RegisterSpace = 0;
-				//range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
-				ranges[index] = range;
-
-				D3D12_ROOT_PARAMETER1 p = { };
-				p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-				p.DescriptorTable.NumDescriptorRanges = 1;
-				p.DescriptorTable.pDescriptorRanges = &ranges[index];
-				p.ShaderVisibility = __LocalsCSU[i].visibility;
-				parameters[index] = p;
-
-				index++;
-			}
+				parameters[index++] = __LocalsCSU[i].Root_Parameter;
 
 			for (int i = 0; i < __LocalsSamplers.size(); i++)
-			{
-				D3D12_DESCRIPTOR_RANGE1 range = { };
-				range.RangeType = __LocalsSamplers[i].type;
-				range.BaseShaderRegister = __LocalsSamplers[i].slot;
-				range.NumDescriptors = __LocalsSamplers[i].ptrToCount == nullptr ? 1 : -1;
-				range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-				range.RegisterSpace = 0;
-				//range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
-				ranges[index] = range;
+				parameters[index++] = __LocalsSamplers[i].Root_Parameter;
 
-				D3D12_ROOT_PARAMETER1 p = { };
-				p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-				p.DescriptorTable.NumDescriptorRanges = 1;
-				p.DescriptorTable.pDescriptorRanges = &ranges[index];
-				p.ShaderVisibility = __LocalsSamplers[i].visibility;
-				parameters[index] = p;
-
-				index++;
-			}
-
-			D3D12_ROOT_SIGNATURE_DESC1 desc;
+			D3D12_ROOT_SIGNATURE_DESC desc;
 			desc.pParameters = parameters;
 			desc.NumParameters = index;
 			desc.pStaticSamplers = Static_Samplers;
@@ -11774,7 +11712,7 @@ namespace CA4G {
 			ID3DBlob *signatureErrorBlob;
 
 			D3D12_VERSIONED_ROOT_SIGNATURE_DESC d = {};
-			d.Desc_1_1 = desc;
+			d.Desc_1_0 = desc;
 			d.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
 
 			auto hr = D3D12SerializeVersionedRootSignature(&d, &signatureBlob, &signatureErrorBlob);
@@ -11792,7 +11730,6 @@ namespace CA4G {
 			}
 
 			delete[] parameters;
-			delete[] ranges;
 		}
 
 	protected:
@@ -11804,37 +11741,181 @@ namespace CA4G {
 
 		// Binds a constant buffer view
 		void CBV(int slot, gObj<Buffer>& resource, ShaderType type, int space = 0) {
-			__CurrentLoadingCSU->add(SlotBinding{ (D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, slot, D3D12_RESOURCE_DIMENSION_BUFFER, (void*)&resource , nullptr, space });
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+			p.Descriptor.RegisterSpace = space;
+			p.Descriptor.ShaderRegister = slot;
+			p.ShaderVisibility = (D3D12_SHADER_VISIBILITY)type;
+
+			SlotBinding b{ };
+			b.Root_Parameter = p;
+			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+			b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+			
+			__CurrentLoadingCSU->add(b);
 		}
+
+		// Binds a constant buffer view
+		template<typename D>
+		void CBV(int slot, D &data, ShaderType type, int space = 0) {
+			int size = ((sizeof(D) - 1) / 4) + 1;
+
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+			p.Constants.Num32BitValues = size;
+			p.Constants.RegisterSpace = space;
+			p.Constants.ShaderRegister = slot;
+			p.ShaderVisibility = (D3D12_SHADER_VISIBILITY)type;
+
+			SlotBinding b{  };
+			b.Root_Parameter = p;
+			b.ConstantData.ptrToConstant = (void*)&data;
+			__CurrentLoadingCSU->add(b);
+		}
+
+		list<D3D12_DESCRIPTOR_RANGE> ranges;
 
 		// Binds a shader resource view
 		void SRV(int slot, gObj<Buffer>& resource, ShaderType type, int space = 0) {
-			__CurrentLoadingCSU->add(SlotBinding{ (D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, slot, D3D12_RESOURCE_DIMENSION_BUFFER, (void*)&resource, nullptr, space });
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			p.DescriptorTable.NumDescriptorRanges = 1;
+			p.ShaderVisibility = (D3D12_SHADER_VISIBILITY)type;
+
+			D3D12_DESCRIPTOR_RANGE range = { };
+			range.BaseShaderRegister = slot;
+			range.NumDescriptors = 1;
+			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+			range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+			range.RegisterSpace = space;
+
+			ranges.add(range);
+			p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+			SlotBinding b{  };
+			b.Root_Parameter = p;
+			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+			b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+			__CurrentLoadingCSU->add(b);
 		}
 
 		// Binds a shader resource view
 		void SRV(int slot, gObj<Texture2D>& resource, ShaderType type, int space = 0) {
-			__CurrentLoadingCSU->add(SlotBinding{ (D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, slot, D3D12_RESOURCE_DIMENSION_TEXTURE2D, (void*)&resource , nullptr, space });
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			p.DescriptorTable.NumDescriptorRanges = 1;
+			p.ShaderVisibility = (D3D12_SHADER_VISIBILITY)type;
+			D3D12_DESCRIPTOR_RANGE range = { };
+			range.BaseShaderRegister = slot;
+			range.NumDescriptors = 1;
+			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+			range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+			range.RegisterSpace = space;
+
+			ranges.add(range);
+			p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+			SlotBinding b{  };
+			b.Root_Parameter = p;
+			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+			__CurrentLoadingCSU->add(b);
 		}
 
 		// Binds a shader resource view
 		void SRV_Array(int startSlot, gObj<Texture2D>*& resources, int &count, ShaderType type, int space = 0) {
-			__CurrentLoadingCSU->add(SlotBinding{ (D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, startSlot, D3D12_RESOURCE_DIMENSION_TEXTURE2D, (void*)&resources, &count, space });
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			p.DescriptorTable.NumDescriptorRanges = 1;
+			p.ShaderVisibility = (D3D12_SHADER_VISIBILITY)type;
+			D3D12_DESCRIPTOR_RANGE range = { };
+			range.BaseShaderRegister = startSlot;
+			range.NumDescriptors = -1;// undefined this moment
+			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+			range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+			range.RegisterSpace = space;
+
+			ranges.add(range);
+			p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+			SlotBinding b{ };
+			b.Root_Parameter = p;
+			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			b.DescriptorData.ptrToResourceViewArray = (void*)&resources;
+			b.DescriptorData.ptrToCount = &count;
+			__CurrentLoadingCSU->add(b);
 		}
 
 		// Binds a sampler object view
-		void SMP(int slot, gObj<Sampler> &sampler, ShaderType type) {
-			__CurrentLoadingSamplers->add(SlotBinding{ (D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, slot, D3D12_RESOURCE_DIMENSION_UNKNOWN, (void*)&sampler });
+		void SMP(int slot, gObj<Sampler> &sampler, ShaderType type, int space = 0) {
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			p.DescriptorTable.NumDescriptorRanges = 1;
+			p.ShaderVisibility = (D3D12_SHADER_VISIBILITY)type;
+
+			D3D12_DESCRIPTOR_RANGE range = { };
+			range.BaseShaderRegister = slot;
+			range.NumDescriptors = 1;
+			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+			range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+			range.RegisterSpace = space;
+
+			ranges.add(range);
+			p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+			SlotBinding b{ };
+			b.Root_Parameter = p;
+			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_UNKNOWN;
+			b.DescriptorData.ptrToResourceViewArray = (void*)&sampler;
+			__CurrentLoadingSamplers->add(b);
 		}
 
 		// Binds an unordered access view
 		void UAV(int slot, gObj<Buffer> &resource, ShaderType type, int space = 0) {
-			__CurrentLoadingCSU->add(SlotBinding{ (D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, slot, D3D12_RESOURCE_DIMENSION_BUFFER, (void*)&resource, nullptr, space });
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			p.DescriptorTable.NumDescriptorRanges = 1;
+			p.ShaderVisibility = (D3D12_SHADER_VISIBILITY)type;
+
+			D3D12_DESCRIPTOR_RANGE range = { };
+			range.BaseShaderRegister = slot;
+			range.NumDescriptors = 1;
+			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+			range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+			range.RegisterSpace = space;
+
+			ranges.add(range);
+			p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+			SlotBinding b{ };
+			b.Root_Parameter = p;
+			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+			b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+			__CurrentLoadingCSU->add(b);
 		}
 
 		// Binds an unordered access view
 		void UAV(int slot, gObj<Texture2D> &resource, ShaderType type, int space = 0) {
-			__CurrentLoadingCSU->add(SlotBinding{ (D3D12_SHADER_VISIBILITY)type, D3D12_DESCRIPTOR_RANGE_TYPE_UAV, slot, D3D12_RESOURCE_DIMENSION_TEXTURE2D, (void*)&resource, nullptr, space });
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			p.DescriptorTable.NumDescriptorRanges = 1;
+			p.ShaderVisibility = (D3D12_SHADER_VISIBILITY)type;
+
+			D3D12_DESCRIPTOR_RANGE range = { };
+			range.BaseShaderRegister = slot;
+			range.NumDescriptors = 1;
+			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+			range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+			range.RegisterSpace = space;
+
+			ranges.add(range);
+			p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+			SlotBinding b{  };
+			b.Root_Parameter = p;
+			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+			__CurrentLoadingCSU->add(b);
 		}
 
 		// Binds a render target view
@@ -12414,62 +12495,6 @@ namespace CA4G {
 
 #pragma region State Managers
 
-	// Represents a binding of a resource (or resource array) to a shader slot.
-	struct SlotBinding {
-		// Gets or sets the root parameter bound
-		D3D12_ROOT_PARAMETER Root_Parameter;
-
-		union {
-			struct ConstantData {
-				// Gets the pointer to a constant buffer in memory.
-				void* ptrToConstant;
-			} ConstantData;
-			struct DescriptorData
-			{
-				// Determines the dimension of the bound resource
-				D3D12_RESOURCE_DIMENSION Dimension;
-				// Gets the pointer to a resource field (pointer to ResourceView)
-				// or to the array of resources
-				void* ptrToResourceViewArray;
-				// Gets the pointer to the number of resources in array
-				int* ptrToCount;
-			} DescriptorData;
-			struct SceneData {
-				void* ptrToScene;
-			} SceneData;
-		};
-	};
-
-
-	class BindingsHandle {
-		friend RTPipelineManager;
-		friend DXRManager;
-		friend IRTProgram;
-		template<typename R> friend class RTProgram;
-
-		DX_RootSignature rootSignature;
-		bool isLocal;
-		int rootSize;
-
-		list<SlotBinding> csuBindings;
-		list<SlotBinding> samplerBindings;
-
-		D3D12_STATIC_SAMPLER_DESC Samplers[32];
-		int Max_Sampler;
-
-		void AddSampler(SlotBinding binding) {
-			samplerBindings.add(binding);
-		}
-		void AddCSU(SlotBinding binding) {
-			csuBindings.add(binding);
-		}
-
-	public:
-		inline bool HasSomeBindings() {
-			return csuBindings.size() + samplerBindings.size() > 0;
-		}
-	};
-
 	class ProgramHandle {
 		friend RTPipelineManager;
 		friend DXRManager;
@@ -12578,7 +12603,6 @@ namespace CA4G {
 			this->intersection = other.intersection;
 		}
 	};
-
 
 	struct GlobalRootSignatureManager : public DynamicStateBindingOf<D3D12_GLOBAL_ROOT_SIGNATURE, D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE> {
 		void SetGlobalRootSignature(int index, ID3D12RootSignature *rootSignature) {
@@ -12711,6 +12735,37 @@ namespace CA4G {
 	public:
 		inline C* Context() { return context; }
 	};
+
+	// Represents a set of bindings of a specific pipeline 
+	class BindingsHandle {
+		friend RTPipelineManager;
+		friend DXRManager;
+		friend IRTProgram;
+		template<typename R> friend class RTProgram;
+
+		DX_RootSignature rootSignature;
+		bool isLocal;
+		int rootSize;
+
+		list<SlotBinding> csuBindings;
+		list<SlotBinding> samplerBindings;
+
+		D3D12_STATIC_SAMPLER_DESC Samplers[32];
+		int Max_Sampler;
+
+		void AddSampler(SlotBinding binding) {
+			samplerBindings.add(binding);
+		}
+		void AddCSU(SlotBinding binding) {
+			csuBindings.add(binding);
+		}
+
+	public:
+		inline bool HasSomeBindings() {
+			return csuBindings.size() + samplerBindings.size() > 0;
+		}
+	};
+
 
 	// Interface of every raytracing program
 	class IRTProgram {
@@ -14330,7 +14385,12 @@ namespace CA4G {
 
 			RECT rect;
 			GetClientRect(hWnd, &rect);
+			
+			IDXGISwapChain1 *tmpSwapChain;
 
+			DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullScreenDesc = {};
+			fullScreenDesc.Windowed = !fullScreen;
+			
 			// Describe and create the swap chain.
 			DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 			swapChainDesc.BufferCount = buffers;
@@ -14342,20 +14402,19 @@ namespace CA4G {
 			swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 			swapChainDesc.SampleDesc.Count = 1;
 
-			IDXGISwapChain1 *tmpSwapChain;
 
 			factory->CreateSwapChainForHwnd(
 				manager->Scheduler->queues[0]->dxQueue,        // Swap chain needs the queue so that it can force a flush on it.
 				hWnd,
 				&swapChainDesc,
-				nullptr,
+				&fullScreenDesc,
 				nullptr,
 				&tmpSwapChain
 			);
 
 			swapChain = (IDXGISwapChain3*)tmpSwapChain;
 			swapChain->SetMaximumFrameLatency(buffers);
-
+		
 			// This sample does not support fullscreen transitions.
 			factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
@@ -15546,55 +15605,132 @@ namespace CA4G {
 		{
 			SlotBinding binding = list[i];
 
-			// Gets the range length (if bound an array) or 1 if single.
-			int count = binding.ptrToCount == nullptr ? 1 : *binding.ptrToCount;
-
-			// Gets the bound resource if single
-			gObj<ResourceView> resource = binding.ptrToCount == nullptr ? *((gObj<ResourceView>*)binding.ptrToResource) : nullptr;
-
-			// Gets the bound resources if array or treat the resource as a single array case
-			gObj<ResourceView>* resourceArray = binding.ptrToCount == nullptr ? &resource
-				: *((gObj<ResourceView>**)binding.ptrToResource);
-
-			// foreach resource in bound array (or single resource treated as array)
-			for (int j = 0; j < count; j++)
+			switch (binding.Root_Parameter.ParameterType)
 			{
-				// reference to the j-th resource (or bind null if array is null)
-				gObj<ResourceView> resource = resourceArray == nullptr ? nullptr : *(resourceArray + j);
-
-				if (!resource)
-					// Grant a resource view to create null descriptor if missing resource.
-					resource = ResourceView::getNullView(this->manager, binding.Dimension);
+			case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+				if (this->IsComputePipeline())
+					cmdList->SetComputeRoot32BitConstants(startRootParameter + i, binding.Root_Parameter.Constants.Num32BitValues,
+						binding.ConstantData.ptrToConstant, 0);
 				else
-				{
-					switch (binding.type)
-					{
-					case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-						if (IsComputePipeline())
-							resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_COMMON);
-						else
-							resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_GENERIC_READ);
-						break;
-					case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
-						resource->ChangeStateToUAV(cmdList);
-						break;
-					}
-				}
-				// Gets the cpu handle at not visible descriptor heap for the resource
-				D3D12_CPU_DESCRIPTOR_HANDLE handle;
-				resource->getCPUHandleFor(binding.type, handle);
+					cmdList->SetGraphicsRoot32BitConstants(startRootParameter + i, binding.Root_Parameter.Constants.Num32BitValues,
+						binding.ConstantData.ptrToConstant, 0);
 
-				// Adds the handle of the created descriptor into the src list.
-				manager->srcDescriptors.add(handle);
+				break;
+			case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
+			{
+#pragma region DESCRIPTOR TABLE
+				// Gets the range length (if bound an array) or 1 if single.
+				int count = binding.DescriptorData.ptrToCount == nullptr ? 1 : *binding.DescriptorData.ptrToCount;
+
+				// Gets the bound resource if single
+				gObj<ResourceView> resource = binding.DescriptorData.ptrToCount == nullptr ? *((gObj<ResourceView>*)binding.DescriptorData.ptrToResourceViewArray) : nullptr;
+
+				// Gets the bound resources if array or treat the resource as a single array case
+				gObj<ResourceView>* resourceArray = binding.DescriptorData.ptrToCount == nullptr ? &resource
+					: *((gObj<ResourceView>**)binding.DescriptorData.ptrToResourceViewArray);
+
+				// foreach resource in bound array (or single resource treated as array)
+				for (int j = 0; j < count; j++)
+				{
+					// reference to the j-th resource (or bind null if array is null)
+					gObj<ResourceView> resource = resourceArray == nullptr ? nullptr : *(resourceArray + j);
+
+					if (!resource)
+						// Grant a resource view to create null descriptor if missing resource.
+						resource = ResourceView::getNullView(this->manager, binding.DescriptorData.Dimension);
+					else
+					{
+						switch (binding.Root_Parameter.DescriptorTable.pDescriptorRanges[0].RangeType)
+						{
+						case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+							if (IsComputePipeline())
+								resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_COMMON);
+							else
+								resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_GENERIC_READ);
+							break;
+						case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+							//resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+							resource->ChangeStateToUAV(cmdList);
+							resource->BarrierUAV(cmdList);
+							break;
+						}
+					}
+					// Gets the cpu handle at not visible descriptor heap for the resource
+					D3D12_CPU_DESCRIPTOR_HANDLE handle;
+					resource->getCPUHandleFor(binding.Root_Parameter.DescriptorTable.pDescriptorRanges[0].RangeType, handle);
+
+					// Adds the handle of the created descriptor into the src list.
+					manager->srcDescriptors.add(handle);
+				}
+				// add the descriptors range length
+				manager->dstDescriptorRangeLengths.add(count);
+				int startIndex = this->manager->descriptors->gpu_csu->Malloc(count);
+				manager->dstDescriptors.add(this->manager->descriptors->gpu_csu->getCPUVersion(startIndex));
+				if (this->IsComputePipeline())
+					cmdList->SetComputeRootDescriptorTable(startRootParameter + i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
+				else
+					cmdList->SetGraphicsRootDescriptorTable(startRootParameter + i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
+				break; // DESCRIPTOR TABLE
+#pragma endregion
 			}
-			// add the descriptors range length
-			manager->dstDescriptorRangeLengths.add(count);
-			int startIndex = this->manager->descriptors->gpu_csu->Malloc(count);
-			manager->dstDescriptors.add(this->manager->descriptors->gpu_csu->getCPUVersion(startIndex));
-			if(IsComputePipeline())
-				cmdList->SetComputeRootDescriptorTable(startRootParameter + i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
-			else
-				cmdList->SetGraphicsRootDescriptorTable(startRootParameter + i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
+			case D3D12_ROOT_PARAMETER_TYPE_CBV:
+			{
+#pragma region DESCRIPTOR CBV
+				// Gets the range length (if bound an array) or 1 if single.
+				gObj<ResourceView> resource = *((gObj<ResourceView>*)binding.DescriptorData.ptrToResourceViewArray);
+				if (this->IsComputePipeline())
+					cmdList->SetComputeRootConstantBufferView(startRootParameter + i, resource->resource->GetGPUVirtualAddress());
+				else
+					cmdList->SetGraphicsRootConstantBufferView(startRootParameter + i, resource->resource->GetGPUVirtualAddress());
+				break; // DESCRIPTOR CBV
+#pragma endregion
+			}
+			}
+
+			//// Gets the range length (if bound an array) or 1 if single.
+			//int count = binding.ptrToCount == nullptr ? 1 : *binding.ptrToCount;
+			//// Gets the bound resource if single
+			//gObj<ResourceView> resource = binding.ptrToCount == nullptr ? *((gObj<ResourceView>*)binding.ptrToResource) : nullptr;
+			//// Gets the bound resources if array or treat the resource as a single array case
+			//gObj<ResourceView>* resourceArray = binding.ptrToCount == nullptr ? &resource
+			//	: *((gObj<ResourceView>**)binding.ptrToResource);
+			//// foreach resource in bound array (or single resource treated as array)
+			//for (int j = 0; j < count; j++)
+			//{
+			//	// reference to the j-th resource (or bind null if array is null)
+			//	gObj<ResourceView> resource = resourceArray == nullptr ? nullptr : *(resourceArray + j);
+			//	if (!resource)
+			//		// Grant a resource view to create null descriptor if missing resource.
+			//		resource = ResourceView::getNullView(this->manager, binding.Dimension);
+			//	else
+			//	{
+			//		switch (binding.type)
+			//		{
+			//		case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+			//			if (IsComputePipeline())
+			//				resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_COMMON);
+			//			else
+			//				resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_GENERIC_READ);
+			//			break;
+			//		case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+			//			resource->ChangeStateToUAV(cmdList);
+			//			break;
+			//		}
+			//	}
+			//	// Gets the cpu handle at not visible descriptor heap for the resource
+			//	D3D12_CPU_DESCRIPTOR_HANDLE handle;
+			//	resource->getCPUHandleFor(binding.type, handle);
+			//	// Adds the handle of the created descriptor into the src list.
+			//	manager->srcDescriptors.add(handle);
+			//}
+			//// add the descriptors range length
+			//manager->dstDescriptorRangeLengths.add(count);
+			//int startIndex = this->manager->descriptors->gpu_csu->Malloc(count);
+			//manager->dstDescriptors.add(this->manager->descriptors->gpu_csu->getCPUVersion(startIndex));
+			//if(IsComputePipeline())
+			//	cmdList->SetComputeRootDescriptorTable(startRootParameter + i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
+			//else
+			//	cmdList->SetGraphicsRootDescriptorTable(startRootParameter + i, this->manager->descriptors->gpu_csu->getGPUVersion(startIndex));
 		}
 	}
 

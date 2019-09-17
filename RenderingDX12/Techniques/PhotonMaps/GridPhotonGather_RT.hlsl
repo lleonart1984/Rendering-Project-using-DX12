@@ -86,8 +86,8 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 
 	for (int i = 0; i < maxValueInHist; i++)
 	{
-		float x = (i + 0.5) / (float)maxValueInHist;
-		float kernel = 2 - 2 * x;
+		float x = (i + 0.5) / maxValueInHist;
+		float kernel = 1;// 2 - 2 * x;
 		totalLighting += kernel * lightHist[i];
 	}
 

@@ -260,7 +260,7 @@ public:
 	// AABBs buffer for photon map
 	gObj<Buffer> PhotonsAABBs;
 	// Baked photon map used for updates
-	gObj<GeometriesOnGPU> PhotonsAABBsOnTheGPU;
+	gObj<GeometriesOnGPU> PhotonsAABBsOnTheGPU [PHOTONS_LOD + 1];
 	// Baked scene geometries used for toplevel instance updates
 	gObj<GeometriesOnGPU> sceneGeometriesOnGPU;
 	// Vertex buffer for scene triangles
@@ -390,30 +390,44 @@ public:
 		dxrPTPipeline->_Program->Scene = sceneInstances gCreate BakedScene();
 	}
 
+
+
 	void CreateSceneAndPhotonMapOnGPU(gObj<DXRManager> manager) {
 		// Building top-level ADS for SceneAndPhotonMap
 		auto sceneInstances = manager gCreate Instances();
 
-		auto photonMapBuilder = manager gCreate ProceduralGeometries();
-		photonMapBuilder gSet AABBs(PhotonsAABBs);
-		photonMapBuilder gLoad Geometry(0, PHOTON_DIMENSION*PHOTON_DIMENSION);
-		PhotonsAABBsOnTheGPU = photonMapBuilder gCreate BakedGeometry(true, true);
+		for (int t = 0; t <= PHOTONS_LOD; t++)
+		{
+			auto photonMapBuilder = manager gCreate ProceduralGeometries();
+			photonMapBuilder gSet AABBs(PhotonsAABBs);
+			int start = t == 0 ? 0 : (1 << (t - 1))*PHOTON_DIMENSION;
+			int count = max(PHOTON_DIMENSION, start);
+			photonMapBuilder gLoad Geometry(start, count);
+			PhotonsAABBsOnTheGPU[t] = photonMapBuilder gCreate BakedGeometry(true, true);
+			sceneInstances gLoad Instance(PhotonsAABBsOnTheGPU[t], 2, 0, start);
+		}
 
 		sceneInstances gLoad Instance(sceneGeometriesOnGPU, 1);
-		sceneInstances gLoad Instance(PhotonsAABBsOnTheGPU, 2);
 
 		dxrRTPipeline->_Program->SceneAndPhotonMap = sceneInstances gCreate BakedScene(true, true);
 	}
 
 	void UpdatePhotonMap(gObj<DXRManager> manager) {
-		auto photonMapBuilder = manager gCreate ProceduralGeometries(PhotonsAABBsOnTheGPU);
-		photonMapBuilder gSet AABBs(PhotonsAABBs);
-		photonMapBuilder gLoad Geometry(0, PHOTON_DIMENSION*PHOTON_DIMENSION);
-		PhotonsAABBsOnTheGPU = photonMapBuilder gCreate RebuiltGeometry(true, true);
-
+		
 		auto sceneInstances = manager gCreate Instances(dxrRTPipeline->_Program->SceneAndPhotonMap);
+		
+		for (int t = 0; t <= PHOTONS_LOD; t++)
+		{
+			auto photonMapBuilder = manager gCreate ProceduralGeometries(PhotonsAABBsOnTheGPU[t]);
+			photonMapBuilder gSet AABBs(PhotonsAABBs);
+			int start = t == 0 ? 0 : (1 << (t - 1))*PHOTON_DIMENSION;
+			int count = max(PHOTON_DIMENSION, start);
+			photonMapBuilder gLoad Geometry(start, count);
+			PhotonsAABBsOnTheGPU[t] = photonMapBuilder gCreate RebuiltGeometry(true, true);
+			sceneInstances gLoad Instance(PhotonsAABBsOnTheGPU[t], 2, 0, start);
+		}
+
 		sceneInstances gLoad Instance(sceneGeometriesOnGPU, 1);
-		sceneInstances gLoad Instance(PhotonsAABBsOnTheGPU, 2);
 		dxrRTPipeline->_Program->SceneAndPhotonMap = sceneInstances gCreate UpdatedScene();
 	}
 
