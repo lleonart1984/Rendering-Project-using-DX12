@@ -19,7 +19,7 @@ StructuredBuffer<float4x4> transforms   : register(t2);
 
 RWStructuredBuffer<Vertex> transformedVertices : register(u0);
 
-[numthreads(CS_BLOCK_SIZE_1D, 1, 1)]
+[numthreads(CS_GROUPSIZE_1D, 1, 1)]
 void main(uint3 DTid: SV_DispatchThreadID)
 {
     int vertexId = DTid.x;

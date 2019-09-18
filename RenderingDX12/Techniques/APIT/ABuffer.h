@@ -54,13 +54,13 @@ public:
     gObj<Buffer> screenInfo;
     gObj<Buffer> layerTransforms;
 
-    const int Width, Height;
+    const int Width, Height, Levels;
     float4x4 ViewMatrix;
 
     gObj<ABufferPipeline> pipeline;
 
-    ABuffer(int width, int height)
-        : Width(width), Height(height) { }
+    ABuffer(int width, int height, int levels)
+        : Width(width), Height(height), Levels(levels) { }
 
 protected:
     void SetScene(gObj<CA4G::Scene> scene) {
@@ -143,7 +143,7 @@ protected:
 
         manager gClear  UAV(Malloc, 0U);
         manager gClear  UAV(FirstBuffer, (unsigned int)-1);
-        manager gCopy   ValueData(screenInfo, ScreenInfo{ Width, Height });
+        manager gCopy   ValueData(screenInfo, ScreenInfo{ Width, Height, 0, 0, Levels });
 
         manager gSet Viewport(Width, Height);
         manager gSet Pipeline(pipeline);

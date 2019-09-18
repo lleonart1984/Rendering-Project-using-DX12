@@ -105,7 +105,7 @@ void ResolveReferencesToNextNonChildrenInPreorder(int root)
     }
 }
 
-[numthreads(CS_BLOCK_SIZE_2D, CS_BLOCK_SIZE_2D, 1)]
+[numthreads(CS_GROUPSIZE_2D, CS_GROUPSIZE_2D, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint2 crd = uint2(DTid.xy);

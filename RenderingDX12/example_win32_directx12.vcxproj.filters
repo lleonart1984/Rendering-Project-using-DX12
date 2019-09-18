@@ -40,7 +40,6 @@
     <FxCompile Include="Techniques\PhotonMaps\PhotonBitonicSort_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\PhotonMortonIndexing_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonMapMortonConstruction_RT.hlsl" />
-    <FxCompile Include="Techniques\APIT\Shaders\TestVS.hlsl" />
     <FxCompile Include="Techniques\APIT\Shaders\CPIT_VS.hlsl" />
     <FxCompile Include="Techniques\APIT\Shaders\CPIT_GS.hlsl" />
     <FxCompile Include="Techniques\APIT\Shaders\CPIT_PS.hlsl" />
@@ -165,7 +164,6 @@
     <ClInclude Include="Techniques\APIT\ABuffer.h" />
     <ClInclude Include="Techniques\APIT\APITConstruction.h" />
     <ClInclude Include="Techniques\APIT\DebugAPIT.h" />
-    <ClInclude Include="Techniques\APIT\APITRaytracing.h" />
     <ClInclude Include="Techniques\APIT\ViewSpaceTransformer.h" />
     <ClInclude Include="Techniques\RaymarchRT\RaymarchRT.h" />
     <ClInclude Include="Techniques\Common\CS_Constants.h" />

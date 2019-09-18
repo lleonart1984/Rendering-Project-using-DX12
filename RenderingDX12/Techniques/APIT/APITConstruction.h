@@ -262,16 +262,17 @@ public:
         this->description = description;
     }
 
-    int detectCollisionWidth, detectCollisionHeight;
     void ComputeCollision(gObj<GraphicsManager> manager) {
         manager gCopy ValueData(traversalPipeline->raymarchingInfo, RaymarchingDebug{
                     CountSteps ? 1 : 0,
                     CountHits ? 1 : 0
             });
 
+        int width = traversalPipeline->rayHeadBuffer->Width;
+        int height = traversalPipeline->rayHeadBuffer->Height;
+
         manager gSet Pipeline(traversalPipeline);
-        manager.Dynamic_Cast<ComputeManager>() gDispatch
-            Threads(detectCollisionWidth / CS_BLOCK_SIZE_2D, detectCollisionHeight / CS_BLOCK_SIZE_2D);
+        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_SQUAREGROUP(width, height));
     }
 
     void DetectCollision(gObj<Buffer> rays, gObj<Texture2D> rayHeadBuffer, gObj<Buffer> rayNextBuffer, gObj<Buffer> hits, gObj<Texture2D> complexity)
@@ -282,8 +283,6 @@ public:
         traversalPipeline->hits = hits;
         traversalPipeline->complexity = complexity;
 
-        detectCollisionWidth = rayHeadBuffer->Width;
-        detectCollisionHeight = rayHeadBuffer->Height;
         perform(ComputeCollision);
     }
 
@@ -302,7 +301,7 @@ protected:
         {
             total = total + ((x % 2) << (2 * bit));
             bit++;
-            x /= 2;
+            x >>= 1;
         }
         return total;
     }
@@ -315,7 +314,7 @@ protected:
             _ gLoad Subprocess(sceneLoader);
         }
 
-        aBuffer = new ABuffer(description.getResolution(), description.getResolution());
+        aBuffer = new ABuffer(description.getResolution(), description.getResolution(), description.Power + 1);
         aBuffer->sceneLoader = sceneLoader;
         _ gLoad Subprocess(aBuffer);
 
@@ -413,11 +412,12 @@ protected:
 
         int* startMipMaps = new int[description.Power + 1];
         int start = 0;
+        int startResolution = resolution;
         for (int level = 0; level <= description.Power; level++)
         {
             startMipMaps[level] = start;
-            start += resolution * resolution * 6;
-            resolution /= 2;
+            start += startResolution * startResolution * 6;
+            startResolution >>= 1;
         }
         StartMipMaps = _ gCreate StructuredBuffer<int>(description.Power + 1);
         manager gCopy PtrData(StartMipMaps, startMipMaps);
@@ -432,7 +432,7 @@ protected:
 
     void DrawScreen(gObj<GraphicsManager> manager, int width, int height) {
 #ifdef USE_COMPUTESHADER
-        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(width / CS_BLOCK_SIZE_2D, height / CS_BLOCK_SIZE_2D);
+        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_SQUAREGROUP(width, height));
 #else
         manager gSet Viewport(width, height);
         manager gSet VertexBuffer(vertices);
@@ -442,7 +442,7 @@ protected:
 
     void BuildMipMaps(gObj<GraphicsManager> manager) {
         int resolution = description.getResolution();
-        manager gSet Pipeline(buildMipMapsPipeline);
+        manager gSet Pipeline(initialMipPipeline);
         DrawScreen(manager, resolution * 6, resolution);
 
         manager gSet Pipeline(buildMipMapsPipeline);

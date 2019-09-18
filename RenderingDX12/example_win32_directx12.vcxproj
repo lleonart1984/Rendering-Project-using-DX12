@@ -202,7 +202,6 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="Techniques\AccPathtracing\DXRPathtracer.h" />
     <ClInclude Include="Techniques\APIT\ABuffer.h" />
     <ClInclude Include="Techniques\APIT\APITConstruction.h" />
-    <ClInclude Include="Techniques\APIT\APITRaytracing.h" />
     <ClInclude Include="Techniques\Common\CS_Constants.h" />
     <ClInclude Include="Techniques\APIT\DebugAPIT.h" />
     <ClInclude Include="Techniques\APIT\ViewSpaceTransformer.h" />
@@ -435,14 +434,6 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
       </ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.1</ShaderModel>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="Techniques\APIT\Shaders\TestVS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='HLSL|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='HLSL|x64'">Vertex</ShaderType>
     </FxCompile>
     <FxCompile Include="Techniques\APIT\Shaders\ViewSpaceTransform_CS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>

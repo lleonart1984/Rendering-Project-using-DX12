@@ -276,7 +276,6 @@ float2 GetOccupiedRange(int2 px, int view, int level)
 void AdaptiveAdvanceRayMarchingAtLevel(inout int counter, float3 rayOrigin, float3 rayDirection, float3 P, float3 H, int faceIndex,
     inout float t, inout float screent, inout int index, inout float3 rayHitCoords)
 {
-
     int level = Levels - 1;
 
     int2 px = int2(0, 0);
@@ -445,7 +444,7 @@ void Raymarch(int2 px, int index)
 
     for (int i = 0; i <= lastfHits; i++)
     {
-        FixedAdvanceRayMarchingAtFace(counter, fHits[i].xyz, fHits[i + 1].xyz, GetFace(lerp(fHits[i].xyz, fHits[i + 1].xyz, 0.5)),
+        AdaptiveAdvanceRayMarchingAtFace(counter, fHits[i].xyz, fHits[i + 1].xyz, GetFace(lerp(fHits[i].xyz, fHits[i + 1].xyz, 0.5)),
             intersection.TriangleIndex, intersection.Coordinates);
 
         if (intersection.TriangleIndex != -1)
@@ -457,7 +456,7 @@ void Raymarch(int2 px, int index)
     complexity[px] += counter;
 }
 
-[numthreads(CS_BLOCK_SIZE_2D, CS_BLOCK_SIZE_2D, 1)]
+[numthreads(CS_GROUPSIZE_2D, CS_GROUPSIZE_2D, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     int2 px = DTid.xy;

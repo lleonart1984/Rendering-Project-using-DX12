@@ -3,6 +3,11 @@ cbuffer ScreenInfo : register (b0)
 {
     int Width;
     int Height;
+
+    int pWidth;
+    int pHeight;
+
+    int Levels;
 }
 
 struct PITNode {
@@ -24,6 +29,8 @@ StructuredBuffer<int> nextBuffer        : register(t4);
 StructuredBuffer<int> preorderBuffer    : register(t5);
 StructuredBuffer<int> skipBuffer        : register(t6);
 StructuredBuffer<int> depth             : register(t7);
+StructuredBuffer<int> startMipMaps      : register(t8);
+StructuredBuffer<float2> mipMaps        : register(t9);
 
 float3 GetColor(int complexity) {
     if (complexity == 0) {
@@ -89,10 +96,9 @@ float4 main(float4 P: SV_POSITION, float2 C : TEXCOORD) : SV_TARGET
     int fragmentCount = 0;
     int currentNode = rootBuffer[coord];
 
-    //float maxDepth = boundaryBuffer[currentNode].w;
-    //float minDepth = boundaryBuffer[currentNode].z;
-
-    //return float4((maxDepth - minDepth) * float3(0.00, 0.07, 0.09), 1);
+    float maxDepth = boundaryBuffer[currentNode].w;
+    float minDepth = boundaryBuffer[currentNode].z;
+    return float4((maxDepth - minDepth) * float3(0.00, 0.27, 0.29), 1);
 
     int maxNodeDepth = 0;
 

@@ -85,9 +85,8 @@ protected:
         manager gCopy ValueData(pipeline->cameraCB, ViewMatrix);
 
 #ifdef USE_COMPUTESHADER
-        int groupCount = (int)ceil(pipeline->vertices->ElementCount * 1.0 / CS_BLOCK_SIZE_1D);
         manager gSet Pipeline(pipeline);
-        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(groupCount);
+        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_LINEARGROUP(pipeline->vertices->ElementCount));
 #else
         manager gSet Viewport(1, 1);
         manager gSet Pipeline(pipeline);

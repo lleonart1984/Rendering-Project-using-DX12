@@ -16,7 +16,7 @@ int get_index(int2 px, int view, int level)
     return StartMipMaps[level] + Morton[px.x] + Morton[px.y] * 2 + view * res * res;
 }
 
-[numthreads(CS_BLOCK_SIZE_2D, CS_BLOCK_SIZE_2D, 1)]
+[numthreads(CS_GROUPSIZE_2D, CS_GROUPSIZE_2D, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     int2 px = int2(DTid.xy);

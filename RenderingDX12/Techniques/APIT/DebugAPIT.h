@@ -18,6 +18,8 @@ public:
     gObj<Buffer> preorderBuffer;
     gObj<Buffer> skipBuffer;
     gObj<Buffer> depth;
+    gObj<Buffer> startMipMaps;
+    gObj<Buffer> mipMaps;
 protected:
     void Setup() {
         ShowTexturePipeline::Setup();
@@ -36,6 +38,8 @@ protected:
         SRV(5, preorderBuffer, ShaderType_Pixel);
         SRV(6, skipBuffer, ShaderType_Pixel);
         SRV(7, depth, ShaderType_Pixel);
+        SRV(8, startMipMaps, ShaderType_Pixel);
+        SRV(9, mipMaps, ShaderType_Pixel);
     }
 };
 
@@ -84,6 +88,8 @@ protected:
         pipeline->preorderBuffer = aPIT->PreorderBuffer;
         pipeline->skipBuffer = aPIT->SkipBuffer;
         pipeline->depth = aPIT->Depth;
+        pipeline->startMipMaps = aPIT->StartMipMaps;
+        pipeline->mipMaps = aPIT->MipMaps;
 
         perform(CreatingAssets);
     }

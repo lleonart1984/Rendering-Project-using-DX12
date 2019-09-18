@@ -70,7 +70,7 @@ sampler Sampler : register(s0);
 
 float4 Sampling(int index, float2 coord)
 {
-    if (index < -1) {
+    if (index < 0 || index > 31) {
         return float4(1, 1, 1, 1);
     }
 
@@ -141,7 +141,6 @@ float3 AnalizeRay(int2 px, int index)
         float ratio = isOutside ? 1 / material.RefractionIndex : material.RefractionIndex;
 
         ComputeFresnel(dir, facedNormal, ratio, reflection, refraction);
-
         refractingDirection = refract(dir, facedNormal, ratio);
 
         if (!any(refractingDirection)) // internal reflection
@@ -156,7 +155,6 @@ float3 AnalizeRay(int2 px, int index)
     refraction = refraction * material.Roulette.w;
 
     float3 brdf = material.Roulette.x * diffuse + material.Roulette.y * specular * pow(saturate(dot(L, reflectingDirection)), max(1, material.SpecularSharpness)); // brdf for local lighting
-
     float3 localLighting = material.Emissive + brdf * saturate(dot(facedNormal, L)) * Lin; // +diffuse*0.3*material.Roulette.x;
     
     if (reflection > 0)
@@ -194,7 +192,6 @@ float4 main(float4 proj : SV_POSITION) : SV_TARGET0
     int2 px = proj.xy;
 
     int currentIndex = HeadBuffer[px];
-    int k = currentIndex;
 
     [loop]
     while (currentIndex != -1)
@@ -202,16 +199,6 @@ float4 main(float4 proj : SV_POSITION) : SV_TARGET0
         accumulations += AnalizeRay(px, currentIndex);
         currentIndex = NextBuffer[currentIndex];
     }
-
-    /*if (k == -1) {
-        return float4(0.8, 0, 1, 1);
-    }*/
-
-    /*int hit = Intersections[k].TriangleIndex;
-    if (hit < 0) {
-        return float4(1, 0.3, 0, 1);
-    }
-    return float4(hit % 5 * 0.2, 0.3, 0, 1);*/
 
     return float4(accumulations, 1);
 }

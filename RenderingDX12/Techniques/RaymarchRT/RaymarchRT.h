@@ -2,7 +2,7 @@
 
 #include "../../stdafx.h"
 
-#define BOUNCES 5
+#define BOUNCES 2
 
 class InitializeRaysPipeline : public GraphicsPipelineBindings {
 public:
@@ -97,7 +97,7 @@ protected:
         ShowTexturePipeline::Setup();
         _ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\RaymarchRT\\Shaders\\RT_Bounce_PS.cso"));
         //_ gSet AllRenderTargets(1, DXGI_FORMAT_B8G8R8A8_UNORM_SRGB);
-        _ gSet IndependentBlend(true);
+        //_ gSet IndependentBlend(true);
         //_ gSet AlphaToCoverage(true);
         //_ gSet BlendSampleMask(0);
         _ gSet BlendForAllRenderTargets(true, D3D12_BLEND_OP_ADD, D3D12_BLEND_ONE, D3D12_BLEND_ONE);
@@ -271,7 +271,7 @@ protected:
         constructing->CountHits = this->CountHits;
         constructing->CountSteps = this->CountSteps;
 
-        int N = 2;
+        int N = BOUNCES;
         bounceRaysPipeline->accumulations = render_target;
 
         float3 position = xyz(mul(float4(Light->Position, 1), view));
