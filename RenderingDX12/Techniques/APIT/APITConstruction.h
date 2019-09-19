@@ -145,14 +145,11 @@ protected:
     }
 
     void Globals() {
+        CBV(0, levelInfo, type);
         SRV(0, morton, type);
         SRV(1, startMipMaps, type);
 
         UAV(0, mipMaps, type);
-    }
-
-    void Locals() {
-        CBV(0, levelInfo, type);
     }
 };
 
@@ -219,7 +216,7 @@ protected:
 struct APITDescription {
     int Power;
 
-    APITDescription() :APITDescription(8) {}
+    APITDescription() : APITDescription(8) {}
     APITDescription(int power) : Power(power) {}
 
     int getResolution() {
@@ -231,7 +228,7 @@ class APITConstruction : public Technique, public IHasScene, public DebugRaymarc
 public:
     gObj<RetainedSceneLoader> sceneLoader;
     gObj<ABuffer> aBuffer;
-    
+
     gObj<Buffer> Vertices;
     gObj<Buffer> Fragments;
     gObj<Buffer> FirstBuffer;
@@ -258,14 +255,16 @@ public:
     APITDescription description;
     float4x4 ViewMatrix;
 
-    APITConstruction(APITDescription description) {
+    APITConstruction(APITDescription description)
+    {
         this->description = description;
     }
 
-    void ComputeCollision(gObj<GraphicsManager> manager) {
+    void ComputeCollision(gObj<GraphicsManager> manager)
+    {
         manager gCopy ValueData(traversalPipeline->raymarchingInfo, RaymarchingDebug{
-                    CountSteps ? 1 : 0,
-                    CountHits ? 1 : 0
+            CountSteps ? 1 : 0,
+            CountHits ? 1 : 0
             });
 
         int width = traversalPipeline->rayHeadBuffer->Width;
@@ -287,14 +286,16 @@ public:
     }
 
 protected:
-    void SetScene(gObj<CA4G::Scene> scene) {
+    void SetScene(gObj<CA4G::Scene> scene)
+    {
         IHasScene::SetScene(scene);
         if (sceneLoader != nullptr) {
             sceneLoader->SetScene(scene);
         }
     }
 
-    int morton_index(int x) {
+    int morton_index(int x)
+    {
         int total = 0;
         int bit = 0;
         while (x != 0)
@@ -306,7 +307,8 @@ protected:
         return total;
     }
 
-    void Startup() {
+    void Startup()
+    {
         // Load scene in retained mode
         if (sceneLoader == nullptr) {
             sceneLoader = new RetainedSceneLoader();
@@ -337,6 +339,8 @@ protected:
         PreorderBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         SkipBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         perform(CreatingAssets);
+        
+        flush_all_to_gpu;
 
         buildPipeline->fragments = Fragments;
         buildPipeline->firstBuffer = FirstBuffer;
@@ -399,22 +403,21 @@ protected:
             });
     }
 #endif
-
-    void CreatingAssets(gObj<CopyingManager> manager) {
+    void CreatingAssets(gObj<CopyingManager> manager)
+    {
         int resolution = description.getResolution();
         Morton = _ gCreate StructuredBuffer<int>(resolution);
 
-        int* morton = new int[resolution];
+        int *morton = new int[resolution];
         for (int x = 0; x < resolution; x++)
             morton[x] = morton_index(x);
         manager gCopy PtrData(Morton, morton);
         //delete[] morton;
 
-        int* startMipMaps = new int[description.Power + 1];
+        int *startMipMaps = new int[description.Power + 1];
         int start = 0;
         int startResolution = resolution;
-        for (int level = 0; level <= description.Power; level++)
-        {
+        for (int level = 0; level <= description.Power; level++) {
             startMipMaps[level] = start;
             start += startResolution * startResolution * 6;
             startResolution >>= 1;
@@ -426,11 +429,18 @@ protected:
         LevelInfos = new gObj<Buffer>[description.Power];
         for (int i = 0; i < description.Power; i++) {
             LevelInfos[i] = _ gCreate ConstantBuffer<LevelInfo>();
-            manager gCopy ValueData(LevelInfos[i], LevelInfo{ resolution, i });
+            manager gCopy ValueData(LevelInfos[i], LevelInfo{ resolution, i + 1 });
         }
     }
 
-    void DrawScreen(gObj<GraphicsManager> manager, int width, int height) {
+    void DrawScreen(gObj<GraphicsManager> manager, int width, int height)
+    {
+        /*int computedWidth = (int)ceil(width * 1.0 / CS_GROUPSIZE_2D);
+        int computedHeight = (int)ceil(height * 1.0 / CS_GROUPSIZE_2D);*/
+        /*double n = ceil(width * 1.0 / CS_GROUPSIZE_2D);
+        int i = (int)n;
+        double nh = ceil(height * 1.0 / CS_GROUPSIZE_2D);
+        int ih = (int)nh;*/
 #ifdef USE_COMPUTESHADER
         manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_SQUAREGROUP(width, height));
 #else
@@ -440,20 +450,22 @@ protected:
 #endif
     }
 
-    void BuildMipMaps(gObj<GraphicsManager> manager) {
+    void BuildMipMaps(gObj<GraphicsManager> manager)
+    {
         int resolution = description.getResolution();
         manager gSet Pipeline(initialMipPipeline);
         DrawScreen(manager, resolution * 6, resolution);
 
-        manager gSet Pipeline(buildMipMapsPipeline);
-        for (int i = 1; i <= description.Power; i++)
-        {
+        for (int i = 1; i <= description.Power; i++) {
             buildMipMapsPipeline->levelInfo = LevelInfos[i - 1];
+            manager gSet Pipeline(buildMipMapsPipeline);
+            //manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(6 * (resolution >> i), resolution >> i);
             DrawScreen(manager, 6 * (resolution >> i), resolution >> i);
         }
     }
 
-    void Graphics(gObj<GraphicsManager> manager) {
+    void Graphics(gObj<GraphicsManager> manager)
+    {
         aBuffer->ViewMatrix = ViewMatrix;
         ExecuteFrame(aBuffer);
 

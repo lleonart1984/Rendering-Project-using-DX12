@@ -29,8 +29,10 @@ StructuredBuffer<int> nextBuffer        : register(t4);
 StructuredBuffer<int> preorderBuffer    : register(t5);
 StructuredBuffer<int> skipBuffer        : register(t6);
 StructuredBuffer<int> depth             : register(t7);
-StructuredBuffer<int> startMipMaps      : register(t8);
-StructuredBuffer<float2> mipMaps        : register(t9);
+
+StructuredBuffer<int> Morton            : register(t8);
+StructuredBuffer<int> StartMipMaps      : register(t9);
+StructuredBuffer<float2> MipMaps        : register(t10);
 
 float3 GetColor(int complexity) {
     if (complexity == 0) {
@@ -57,6 +59,12 @@ float3 GetColor(int complexity) {
     }
 
     return lerp(stopPoints[(int)level], stopPoints[(int)level + 1], level % 1);
+}
+
+int get_index(int2 px, int view, int level)
+{
+    int res = Width >> level;
+    return StartMipMaps[level] + Morton[px.x] + Morton[px.y] * 2 + view * res * res;
 }
 
 float4 main(float4 P: SV_POSITION, float2 C : TEXCOORD) : SV_TARGET
@@ -96,9 +104,16 @@ float4 main(float4 P: SV_POSITION, float2 C : TEXCOORD) : SV_TARGET
     int fragmentCount = 0;
     int currentNode = rootBuffer[coord];
 
-    float maxDepth = boundaryBuffer[currentNode].w;
-    float minDepth = boundaryBuffer[currentNode].z;
-    return float4((maxDepth - minDepth) * float3(0.00, 0.27, 0.29), 1);
+    int2 px = coord >> 2;
+    int view = px.x / (Width >> 2);
+    int index = get_index(px % (Width >> 2), view, 5);
+
+    return float4((MipMaps[index].y - MipMaps[index].x) * float3(0.00, 0.57, 0.59), 1);
+
+    /*float maxDepth = boundaryBuffer[currentNode].w;
+    float minDepth = boundaryBuffer[currentNode].z;*/
+
+    //return float4((maxDepth - minDepth) * float3(0.00, 0.27, 0.29), 1);
 
     int maxNodeDepth = 0;
 

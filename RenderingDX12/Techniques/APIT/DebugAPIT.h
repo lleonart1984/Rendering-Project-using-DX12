@@ -18,6 +18,7 @@ public:
     gObj<Buffer> preorderBuffer;
     gObj<Buffer> skipBuffer;
     gObj<Buffer> depth;
+    gObj<Buffer> morton;
     gObj<Buffer> startMipMaps;
     gObj<Buffer> mipMaps;
 protected:
@@ -38,8 +39,9 @@ protected:
         SRV(5, preorderBuffer, ShaderType_Pixel);
         SRV(6, skipBuffer, ShaderType_Pixel);
         SRV(7, depth, ShaderType_Pixel);
-        SRV(8, startMipMaps, ShaderType_Pixel);
-        SRV(9, mipMaps, ShaderType_Pixel);
+        SRV(8, morton, ShaderType_Pixel);
+        SRV(9, startMipMaps, ShaderType_Pixel);
+        SRV(10, mipMaps, ShaderType_Pixel);
     }
 };
 
@@ -88,6 +90,7 @@ protected:
         pipeline->preorderBuffer = aPIT->PreorderBuffer;
         pipeline->skipBuffer = aPIT->SkipBuffer;
         pipeline->depth = aPIT->Depth;
+        pipeline->morton = aPIT->Morton;
         pipeline->startMipMaps = aPIT->StartMipMaps;
         pipeline->mipMaps = aPIT->MipMaps;
 

@@ -276,6 +276,7 @@ float2 GetOccupiedRange(int2 px, int view, int level)
 void AdaptiveAdvanceRayMarchingAtLevel(inout int counter, float3 rayOrigin, float3 rayDirection, float3 P, float3 H, int faceIndex,
     inout float t, inout float screent, inout int index, inout float3 rayHitCoords)
 {
+
     int level = Levels - 1;
 
     int2 px = int2(0, 0);
@@ -374,7 +375,7 @@ void AdaptiveAdvanceRayMarchingAtFace(inout int counter, float3 P, float3 H, int
     float t = 1;
     float screent = 1;
 
-    AdaptiveAdvanceRayMarchingAtLevel(counter, rayOrigin, rayDirection, P, H, faceIndex,
+    FixedAdvanceRayMarchingAtLevel(counter, rayOrigin, rayDirection, P, H, faceIndex,
         t, screent, index, rayHitCoords);
 }
 

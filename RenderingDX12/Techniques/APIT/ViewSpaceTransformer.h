@@ -83,6 +83,7 @@ protected:
 
     void Compute(gObj<GraphicsManager> manager) {
         manager gCopy ValueData(pipeline->cameraCB, ViewMatrix);
+        //int groupCount = (int)ceil(pipeline->vertices->ElementCount * 1.0 / CS_GROUPSIZE_1D);
 
 #ifdef USE_COMPUTESHADER
         manager gSet Pipeline(pipeline);
