@@ -60,10 +60,6 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define OBJECT_CB_REG				b3
 #endif
 
-#ifndef	OUTPUT_PHOTONS_REG
-#define OUTPUT_PHOTONS_REG			u0
-#endif
-
 #ifndef PT_CUSTOM_PAYLOAD
 struct PTPayload
 {
@@ -72,7 +68,7 @@ struct PTPayload
 };
 #endif
 
-RWStructuredBuffer<Photon> Photons		: register(OUTPUT_PHOTONS_REG);
+RWStructuredBuffer<Photon> Photons		: register(u0);
 
 cbuffer AccumulativeInfo : register(ACCUMULATIVE_CB_REG) {
 	int PassCount;

@@ -178,8 +178,8 @@ public:
 
 	gObj<Buffer> screenVertices;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
-	gObj<DXR_PM_Pipeline> dxrPMPipeline;
-	//gObj<PhotonMapConstructionPipeline> constructingPM;
+	//gObj<DXR_PM_Pipeline> dxrPMPipeline;
+	gObj<PhotonMapConstructionPipeline> constructingPM;
 	gObj<DXR_RT_Pipeline> dxrRTPipeline;
 
 	void SetScene(gObj<CA4G::Scene> scene) {
@@ -208,8 +208,8 @@ public:
 		wait_for(signal(flush_all_to_gpu));
 
 		_ gLoad Pipeline(dxrPTPipeline);
-		_ gLoad Pipeline(dxrPMPipeline);
-		//_ gLoad Pipeline(constructingPM);
+		//_ gLoad Pipeline(dxrPMPipeline);
+		_ gLoad Pipeline(constructingPM);
 		_ gLoad Pipeline(dxrRTPipeline);
 
 		// Load assets to render the deferred lighting image
@@ -251,17 +251,17 @@ public:
 
 #pragma region DXR Photon map construction pipeline objects
 
-		//constructingPM->Photons = dxrPTPipeline->_Program->Photons;
-		dxrPMPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
+		constructingPM->Photons = dxrPTPipeline->_Program->Photons;
+		//dxrPMPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 #if USE_VOLUME_GRID
-		//constructingPM->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
-		dxrPMPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
+		constructingPM->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
+		//dxrPMPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
 #else
-		//constructingPM->HeadBuffer = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
-		dxrPMPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
+		constructingPM->HeadBuffer = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
+		//dxrPMPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
 #endif
-		//constructingPM->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
-		dxrPMPipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+		constructingPM->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+		//dxrPMPipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 
 #pragma endregion
 
@@ -283,10 +283,10 @@ public:
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		// Bind now as SRVs
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
-		dxrRTPipeline->_Program->HashtableBuffer = dxrPMPipeline->_Program->HeadBuffer;
-		//dxrRTPipeline->_Program->HashtableBuffer = constructingPM->HeadBuffer;
-		dxrRTPipeline->_Program->NextBuffer = dxrPMPipeline->_Program->NextBuffer;
-		//dxrRTPipeline->_Program->NextBuffer = constructingPM->NextBuffer;
+		//dxrRTPipeline->_Program->HashtableBuffer = dxrPMPipeline->_Program->HeadBuffer;
+		dxrRTPipeline->_Program->HashtableBuffer = constructingPM->HeadBuffer;
+		//dxrRTPipeline->_Program->NextBuffer = dxrPMPipeline->_Program->NextBuffer;
+		dxrRTPipeline->_Program->NextBuffer = constructingPM->NextBuffer;
 #pragma endregion
 	}
 
@@ -338,9 +338,9 @@ public:
 #pragma endregion
 
 		perform(Photontracing);
-
-		perform(PhotonMapConstruction);
 		
+		perform(PhotonMapConstruction);
+
 		perform(Raytracing);
 	}
 
@@ -412,18 +412,17 @@ public:
 	}
 
 	void PhotonMapConstruction(gObj<DXRManager> manager) {
-		//auto computeManager = manager.Dynamic_Cast<ComputeManager>();
-		//
-		//computeManager gClear UAV(constructingPM->HeadBuffer, (unsigned int)-1); // reset head buffer to null for every list
-		//computeManager gSet Pipeline(constructingPM);
-		//computeManager gDispatch Threads(PHOTON_DIMENSION/32, PHOTON_DIMENSION/32);
+		auto computeManager = manager.Dynamic_Cast<ComputeManager>();
+		computeManager gClear UAV(constructingPM->HeadBuffer, (unsigned int)-1); // reset head buffer to null for every list
+		computeManager gSet Pipeline(constructingPM);
+		computeManager gDispatch Threads(PHOTON_DIMENSION, PHOTON_DIMENSION);
 		
-		auto rtProgram = dxrPMPipeline->_Program;
-		manager gClear UAV(rtProgram->HeadBuffer, (unsigned int)-1); // reset head buffer to null for every list
-		manager gSet Pipeline(dxrPMPipeline);
-		manager gSet Program(rtProgram);
-		manager gSet RayGeneration(dxrPMPipeline->Main);
-		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
+		//auto rtProgram = dxrPMPipeline->_Program;
+		//manager gClear UAV(rtProgram->HeadBuffer, (unsigned int)-1); // reset head buffer to null for every list
+		//manager gSet Pipeline(dxrPMPipeline);
+		//manager gSet Program(rtProgram);
+		//manager gSet RayGeneration(dxrPMPipeline->Main);
+		//manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
 	}
 
 	void Raytracing(gObj<DXRManager> manager) {

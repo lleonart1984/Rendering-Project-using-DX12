@@ -8575,7 +8575,7 @@ namespace CA4G {
 		static D3D12_SHADER_BYTECODE DrawScreenVS() {
 			return FromMemory(cso_DrawScreen_VS);
 		}
-		
+
 		static D3D12_SHADER_BYTECODE DrawTexturePS() {
 			return FromMemory(cso_DrawScreen_PS);
 		}
@@ -10535,7 +10535,7 @@ namespace CA4G {
 			return Create(D3D12_FILTER_MIN_MAG_MIP_POINT,
 				AddressU,
 				AddressV,
-				AddressW, 0, 0, D3D12_COMPARISON_FUNC_ALWAYS, float4(0,0,0,0), 0, 0);
+				AddressW, 0, 0, D3D12_COMPARISON_FUNC_ALWAYS, float4(0, 0, 0, 0), 0, 0);
 		}
 
 		// Creates a default linear sampling object
@@ -11012,7 +11012,7 @@ namespace CA4G {
 		};
 	};
 
-	
+
 	// Represents the element type of a vertex field.
 	enum VertexElementType {
 		// Each component of this field is a signed integer
@@ -11751,7 +11751,7 @@ namespace CA4G {
 			b.Root_Parameter = p;
 			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 			b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
-			
+
 			__CurrentLoadingCSU->add(b);
 		}
 
@@ -12809,7 +12809,7 @@ namespace CA4G {
 
 		// Gets the maximum number of hit groups that will be setup before any 
 		// single dispatch rays
-		int MaxGroups = 1024*1024;
+		int MaxGroups = 1024 * 1024;
 		// Gets the maximum number of miss programs that will be setup before any
 		// single dispatch rays
 		int MaxMiss = 10;
@@ -13038,7 +13038,7 @@ namespace CA4G {
 			desc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 			__CurrentBindings->Samplers[slot] = desc;
-			__CurrentBindings->Max_Sampler = max(slot+1, __CurrentBindings->Max_Sampler);
+			__CurrentBindings->Max_Sampler = max(slot + 1, __CurrentBindings->Max_Sampler);
 		}
 
 #pragma endregion
@@ -13252,7 +13252,7 @@ namespace CA4G {
 		gObj<Buffer> __NullBuffer = nullptr;
 		gObj<Texture2D> __NullTexture2D = nullptr;
 
-		
+
 		DeviceManager(DX_Device device, int buffers, bool useFrameBuffer, bool isWarpDevice);
 
 		WRAPPED_GPU_POINTER CreateFallbackWrappedPointer(gObj<Buffer> resource, UINT bufferNumElements);
@@ -13446,7 +13446,7 @@ namespace CA4G {
 			return new Buffer(CreateResourceAndWrap(desc, state, cpuAccess), sizeof(T));
 		}
 
-	
+
 
 		// Creates a 2D texture of specific element type.
 		// Use int, float, unsigned int, float[2,3,4], int[2,3,4]
@@ -13542,7 +13542,7 @@ namespace CA4G {
 		// using the uploading version.
 		template<typename T>
 		gObj<Buffer> RWStructuredBuffer(int count) {
-			return GenericBuffer<T>(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, count, CPU_ACCESS_NONE, 
+			return GenericBuffer<T>(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, count, CPU_ACCESS_NONE,
 				D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		}
 
@@ -13664,7 +13664,7 @@ namespace CA4G {
 				cmdList->ClearUnorderedAccessViewFloat(
 					gpuHandle,
 					cpuHandle,
-					uav->resource->internalResource, values, 0, nullptr); 
+					uav->resource->internalResource, values, 0, nullptr);
 			}
 			inline void UAV(gObj<ResourceView> uav, const float4 &value) {
 				float v[4]{ value.x, value.y, value.z, value.w };
@@ -13849,7 +13849,7 @@ namespace CA4G {
 		gObj<RTPipelineManager> currentPipeline1 = nullptr;
 		gObj<IRTProgram> activeRTProgram = nullptr;
 
-		ComputeManager(gObj<DeviceManager> manager, DX_CommandList cmdList) : CopyingManager(manager, cmdList), 
+		ComputeManager(gObj<DeviceManager> manager, DX_CommandList cmdList) : CopyingManager(manager, cmdList),
 			setting(new Setter(this)),
 			dispatcher(new Dispatcher(this))
 		{
@@ -13918,7 +13918,7 @@ namespace CA4G {
 			Setter* Pipeline(gObj<IPipelineBindings> pipeline) {
 				manager->currentPipeline = pipeline;
 				manager->cmdList->SetPipelineState(pipeline->pso);
-				if (pipeline->IsComputePipeline ())
+				if (pipeline->IsComputePipeline())
 					manager->cmdList->SetComputeRootSignature(pipeline->rootSignature);
 				else
 					manager->cmdList->SetGraphicsRootSignature(pipeline->rootSignature);
@@ -14344,7 +14344,7 @@ namespace CA4G {
 				CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&factory));
 				dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
 				dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
-		}
+			}
 			else
 				CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory));
 #else
@@ -14385,12 +14385,12 @@ namespace CA4G {
 
 			RECT rect;
 			GetClientRect(hWnd, &rect);
-			
+
 			IDXGISwapChain1 *tmpSwapChain;
 
 			DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullScreenDesc = {};
 			fullScreenDesc.Windowed = !fullScreen;
-			
+
 			// Describe and create the swap chain.
 			DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 			swapChainDesc.BufferCount = buffers;
@@ -14414,7 +14414,7 @@ namespace CA4G {
 
 			swapChain = (IDXGISwapChain3*)tmpSwapChain;
 			swapChain->SetMaximumFrameLatency(buffers);
-		
+
 			// This sample does not support fullscreen transitions.
 			factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
@@ -14886,7 +14886,7 @@ namespace CA4G {
 					t.readFloatToken(b);
 					float norm = max(0.0001f, max(r, max(g, b)));
 					MaterialsData.last().Roulette.x = norm;
-					MaterialsData.last().Diffuse = float3(r/norm, g/norm, b/norm);
+					MaterialsData.last().Diffuse = float3(r / norm, g / norm, b / norm);
 					float rouletteXY = MaterialsData.last().Roulette.x + MaterialsData.last().Roulette.y;
 					MaterialsData.last().Roulette.x /= rouletteXY;
 					MaterialsData.last().Roulette.y /= rouletteXY;
@@ -15643,11 +15643,22 @@ namespace CA4G {
 						switch (binding.Root_Parameter.DescriptorTable.pDescriptorRanges[0].RangeType)
 						{
 						case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+						{
+							D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
 							if (IsComputePipeline())
-								resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_COMMON);
+								state |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 							else
-								resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_GENERIC_READ);
-							break;
+								state |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+							if (resource->resource->LastUsageState & D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+							{
+								resource->ChangeStateFromTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, state);
+								resource->BarrierUAV(cmdList);
+							}
+							else
+								resource->ChangeStateTo(cmdList, state);
+						}
+						break;
 						case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
 							//resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 							resource->ChangeStateToUAV(cmdList);
@@ -15750,7 +15761,7 @@ namespace CA4G {
 		if (!(DepthBufferField == nullptr || !(*DepthBufferField)))
 			depthHandle = (*DepthBufferField)->getDSVHandle();
 
-		if (!this->IsComputePipeline ())
+		if (!this->IsComputePipeline())
 			cmdList->OMSetRenderTargets(RenderTargetMax, RenderTargetDescriptors, FALSE, (DepthBufferField == nullptr || !(*DepthBufferField)) ? nullptr : &depthHandle);
 
 		ID3D12DescriptorHeap* heaps[] = { this->manager->descriptors->gpu_csu->getInnerHeap(), this->manager->descriptors->gpu_smp->getInnerHeap() };
@@ -15765,7 +15776,7 @@ namespace CA4G {
 	void gObj<S>::AddReference() {
 		if (!counter)
 			throw new CA4GException("Error referencing");
-		
+
 		InterlockedAdd(counter, 1);
 	}
 

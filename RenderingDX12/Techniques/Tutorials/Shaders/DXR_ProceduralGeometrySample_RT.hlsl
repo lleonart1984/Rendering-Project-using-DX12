@@ -9,6 +9,7 @@ struct MyAttributes {
 };
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
+StructuredBuffer<float3> Colors : register(t1);
 RWTexture2D<float4> RenderTarget : register(u0);
 
 [shader("raygeneration")]
@@ -41,18 +42,19 @@ void MyRaygenShader()
 void MyAnyHit(inout RayPayload payload, in MyAttributes attr) {
 	
 	//if ((int)PrimitiveIndex() == -1)
-		payload.color += float4(0.01, 1, 0.01, 0);
+	//	payload.color += float4(0.01, 1, 0.01, 0);
 	//else {
-	//	int f = abs((int)PrimitiveIndex()) / (float)(128 * 128);
-	//	payload.color += float4(0.01, f, 0.01, 0);
+		float f = PrimitiveIndex() / (float)(128 * 128);
+		payload.color += float4(0.1*Colors[PrimitiveIndex()], 0);// float4(0.01, f, 1 - f, 0);
 	//}
 	IgnoreHit();
 }
 
 [shader("intersection")]
 void MyIntersectionShader() {
-	float THit = RayTCurrent();
-	MyAttributes attr = (MyAttributes)float2(RayTCurrent(), THit/20000.0);
+	//float THit = RayTCurrent();
+	//MyAttributes attr = (MyAttributes)float2(RayTCurrent(), THit / 20000.0);
+	MyAttributes attr = (MyAttributes)float2(0.001, 20000.0);
 
 	ReportHit(0.5, /*hitKind*/ 0, attr);
 }
