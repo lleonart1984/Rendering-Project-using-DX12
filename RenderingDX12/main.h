@@ -19,7 +19,7 @@
 //#define WARP
 
 // Uncomment this to Force fallback device
-//#define FORCE_FALLBACK
+#define FORCE_FALLBACK
 
 //class NoTechnique : public Technique {}; gObj<NoTechnique> technique;
 
@@ -47,7 +47,7 @@
 //gObj<FullDXRPhotonTracer> technique;
 
 //----- Pathtracing approaches on the GPU using RT cores
-//gObj<IterativePathtracer> technique;
+gObj<IterativePathtracer> technique;
 //gObj<RecursivePathtracer> technique;
 
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
@@ -64,3 +64,7 @@ gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of pho
 
 // --- Discarded implementation
 //gObj<BPGPhotonMappingTechnique> technique; // Box Per Geometry Technique
+
+// APIT
+//gObj<DebugAPIT> technique;
+//gObj<RaymarchRT<APITConstruction, APITDescription>> technique;
