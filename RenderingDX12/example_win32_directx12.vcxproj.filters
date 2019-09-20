@@ -44,6 +44,9 @@
     <FxCompile Include="Techniques\Tutorials\Shaders\UpdateBoxes_CS.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\UpdateColors_CS.hlsl" />
     <FxCompile Include="Techniques\Raytracing\DXRRaytracing_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PhotonBitonicSort_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\BPP_MortonIndexing_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PhotonMortonConstruction_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -142,9 +145,9 @@
     <ClInclude Include="Techniques\PhotonMaps\GridPhotonMapTechnique.h" />
     <ClInclude Include="Techniques\PhotonMaps\PhotonDefinition.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap2Technique.h" />
-    <ClInclude Include="Techniques\PhotonMaps\CommonHashing_RT.hlsl.h" />
     <ClInclude Include="Techniques\PhotonMaps\DXR_PhotonTracing_Pipeline.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap3Technique.h" />
+    <ClInclude Include="Techniques\PhotonMaps\CommonHashing_RT.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

@@ -16,124 +16,64 @@ public:
 
 #include "DXR_PhotonTracing_Pipeline.h"
 
-	// DXR pipeline for Morton indexing and permutation initialization (should be a compute shader)
-	// needs to be fixed asap!
-	struct DXR_Morton_Pipeline : public RTPipelineManager {
-		gObj<RayGenerationHandle> Main;
+	struct MortonIndexing : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\BPP_MortonIndexing_CS.cso"));
+		}
 
-		class DXR_PM_IL : public DXIL_Library<DXR_Morton_Pipeline> {
-			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\PhotonMortonIndexing_RT.cso"));
-				_ gLoad Shader(Context()->Main, L"Main");
-			}
-		};
-		gObj<DXR_PM_IL> _Library;
+		gObj<Buffer> Photons;
+		gObj<Buffer> Indices;
 
-		struct DXR_PM_Program : public RTProgram<DXR_Morton_Pipeline> {
-			void Setup() {
-				_ gLoad Shader(Context()->Main);
-			}
+		void Globals() {
+			UAV(0, Indices, ShaderType_Any);
 
-			gObj<Buffer> Photons;
-			gObj<Buffer> Indices;
-
-			void Globals() {
-				UAV(0, Indices);
-
-				SRV(0, Photons);
-			}
-		};
-		gObj<DXR_PM_Program> _Program;
-
-		void Setup() override
-		{
-			_ gLoad Library(_Library);
-			_ gLoad Program(_Program);
+			SRV(0, Photons, ShaderType_Any);
 		}
 	};
 
+	
 	struct BitonicStage {
 		int len;
 		int dif;
 	};
 
-	// DXR pipeline for Morton indexing and permutation initialization (should be a compute shader)
-	// needs to be fixed asap!
-	struct DXR_Sorting_Pipeline : public RTPipelineManager {
-		gObj<RayGenerationHandle> Main;
+	struct SortingPipeline : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\PhotonBitonicSort_CS.cso"));
+		}
 
-		class DXR_PM_IL : public DXIL_Library<DXR_Sorting_Pipeline> {
-			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\PhotonBitonicSort_RT.cso"));
-				_ gLoad Shader(Context()->Main, L"Main");
-			}
-		};
-		gObj<DXR_PM_IL> _Library;
+		gObj<Buffer> Photons;
+		gObj<Buffer> Indices;
 
-		struct DXR_PM_Program : public RTProgram<DXR_Sorting_Pipeline> {
-			void Setup() {
-				_ gLoad Shader(Context()->Main);
-			}
+		// CB views
+		BitonicStage Stage;
 
-			gObj<Buffer> Photons;
-			gObj<Buffer> Indices;
+		void Globals() {
+			UAV(0, Photons, ShaderType_Any);
+			UAV(1, Indices, ShaderType_Any);
+		}
 
-			// CB views
-			BitonicStage Stage;
-
-			void Globals() {
-				UAV(0, Photons);
-				UAV(1, Indices);
-				CBV(0, Stage);
-			}
-		};
-		gObj<DXR_PM_Program> _Program;
-
-		void Setup() override
-		{
-			_ gLoad Library(_Library);
-			_ gLoad Program(_Program);
+		void Locals() {
+			CBV(0, Stage, ShaderType_Any);
 		}
 	};
 
+	struct ConstructPhotonMapPipeline : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\PhotonMortonConstruction_CS.cso"));
+		}
 
-	// DXR pipeline for AABB construction and Radii population (should be a compute shader)
-	// needs to be fixed asap!
-	struct DXR_PM_Pipeline : public RTPipelineManager {
-		gObj<RayGenerationHandle> Main;
+		gObj<Buffer> Photons;
+		gObj<Buffer> AABBs;
+		gObj<Buffer> Radii;
+		gObj<Buffer> MortonIndices;
 
-		class DXR_PM_IL : public DXIL_Library<DXR_PM_Pipeline> {
-			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\BPP_PhotonMapMortonConstruction_RT.cso"));
-				_ gLoad Shader(Context()->Main, L"Main");
-			}
-		};
-		gObj<DXR_PM_IL> _Library;
+		void Globals() {
+			UAV(0, AABBs, ShaderType_Any);
+			UAV(1, Radii, ShaderType_Any);
 
-		struct DXR_PM_Program : public RTProgram<DXR_PM_Pipeline> {
-			void Setup() {
-				_ gLoad Shader(Context()->Main);
-			}
-
-			gObj<Buffer> Photons;
-			gObj<Buffer> AABBs;
-			gObj<Buffer> Radii;
-			gObj<Buffer> MortonIndices;
-
-			void Globals() {
-				UAV(0, AABBs);
-				UAV(1, Radii);
-
-				SRV(0, Photons);
-				SRV(1, MortonIndices);
-			}
-		};
-		gObj<DXR_PM_Program> _Program;
-
-		void Setup() override
-		{
-			_ gLoad Library(_Library);
-			_ gLoad Program(_Program);
+			SRV(0, Photons, ShaderType_Any);
+			SRV(1, MortonIndices, ShaderType_Any);
 		}
 	};
 
@@ -252,9 +192,9 @@ public:
 
 	gObj<Buffer> screenVertices;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
-	gObj<DXR_Morton_Pipeline> dxrMortonPipeline;
-	gObj<DXR_Sorting_Pipeline> dxrSortingPipeline;
-	gObj<DXR_PM_Pipeline> dxrPMPipeline;
+	gObj<MortonIndexing> mortonIndexingPipeline;
+	gObj<SortingPipeline> sortingPipeline;
+	gObj<ConstructPhotonMapPipeline> photonMapConstruction;
 	gObj<DXR_RT_Pipeline> dxrRTPipeline;
 
 	// AABBs buffer for photon map
@@ -292,9 +232,9 @@ public:
 		flush_all_to_gpu;
 
 		_ gLoad Pipeline(dxrPTPipeline);
-		_ gLoad Pipeline(dxrMortonPipeline);
-		_ gLoad Pipeline(dxrSortingPipeline);
-		_ gLoad Pipeline(dxrPMPipeline);
+		_ gLoad Pipeline(mortonIndexingPipeline);
+		_ gLoad Pipeline(sortingPipeline);
+		_ gLoad Pipeline(photonMapConstruction);
 		_ gLoad Pipeline(dxrRTPipeline);
 
 		// Load assets to render the deferred lighting image
@@ -331,21 +271,21 @@ public:
 		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION*PHOTON_DIMENSION);
 #pragma endregion
 
-#pragma region DXR Morton indexing and initialization
-		dxrMortonPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
-		dxrMortonPipeline->_Program->Indices = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION*PHOTON_DIMENSION);
+#pragma region Morton indexing and initialization
+		mortonIndexingPipeline->Photons = dxrPTPipeline->_Program->Photons;
+		mortonIndexingPipeline->Indices = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION*PHOTON_DIMENSION);
 #pragma endregion
 
-#pragma region DXR Sorting with Bitonic
-		dxrSortingPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
-		dxrSortingPipeline->_Program->Indices = dxrMortonPipeline->_Program->Indices;
+#pragma region Sorting with Bitonic
+		sortingPipeline->Photons = dxrPTPipeline->_Program->Photons;
+		sortingPipeline->Indices = mortonIndexingPipeline->Indices;
 #pragma endregion
 
 #pragma region DXR Pipeline for PM construction using AABBs
-		dxrPMPipeline->_Program->AABBs = PhotonsAABBs;
-		dxrPMPipeline->_Program->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION*PHOTON_DIMENSION);
-		dxrPMPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
-		dxrPMPipeline->_Program->MortonIndices = dxrMortonPipeline->_Program->Indices;
+		photonMapConstruction->AABBs = PhotonsAABBs;
+		photonMapConstruction->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION*PHOTON_DIMENSION);
+		photonMapConstruction->Photons = dxrPTPipeline->_Program->Photons;
+		photonMapConstruction->MortonIndices = mortonIndexingPipeline->Indices;
 #pragma endregion
 
 #pragma region DXR Photon gathering Pipeline Objects
@@ -365,7 +305,7 @@ public:
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		// Bind now Photon map as SRVs
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
-		dxrRTPipeline->_Program->Radii = dxrPMPipeline->_Program->Radii;
+		dxrRTPipeline->_Program->Radii = photonMapConstruction->Radii;
 #pragma endregion
 	}
 
@@ -458,10 +398,6 @@ public:
 
 		perform(Photontracing);
 
-		perform(MortonPhotons);
-
-		perform(SortPhotons);
-
 		perform(ConstructPhotonMap);
 
 		static bool firstTime = true;
@@ -546,37 +482,57 @@ public:
 #pragma endregion
 	}
 
-	void MortonPhotons(gObj<DXRManager> manager) {
-		auto rtMortonProgram = dxrMortonPipeline->_Program;
-		manager gSet Pipeline(dxrMortonPipeline);
-		manager gSet Program(rtMortonProgram);
-		manager gSet RayGeneration(dxrMortonPipeline->Main);
-		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION); // initialize photon indices (using morton curve) and permutation 0,1,2,...
+	void MortonPhotons(gObj<GraphicsManager> manager) {
+
+		auto computeManager = manager.Dynamic_Cast<ComputeManager>();
+
+		computeManager gSet Pipeline(mortonIndexingPipeline);
+		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 1024);
 	}
 
-	void SortPhotons(gObj<DXRManager> manager) {
-		auto rtSortingProgram = dxrSortingPipeline->_Program;
-		manager gSet Pipeline(dxrSortingPipeline);
+	void SortPhotons(gObj<GraphicsManager> manager) {
+
+		auto computeManager = manager.Dynamic_Cast<ComputeManager>();
+
+		// Indexing
+		computeManager gSet Pipeline(mortonIndexingPipeline);
+		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 1024);
+
+		// Sorting
+		computeManager gSet Pipeline(sortingPipeline);
 
 		int n = PHOTON_DIMENSION * PHOTON_DIMENSION;
 		for (len = 2; len <= n; len <<= 1)
 			for (dif = len >> 1; dif > 0; dif >>= 1)
 			{
-				rtSortingProgram->Stage = BitonicStage{ len, dif };
-				manager gSet Program(rtSortingProgram);
-				manager gSet RayGeneration(dxrSortingPipeline->Main);
+				sortingPipeline->Stage = BitonicStage{ len, dif };
 				// Bitonic sort wave
-				manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION / 2);
+				computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 2048);
 			}
 	}
 
-	void ConstructPhotonMap(gObj<DXRManager> manager) {
-		auto rtProgram = dxrPMPipeline->_Program;
+	void ConstructPhotonMap(gObj<GraphicsManager> manager) {
+		auto computeManager = manager.Dynamic_Cast<ComputeManager>();
 
-		manager gSet Pipeline(dxrPMPipeline);
-		manager gSet Program(rtProgram);
-		manager gSet RayGeneration(dxrPMPipeline->Main);
-		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
+		// Indexing
+		computeManager gSet Pipeline(mortonIndexingPipeline);
+		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 1024);
+
+		// Sorting
+		computeManager gSet Pipeline(sortingPipeline);
+
+		int n = PHOTON_DIMENSION * PHOTON_DIMENSION;
+		for (len = 2; len <= n; len <<= 1)
+			for (dif = len >> 1; dif > 0; dif >>= 1)
+			{
+				sortingPipeline->Stage = BitonicStage{ len, dif };
+				// Bitonic sort wave
+				computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 2048);
+			}
+
+		// Constructing AABBs and Computing Radii
+		computeManager gSet Pipeline(photonMapConstruction);
+		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 1024);
 	}
 
 	void Raytracing(gObj<DXRManager> manager) {

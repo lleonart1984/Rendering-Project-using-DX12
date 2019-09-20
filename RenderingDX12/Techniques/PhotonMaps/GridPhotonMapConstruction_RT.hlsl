@@ -10,7 +10,7 @@ StructuredBuffer<Photon> Photons		: register (t0);
 RWStructuredBuffer<int> HeadBuffer		: register (u0);
 RWStructuredBuffer<int> NextBuffer		: register (u1);
 
-#include "CommonHashing_RT.hlsl.h"
+#include "CommonHashing_RT.h"
 
 [shader("raygeneration")]
 void Main()

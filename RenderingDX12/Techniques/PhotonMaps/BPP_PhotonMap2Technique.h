@@ -195,7 +195,7 @@ public:
 		_ gLoad Subprocess(sceneLoader);
 
 		// Load and setup gbuffer construction process from light
-		gBufferFromLight = new GBufferConstruction(PHOTON_DIMENSION, PHOTON_DIMENSION);
+		gBufferFromLight = new GBufferConstruction(SHADOWMAP_DIMENSION, SHADOWMAP_DIMENSION);
 		gBufferFromLight->sceneLoader = this->sceneLoader;
 		_ gLoad Subprocess(gBufferFromLight);
 

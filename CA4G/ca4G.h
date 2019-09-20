@@ -13882,6 +13882,7 @@ namespace CA4G {
 				// Grant this cmdlist is active before use it
 				if (manager->currentPipeline.isNull())
 					return;
+				manager->currentPipeline->__OnDraw(manager);
 
 				manager->cmdList->Dispatch(dimx, dimy, dimz);
 			}
@@ -15646,14 +15647,14 @@ namespace CA4G {
 						{
 							D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
 							if (IsComputePipeline())
-								state |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+								state |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 							else
 								state |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
 							if (resource->resource->LastUsageState & D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 							{
+								//resource->BarrierUAV(cmdList);
 								resource->ChangeStateFromTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, state);
-								resource->BarrierUAV(cmdList);
 							}
 							else
 								resource->ChangeStateTo(cmdList, state);
@@ -15661,8 +15662,8 @@ namespace CA4G {
 						break;
 						case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
 							//resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-							resource->ChangeStateToUAV(cmdList);
 							resource->BarrierUAV(cmdList);
+							resource->ChangeStateToUAV(cmdList);
 							break;
 						}
 					}
