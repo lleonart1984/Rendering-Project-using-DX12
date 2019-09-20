@@ -38,11 +38,14 @@ class Tutorial12 : public Technique {
 
 			void Globals() override {
 				UAV(0, Output);
+
 				ADS(0, Scene);
+				SRV(1, Colors);
 			}
 
 		public:
 			gObj<SceneOnGPU> Scene;
+			gObj<Buffer> Colors;
 
 			gObj<Texture2D> Output;
 
@@ -67,14 +70,48 @@ class Tutorial12 : public Technique {
 		
 		gObj<Buffer> Boxes;
 
+		int Time;
+
 		void Globals() {
 			UAV(0, Boxes, ShaderType_Pixel);
+			CBV(0, Time, ShaderType_Pixel);
 		}
 	};
 
+	struct UpdateBoxesCSPipeline : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader (ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\UpdateBoxes_CS.cso"));
+		}
+
+		gObj<Buffer> Boxes;
+		int Time;
+
+		void Globals() {
+			UAV(0, Boxes, ShaderType_Any);
+			CBV(0, Time, ShaderType_Any);
+		}
+	};
+
+	struct UpdateColorsCSPipeline : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\Tutorials\\Shaders\\UpdateColors_CS.cso"));
+		}
+
+		gObj<Buffer> Boxes;
+		gObj<Buffer> Colors;
+
+		void Globals() {
+			UAV(0, Colors, ShaderType_Any);
+			SRV(0, Boxes, ShaderType_Any);
+		}
+	};
+
+
 	// Object for rt pipeline bindings 
 	gObj<DXRBasic> pipeline;
-	gObj<UpdateAABBsPipeline> updatePipeline;
+	//gObj<UpdateAABBsPipeline> updatePipeline;
+	gObj<UpdateBoxesCSPipeline> updatePipeline;
+	gObj<UpdateColorsCSPipeline> colorsPipeline;
 
 	gObj<Texture2D> rtRenderTarget;
 	gObj<Buffer> aabbs;
@@ -85,6 +122,7 @@ class Tutorial12 : public Technique {
 		// Creates the pipeline and close it to be used by the rendering process
 		_ gLoad Pipeline(pipeline);
 		_ gLoad Pipeline(updatePipeline);
+		_ gLoad Pipeline(colorsPipeline);
 
 		// _ gCreate ConstantBuffer<RayGenConstantBuffer>();
 
@@ -94,7 +132,8 @@ class Tutorial12 : public Technique {
 		//aabbs = _ gCreate GenericBuffer<D3D12_RAYTRACING_AABB>(D3D12_RESOURCE_STATE_GENERIC_READ, RES*RES, CPU_WRITE_GPU_READ,
 		//	D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
-		updatePipeline->Boxes = aabbs;
+		updatePipeline->Boxes = colorsPipeline->Boxes = aabbs;
+		colorsPipeline->Colors = pipeline->_Program->Colors = _ gCreate RWStructuredBuffer<float3>(RES*RES);
 
 		screenVertices = _ gCreate VertexBuffer <float2>(6);
 
@@ -164,7 +203,9 @@ class Tutorial12 : public Technique {
 	}
 
 	void Frame() {
-		perform(UpdateBoxes);
+		perform(UpdateBoxesCS);
+
+		perform(UpdateColorsCS);
 
 		//flush_all_to_gpu;
 
@@ -176,11 +217,29 @@ class Tutorial12 : public Technique {
 	}
 
 	void UpdateBoxes(gObj<GraphicsManager> manager) {
+		static int frame = 0;
+
+		updatePipeline->Time = frame++;
 		manager gSet Pipeline(updatePipeline);
 		manager gSet Viewport(RES, RES);
 		manager gSet VertexBuffer(screenVertices);
 
 		manager gDispatch Triangles(6);
+	}
+
+	void UpdateBoxesCS(gObj<GraphicsManager> manager) {
+		static int frame = 0;
+		updatePipeline->Time = frame++;
+		auto computeManager = manager.Dynamic_Cast<ComputeManager>();
+		computeManager gSet Pipeline(updatePipeline);
+		computeManager gDispatch Threads(128/32, 128/32);
+	}
+
+
+	void UpdateColorsCS(gObj<GraphicsManager> manager) {
+		auto computeManager = manager.Dynamic_Cast<ComputeManager>();
+		computeManager gSet Pipeline(colorsPipeline);
+		computeManager gDispatch Threads(128 / 32, 128 / 32);
 	}
 
 	void UpdateADS(gObj<DXRManager> manager) {
@@ -190,7 +249,11 @@ class Tutorial12 : public Technique {
 		updatingGeometries->PrepareBuffer(aabbs);
 		updatingGeometries gSet AABBs(aabbs);
 		updatingGeometries gLoad Geometry(0, RES*RES);
-		geometriesOnGPU = updatingGeometries gCreate UpdatedGeometry();
+		static int frame = 0;
+		if (frame++ % 1 == 0)
+			geometriesOnGPU = updatingGeometries gCreate RebuiltGeometry(true, true);
+		else
+			geometriesOnGPU = updatingGeometries gCreate UpdatedGeometry();
 
 		auto updatingScene = manager gCreate Instances(this->Scene);
 		updatingScene gLoad Instance(geometriesOnGPU);
@@ -204,9 +267,7 @@ class Tutorial12 : public Technique {
 		manager gSet Pipeline(pipeline);
 		manager gSet Program(rtProgram);
 		manager gSet Miss(pipeline->MyMissShader, 0);
-		for (int i = 0; i < RES; i++)
-			for (int j = 0; j < RES; j++)
-				manager gSet HitGroup(rtProgram->ClosestHit, i * RES + j);
+		manager gSet HitGroup(rtProgram->ClosestHit, 0);
 		manager gSet RayGeneration(pipeline->MyRaygenShader);
 		manager gDispatch Rays(render_target->Width, render_target->Height);
 		manager gCopy All(render_target, rtRenderTarget);

@@ -41,6 +41,9 @@
     <FxCompile Include="Techniques\PhotonMaps\PhotonMortonIndexing_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonMapMortonConstruction_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\GridPhotonMapConstruction_CS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\UpdateBoxes_CS.hlsl" />
+    <FxCompile Include="Techniques\Tutorials\Shaders\UpdateColors_CS.hlsl" />
+    <FxCompile Include="Techniques\Raytracing\DXRRaytracing_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
