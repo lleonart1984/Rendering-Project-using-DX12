@@ -4,9 +4,11 @@
 #include "PhotonDefinition.h"
 
 // Photons
-RWStructuredBuffer<Photon> Photons		: register (u0);
+StructuredBuffer<Photon> Photons		: register(t0);
 // Morton indice for each photon. Used as key to sort.
-RWStructuredBuffer<int> Indices			: register(u1);
+StructuredBuffer<int> Indices			: register(t1);
+
+RWStructuredBuffer<int> Permutation		: register(u0);
 
 cbuffer BitonicStage : register(b0) {
 	int len;
@@ -23,17 +25,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	int i = (index & mask) | ((index & ~mask) << 1);
 	int next = i | dif;
 
-	bool dec = Indices[i] > Indices[next];
+	bool dec = Indices[Permutation[i]] > Indices[Permutation[next]];
 	bool shouldDec = (i & len) != 0;
 	bool swap = ((!shouldDec && dec) || (shouldDec && !dec));
 
 	if (swap) {
-		Photon p = Photons[i];
-		Photons[i] = Photons[next];
-		Photons[next] = p;
-
-		int temp = Indices[i];
-		Indices[i] = Indices[next];
-		Indices[next] = temp;
+		int temp = Permutation[i];
+		Permutation[i] = Permutation[next];
+		Permutation[next] = temp;
 	}
 }

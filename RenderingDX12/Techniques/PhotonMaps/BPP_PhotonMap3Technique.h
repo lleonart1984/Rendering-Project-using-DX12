@@ -23,9 +23,11 @@ public:
 
 		gObj<Buffer> Photons;
 		gObj<Buffer> Indices;
+		gObj<Buffer> Permutation;
 
 		void Globals() {
 			UAV(0, Indices, ShaderType_Any);
+			UAV(1, Permutation, ShaderType_Any);
 
 			SRV(0, Photons, ShaderType_Any);
 		}
@@ -44,13 +46,15 @@ public:
 
 		gObj<Buffer> Photons;
 		gObj<Buffer> Indices;
+		gObj<Buffer> Permutation;
 
 		// CB views
 		BitonicStage Stage;
 
 		void Globals() {
-			UAV(0, Photons, ShaderType_Any);
-			UAV(1, Indices, ShaderType_Any);
+			SRV(0, Photons, ShaderType_Any);
+			SRV(1, Indices, ShaderType_Any);
+			UAV(0, Permutation, ShaderType_Any);
 		}
 
 		void Locals() {
@@ -67,6 +71,7 @@ public:
 		gObj<Buffer> AABBs;
 		gObj<Buffer> Radii;
 		gObj<Buffer> MortonIndices;
+		gObj<Buffer> Permutation;
 
 		void Globals() {
 			UAV(0, AABBs, ShaderType_Any);
@@ -74,6 +79,7 @@ public:
 
 			SRV(0, Photons, ShaderType_Any);
 			SRV(1, MortonIndices, ShaderType_Any);
+			SRV(2, Permutation, ShaderType_Any);
 		}
 	};
 
@@ -273,12 +279,14 @@ public:
 
 #pragma region Morton indexing and initialization
 		mortonIndexingPipeline->Photons = dxrPTPipeline->_Program->Photons;
-		mortonIndexingPipeline->Indices = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION*PHOTON_DIMENSION);
+		mortonIndexingPipeline->Indices = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+		mortonIndexingPipeline->Permutation = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION*PHOTON_DIMENSION);
 #pragma endregion
 
 #pragma region Sorting with Bitonic
 		sortingPipeline->Photons = dxrPTPipeline->_Program->Photons;
 		sortingPipeline->Indices = mortonIndexingPipeline->Indices;
+		sortingPipeline->Permutation = mortonIndexingPipeline->Permutation;
 #pragma endregion
 
 #pragma region DXR Pipeline for PM construction using AABBs
@@ -286,6 +294,7 @@ public:
 		photonMapConstruction->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION*PHOTON_DIMENSION);
 		photonMapConstruction->Photons = dxrPTPipeline->_Program->Photons;
 		photonMapConstruction->MortonIndices = mortonIndexingPipeline->Indices;
+		photonMapConstruction->Permutation = mortonIndexingPipeline->Permutation;
 #pragma endregion
 
 #pragma region DXR Photon gathering Pipeline Objects

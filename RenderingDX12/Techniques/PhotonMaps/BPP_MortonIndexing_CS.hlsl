@@ -4,6 +4,7 @@
 #include "PhotonDefinition.h"
 StructuredBuffer<Photon> Photons : register(t0);
 RWStructuredBuffer<int> Indices : register (u0);
+RWStructuredBuffer<int> Permutation : register (u1);
 
 int split3(int value) {
 
@@ -31,4 +32,5 @@ void main(uint3 DTid : SV_DispatchThreadID)
 {
 	int3 pos = saturate(Photons[DTid.x].Position * 0.5 + 0.5) * ((1 << 10) - 1); // map to 1024^3 cells
 	Indices[DTid.x] = any(Photons[DTid.x].Intensity) ? morton(pos) : 0x7FFFFFFF;
+	Permutation[DTid.x] = DTid.x;
 }
