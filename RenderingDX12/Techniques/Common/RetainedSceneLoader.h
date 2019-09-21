@@ -10,11 +10,11 @@ public:
 	gObj<Buffer> VertexBuffer;
 	gObj<Buffer> ObjectBuffer;
 
-	void UpdateTransforms(gObj<CopyingManager> manager) {
+	void UpdateTransforms(gObj<GraphicsManager> manager) {
 		manager gCopy PtrData(TransformBuffer, Scene->Transforms());
 	}
 
-	void UpdateMaterials(gObj<CopyingManager> manager) {
+	void UpdateMaterials(gObj<GraphicsManager> manager) {
 		manager gCopy PtrData(MaterialBuffer, &Scene->Materials().first());
 	}
 
@@ -23,7 +23,7 @@ protected:
 		perform(CreatingAssets);
 	}
 
-	void CreatingAssets(gObj<CopyingManager> manager) {
+	void CreatingAssets(gObj<GraphicsManager> manager) {
 		// loading scene textures
 		TextureCount = Scene->Textures().size();
 		Textures = new gObj<Texture2D>[TextureCount];

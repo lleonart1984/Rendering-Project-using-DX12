@@ -14399,7 +14399,7 @@ namespace CA4G {
 			swapChainDesc.Height = rect.bottom - rect.top;
 			swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 			swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-			//swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+			swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
 			swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 			swapChainDesc.SampleDesc.Count = 1;
 

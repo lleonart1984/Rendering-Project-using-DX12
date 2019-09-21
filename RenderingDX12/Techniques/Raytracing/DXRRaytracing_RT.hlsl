@@ -1,9 +1,4 @@
-/// Implementation of an iterative and accumulative path-tracing.
-/// Primary rays and shadow cast use GBuffer optimization
-/// Path-tracing with next-event estimation.
-
-#include "../CommonGI/Definitions.h"
-
+/// A common header for libraries will use a GBuffer for deferred gathering
 // Top level structure with the scene
 RaytracingAccelerationStructure Scene : register(t0, space0);
 
@@ -27,95 +22,84 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define ACCUMULATIVE_CB_REG			b3
 #define OBJECT_CB_REG				b4
 
-#include "../CommonRT/CommonDeferred.h"
-#include "../CommonRT/CommonShadowMaping.h"
-#include "../CommonRT/CommonProgressive.h"
-#include "../CommonRT/CommonOutput.h"
-#include "../CommonGI/ScatteringTools.h"
+#include "..\CommonRT\CommonDeferred.h"
+#include "..\CommonRT\CommonShadowMaping.h"
+#include "..\CommonRT\CommonProgressive.h"
+#include "..\CommonRT\CommonOutput.h"
+#include "..\CommonGI\ScatteringTools.h"
 
-struct Ray {
-	float3 Position;
-	float3 Direction;
-};
-
-struct RayPayload
+#ifndef RT_CUSTOM_PAYLOAD
+struct RTPayload
 {
-	float3 Importance;
-	float3 AccRadiance;
-	Ray ScatteredRay;
-	int bounce;
+	float3 Accumulation;
+	int Bounce;
 };
+#endif
 
-// Represents a single bounce of path tracing
-// Will accumulate emissive and direct lighting modulated by the carrying importance
-// Will update importance with scattered ratio divided by pdf
-// Will output scattered ray to continue with
-void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPayload payload)
+float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int bounces)
 {
-	// Adding emissive and direct lighting
+	float3 total = float3(0, 0, 0);
+
+	// Adding Emissive
+	total += material.Emissive;
+
+	// Adding direct lighting
 	float NdotV;
 	bool invertNormal;
 	float3 fN;
 	float4 R, T;
-	// Update Accumulated Radiance to the viewer
-	payload.AccRadiance += payload.Importance *
-		(material.Emissive
-			// Next Event estimation
-			+ ComputeDirectLighting(V, surfel, material, LightPosition, LightIntensity,
-				// Co-lateral outputs
-				NdotV, invertNormal, fN, R, T));
+	
+	total += ComputeDirectLighting(
+		V,
+		surfel,
+		material,
+		LightPosition,
+		LightIntensity,
+		/*Out*/ NdotV, invertNormal, fN, R, T);
 
-	float3 ratio;
-	float3 direction;
-	float pdf;
-	RandomScatterRay(V, fN, R, T, material, ratio, direction, pdf);
-
-	// Update gathered Importance to the viewer
-	payload.Importance *= ratio;// / (1 - russianRoulette);
-	// Update scattered ray
-	payload.ScatteredRay.Direction = direction;
-	payload.ScatteredRay.Position = surfel.P + sign(dot(direction, fN))*0.001*fN;
-}
-
-float3 ComputePath(float3 V, Vertex surfel, Material material, int bounces)
-{
-	RayPayload payload = (RayPayload)0;
-	payload.Importance = 1;
-
-	// initial scatter (primary rays)
-	SurfelScattering(V, surfel, material, payload);
-
-	[loop]
-	for (int bounce = 1; bounce < bounces; bounce++)
+	if (bounces > 0 && any(material.Specular))
 	{
-		RayDesc newRay;
-		newRay.Origin = payload.ScatteredRay.Position;
-		newRay.Direction = payload.ScatteredRay.Direction;
-		newRay.TMin = 0.001;
-		newRay.TMax = 10.0;
+		if (R.w > 0.01) {
+			// Trace the ray.
+			// Set the ray's extents.
+			RayDesc reflectionRay;
+			reflectionRay.Origin = surfel.P + fN * 0.001;
+			reflectionRay.Direction = R.xyz;
+			reflectionRay.TMin = 0.001;
+			reflectionRay.TMax = 10000.0;
+			RTPayload reflectionPayload = { float3(0, 0, 0), bounces - 1 };
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 1, 0, 1, 0, reflectionRay, reflectionPayload);
+			total += R.w * material.Specular * reflectionPayload.Accumulation; /// Mirror and fresnel reflection
+		}
 
-		if (any(payload.Importance > 0.001))
-		{
-			payload.bounce = bounce;
-			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, payload);
+		if (T.w > 0.01) {
+			// Trace the ray.
+			// Set the ray's extents.
+			RayDesc refractionRay;
+			refractionRay.Origin = surfel.P - fN * 0.001;
+			refractionRay.Direction = T.xyz;
+			refractionRay.TMin = 0.001;
+			refractionRay.TMax = 10000.0;
+			RTPayload refractionPayload = { float3(0, 0, 0), bounces - 1 };
+			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 1, 0, 1, 0, refractionRay, refractionPayload);
+			total += T.w * material.Specular * refractionPayload.Accumulation;
 		}
 	}
 
-	return payload.AccRadiance;
+	return total;
 }
 
-
 [shader("miss")]
-void EnvironmentMap(inout RayPayload payload)
+void EnvironmentMap(inout RTPayload payload)
 {
+	//payload.color = WorldRayDirection();
 }
 
 [shader("raygeneration")]
-void PTMainRays()
+void RTMainRays()
 {
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
-	StartRandomSeedForRay(raysDimensions, PATH_TRACING_MAX_BOUNCES, raysIndex, 0, PassCount);
 
 	Vertex surfel;
 	Material material;
@@ -123,28 +107,22 @@ void PTMainRays()
 	float2 coord = (raysIndex + 0.5) / raysDimensions;
 
 	if (!GetPrimaryIntersection(raysIndex, coord, V, surfel, material))
-	{
-		AccumulateOutput(raysIndex, 0);
+		// no primary ray hit
 		return;
-	}
 
-	float3 color = ComputePath(V, surfel, material, PATH_TRACING_MAX_BOUNCES);
+	float3 color = RaytracingScattering(V, surfel, material, RAY_TRACING_MAX_BOUNCES);
 
 	AccumulateOutput(raysIndex, color);
 }
 
 [shader("closesthit")]
-void PTScattering(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+void RTScattering(inout RTPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
 	Vertex surfel;
 	Material material;
 	GetHitInfo(attr, surfel, material);
 
-	// Start static seed here... for some reason, in RTX static fields are not shared
-	// between different shader types...
-	StartRandomSeedForRay(DispatchRaysDimensions(), PATH_TRACING_MAX_BOUNCES, DispatchRaysIndex(), payload.bounce, PassCount);
+	float3 V = -normalize(WorldRayDirection());
 
-	// This is not a recursive closest hit but it will accumulate in payload
-	// all the result of the scattering to this surface
-	SurfelScattering(-WorldRayDirection(), surfel, material, payload);
+	payload.Accumulation = RaytracingScattering(V, surfel, material, payload.Bounce);
 }

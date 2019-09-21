@@ -148,6 +148,7 @@
     <ClInclude Include="Techniques\PhotonMaps\DXR_PhotonTracing_Pipeline.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap3Technique.h" />
     <ClInclude Include="Techniques\PhotonMaps\CommonHashing_RT.h" />
+    <ClInclude Include="Techniques\Raytracing\DXRRaytracerTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

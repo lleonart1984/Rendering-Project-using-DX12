@@ -125,6 +125,7 @@ public:
 			gObj<SceneOnGPU> SceneAndPhotonMap;
 			gObj<Buffer> Photons;
 			gObj<Buffer> Radii;
+			gObj<Buffer> Permutation;
 
 			gObj<Buffer> Vertices;
 			gObj<Buffer> Materials;
@@ -171,8 +172,9 @@ public:
 				SRV(8, LightPositions);
 
 				SRV(9, Radii);
+				SRV(10, Permutation);
 
-				SRV_Array(10, Textures, TextureCount);
+				SRV_Array(11, Textures, TextureCount);
 
 				Static_SMP(0, Sampler::Linear());
 				Static_SMP(1, Sampler::LinearWithoutMipMaps());
@@ -260,7 +262,8 @@ public:
 		return double(rand()) / (double(RAND_MAX) + 1.0);
 	}
 
-	void CreatingAssets(gObj<CopyingManager> manager) {
+	void CreatingAssets(gObj<GraphicsManager> manager) {
+		
 		// Photons aabbs used in bottom level structure building and updates
 		PhotonsAABBs = _ gCreate RWAccelerationDatastructureBuffer<D3D12_RAYTRACING_AABB>(PHOTON_DIMENSION*PHOTON_DIMENSION);
 
@@ -315,6 +318,7 @@ public:
 		// Bind now Photon map as SRVs
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 		dxrRTPipeline->_Program->Radii = photonMapConstruction->Radii;
+		dxrRTPipeline->_Program->Permutation = photonMapConstruction->Permutation;
 #pragma endregion
 	}
 
@@ -352,7 +356,7 @@ public:
 			int start = t == 0 ? 0 : (1 << (t - 1))*PHOTON_DIMENSION;
 			int count = max(PHOTON_DIMENSION, start);
 			photonMapBuilder gLoad Geometry(start, count);
-			PhotonsAABBsOnTheGPU[t] = photonMapBuilder gCreate BakedGeometry(true, true);
+			PhotonsAABBsOnTheGPU[t] = photonMapBuilder gCreate BakedGeometry(false, true);
 			sceneInstances gLoad Instance(PhotonsAABBsOnTheGPU[t], 2, 0, start);
 		}
 
@@ -372,7 +376,7 @@ public:
 			int start = t == 0 ? 0 : (1 << (t - 1))*PHOTON_DIMENSION;
 			int count = max(PHOTON_DIMENSION, start);
 			photonMapBuilder gLoad Geometry(start, count);
-			PhotonsAABBsOnTheGPU[t] = photonMapBuilder gCreate RebuiltGeometry(true, true);
+			PhotonsAABBsOnTheGPU[t] = photonMapBuilder gCreate RebuiltGeometry(false, true);
 			sceneInstances gLoad Instance(PhotonsAABBsOnTheGPU[t], 2, 0, start);
 		}
 

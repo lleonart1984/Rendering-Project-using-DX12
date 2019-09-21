@@ -70,9 +70,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		float3 pos = 0;// 2 * float3(x, y, z) - 1;
 		//float3 pos = Photons[Permutation[0]].Position;
 
-		//box.minimum = pos - 0.00001;// -radius * 0.0001;
-		//box.maximum = pos + 0.00001;// +radius * 0.0001;
+		box.minimum = pos - 0.00001;// -radius * 0.0001;
+		box.maximum = pos + 0.00001;// +radius * 0.0001;
 	}
 	radii[Permutation[index]] = radius;
-	PhotonAABBs[Permutation[index]] = box;
+	PhotonAABBs[index] = box;
 }

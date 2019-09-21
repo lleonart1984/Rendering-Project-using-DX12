@@ -2,13 +2,14 @@
 #define PHOTON_WITH_NORMAL
 #define PHOTON_WITH_POSITION
 
-#define TEXTURES_REG				t10
+#define TEXTURES_REG				t11
 
 #define RAY_CONTRIBUTION_TO_HITGROUPS 1
 
 #include "CommongPhotonGather_RT.hlsl.h"
 
 StructuredBuffer<float> Radii : register(t9);
+StructuredBuffer<int> Permutation : register(t10);
 
 struct PhotonHitAttributes {
 	// Photon Index
@@ -83,7 +84,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 void PhotonGatheringIntersection() {
 	int index = PrimitiveIndex() + InstanceID();
 	PhotonHitAttributes att;
-	att.PhotonIdx = index;
+	att.PhotonIdx = Permutation[index];
 	ReportHit(0.5, 0, att);
 }
 [shader("miss")]

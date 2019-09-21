@@ -22,7 +22,6 @@ using namespace CA4G;
 #include "Techniques/Tutorials/Tutorial11.h"
 #include "Techniques/Tutorials/Tutorial12.h"
 //#include "Techniques/DeferredShading/DeferredLighting.h"
-//#include "Techniques/DXR_Raytracer/DXRRaytracer.h"
 //#include "Techniques/DXR_Photontracer/DXRPhotonMapping.h"
 //#include "Techniques/RASTER_DXR_Photontracer/HybridPhotonTracer.h"
 //#include "Techniques/AccPathtracing/DXRPathtracer.h"
@@ -30,6 +29,8 @@ using namespace CA4G;
 //#include "Techniques/FULL_DXR_PhotonMap/FullDXRPhotontracerTechnique.h"
 //#include "Techniques/FULL_DXR_PhotonMap2/FullDXRPhotontracerTechnique2.h"
 //#include "Techniques/PhotonMapping/SHPM/SHPhotonMapTechnique.h"
+
+#include "Techniques/Raytracing/DXRRaytracerTechnique.h"
 
 #include "Techniques/PhotonMapping/GridPhotonMapping/GPhotonMappingTechnique.h"
 #include "Techniques/PhotonMapping/SpatialHashPhotonMapping/SHPhotonMapTechnique.h"
