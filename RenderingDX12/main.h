@@ -70,4 +70,4 @@
 //gObj<RaymarchRT<APITConstruction, APITDescription>> technique;
 
 // Raytracing
-//gObj<DXRRaytracingTechnique> technique;
+gObj<DXRRaytracingTechnique> technique;

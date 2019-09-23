@@ -30,5 +30,5 @@ float ShadowCast(Vertex surfel)
 	float2 cToTest = 0.5 + 0.5 * pInLightProjSpace.xy;
 	cToTest.y = 1 - cToTest.y;
 	float3 lightSampleP = LightPositions.SampleGrad(shadowSmp, cToTest, 0, 0);
-	return pInLightViewSpace.z - lightSampleP.z < 0.001 ? 1 : 0.8;
+	return pInLightViewSpace.z - lightSampleP.z < 0.001 ? 1 : 0.0;
 }

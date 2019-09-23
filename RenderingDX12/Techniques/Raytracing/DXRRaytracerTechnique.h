@@ -227,20 +227,24 @@ public:
 
 		auto rtProgram = dxrRTPipeline->_Program;
 
-		// Update camera
-		// Required during ray-trace stage
-		manager gCopy ValueData(rtProgram->CameraCB, view.getInverse());
+		if (CameraIsDirty) {
+			// Update camera
+			// Required during ray-trace stage
+			manager gCopy ValueData(rtProgram->CameraCB, view.getInverse());
+		}
 
-		manager gCopy ValueData(rtProgram->LightTransforms, Globals{
-				lightProj,
-				lightView
-			});
+		if (LightSourceIsDirty) {
+			manager gCopy ValueData(rtProgram->LightTransforms, Globals{
+					lightProj,
+					lightView
+				});
 
-		// Update lighting needed for photon tracing
-		manager gCopy ValueData(rtProgram->LightingCB, Lighting{
-			Light->Position, 0,
-			Light->Intensity, 0
-			});
+			// Update lighting needed for photon tracing
+			manager gCopy ValueData(rtProgram->LightingCB, Lighting{
+				Light->Position, 0,
+				Light->Intensity, 0
+				});
+		}
 
 		dxrRTPipeline->_Program->Positions = gBufferFromViewer->pipeline->GBuffer_P;
 		dxrRTPipeline->_Program->Normals = gBufferFromViewer->pipeline->GBuffer_N;
@@ -248,8 +252,16 @@ public:
 		dxrRTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
 		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
 
+		static int Frame = 0;
+
 		if (CameraIsDirty)
+		{
+			Frame = 0;
 			manager gClear UAV(rtProgram->Output, 0u);
+		}
+		
+		manager gCopy ValueData(dxrRTPipeline->_Program->ProgressiveCB, Frame);
+		Frame++;
 
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrRTPipeline);
