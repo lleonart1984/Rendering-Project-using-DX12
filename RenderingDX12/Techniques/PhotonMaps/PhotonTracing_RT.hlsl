@@ -101,7 +101,7 @@ void PTMainRays() {
 
 	Photons[photonIndex].Intensity = 0;
 
-	if (!GetPrimaryIntersection(raysIndex * SHADOWMAP_DIMENSION / PHOTON_DIMENSION, coord, L, surfel, material))
+	if (!GetPrimaryIntersection((raysIndex + 0.5) * SHADOWMAP_DIMENSION / PHOTON_DIMENSION, coord, L, surfel, material))
 		// no photon hit
 		return;
 
