@@ -397,18 +397,20 @@ public:
 #pragma endregion
 		}
 
-		perform(Photontracing);
-		
-		perform(ComputeAABBs);
+		//if (LightSourceIsDirty || CameraIsDirty) {
+			perform(Photontracing);
 
-		static bool firstTime = true;
+			perform(ComputeAABBs);
 
-		if (firstTime) 
-			perform(CreatePhotonMap);
-		else
-			perform(UpdatePhotonMap);
-		
-		firstTime = false;
+			static bool firstTime = true;
+
+			if (firstTime)
+				perform(CreatePhotonMap);
+			else
+				perform(UpdatePhotonMap);
+
+			firstTime = false;
+		//}
 
 		perform(Raytracing);
 	}

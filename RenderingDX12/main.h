@@ -60,7 +60,7 @@
 //gObj<GridPhotonMapTechnique> technique;
 
 //gObj<BPP_PhotonMap2Technique> technique;
-//gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
+gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
 
 // --- Discarded implementation
 //gObj<BPGPhotonMappingTechnique> technique; // Box Per Geometry Technique
@@ -70,4 +70,4 @@
 //gObj<RaymarchRT<APITConstruction, APITDescription>> technique;
 
 // Raytracing
-gObj<DXRRaytracingTechnique> technique;
+//gObj<DXRRaytracingTechnique> technique;

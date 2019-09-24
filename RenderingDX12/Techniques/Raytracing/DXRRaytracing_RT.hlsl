@@ -104,8 +104,8 @@ void RTMainRays()
 	Vertex surfel;
 	Material material;
 	float3 V;
-	float2 coord = float2(raysIndex.x + random(), raysIndex.y + random()) / raysDimensions;
-	//float2 coord = float2(raysIndex.x + 0.5, raysIndex.y + 0.5) / raysDimensions;
+	//float2 coord = float2(raysIndex.x + random(), raysIndex.y + random()) / raysDimensions;
+	float2 coord = float2(raysIndex.x + 0.5, raysIndex.y + 0.5) / raysDimensions;
 	
 	if (!GetPrimaryIntersection(raysIndex, coord, V, surfel, material))
 		// no primary ray hit
