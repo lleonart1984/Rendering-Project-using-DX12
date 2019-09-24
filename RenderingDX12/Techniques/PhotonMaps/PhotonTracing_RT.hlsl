@@ -65,6 +65,7 @@ struct PTPayload
 {
 	float3 PhotonIntensity;
 	int PhotonBounce;
+	uint seed;
 };
 #endif
 
@@ -87,7 +88,7 @@ void PTMainRays() {
 	if (PHOTON_TRACE_MAX_BOUNCES == 0) // no photon trace
 		return;
 
-	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, PHOTON_TRACE_MAX_BOUNCES, PassCount);
+	uint seed = StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, PHOTON_TRACE_MAX_BOUNCES, PassCount);
 
 	Vertex surfel;
 	Material material;
@@ -112,10 +113,11 @@ void PTMainRays() {
 		(3 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y);
 	payload.PhotonBounce = // Photon Bounces Left
 		PHOTON_TRACE_MAX_BOUNCES - 1;
+	payload.seed = seed;
 
 	float3 direction, ratio;
 	float pdf;
-	RandomScatterRay(L, surfel, material, ratio, direction, pdf);
+	RandomScatterRay(payload.seed, L, surfel, material, ratio, direction, pdf);
 
 	if (any(ratio))
 	{
@@ -155,7 +157,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 
 	float NdotV = dot(V, surfel.N);
 
-	float russianRoulette = random();
+	float russianRoulette = random(payload.seed);
 	float stopPdf;
 
 	if (NdotV > 0.001 && material.Roulette.x > 0) { // store photon assuming this is the last bounce
@@ -180,13 +182,14 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 			float3 ratio;
 			float3 direction;
 			float pdf;
-			RandomScatterRay(V, surfel, material, ratio, direction, pdf);
+			RandomScatterRay(payload.seed, V, surfel, material, ratio, direction, pdf);
 
 			if (any(ratio))
 			{
 				PTPayload newPhotonPayload = (PTPayload)0;
 				newPhotonPayload.PhotonIntensity = payload.PhotonIntensity * ratio / (1 - stopPdf);
 				newPhotonPayload.PhotonBounce = payload.PhotonBounce - 1;
+				newPhotonPayload.seed = payload.seed;
 
 				RayDesc newPhotonRay;
 				newPhotonRay.TMin = 0.001;

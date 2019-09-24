@@ -20,7 +20,7 @@ struct DXR_PT_Pipeline : public RTPipelineManager {
 
 	struct DXR_PT_Program : public RTProgram<DXR_PT_Pipeline> {
 		void Setup() {
-			_ gSet Payload(16);
+			_ gSet Payload(20); // intensity 3f, bounce 1i, seed 1ui
 			_ gSet StackSize(PHOTON_TRACE_MAX_BOUNCES);
 			_ gLoad Shader(Context()->PTMainRays);
 			_ gLoad Shader(Context()->PhotonMiss);

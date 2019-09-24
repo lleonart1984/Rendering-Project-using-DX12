@@ -65,6 +65,7 @@ struct PTPayload
 {
 	float3 PhotonIntensity;
 	int PhotonBounce;
+	uint seed;
 };
 #endif
 
@@ -104,8 +105,8 @@ void InitializePayload(uint2 photonRay, uint2 emissionImageDimensions, inout PTP
 void PTMainRays() {
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
-	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, PHOTON_TRACE_MAX_BOUNCES, PassCount);
-	float2 coord = float2((raysIndex.x + random()) / raysDimensions.x, (raysIndex.y + random()) / raysDimensions.y);
+	uint seed = StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, PHOTON_TRACE_MAX_BOUNCES, PassCount);
+	float2 coord = float2((raysIndex.x + random(seed)) / raysDimensions.x, (raysIndex.y + random(seed)) / raysDimensions.y);
 
 	Vertex surfel;
 	Material material;
@@ -132,12 +133,13 @@ void PTMainRays() {
 		(3 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y);
 	payload.PhotonBounce = // Photon Bounce Left
 		PHOTON_TRACE_MAX_BOUNCES - 1;
+	payload.seed = seed;
 
 	InitializePayload(raysIndex, raysDimensions, payload);
 
 	float3 direction, ratio;
 	float pdf;
-	RandomScatterRay(L, surfel, material, ratio, direction, pdf);
+	RandomScatterRay(payload.seed, L, surfel, material, ratio, direction, pdf);
 
 	OnPhotonScatter(L, surfel, material, ratio, pdf, direction, payload);
 
@@ -174,7 +176,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
-	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, payload.PhotonBounce, PassCount);
+	//StartRandomSeedForRay(payload.seed, raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, payload.PhotonBounce, PassCount);
 
 	int rayId = raysIndex.x + raysIndex.y * raysDimensions.x;
 
@@ -198,7 +200,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 	if (NdotV > 0.001 && material.Roulette.x > 0)
 		AddPhoton(p, surfel, payload, rayId); // Adds or updates the photon stored in rayId position
 	
-	float russianRoulette = random();
+	float russianRoulette = random(payload.seed);
 	float stopPdf = material.Roulette.x * 0.5;// *0.002;
 	
 	if (russianRoulette < stopPdf) // photon stay here
@@ -215,14 +217,14 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 			float3 ratio;
 			float3 direction;
 			float pdf;
-			RandomScatterRay(V, surfel, material, ratio, direction, pdf);
+			RandomScatterRay(payload.seed, V, surfel, material, ratio, direction, pdf);
 
 			if (any(ratio))
 			{
 				PTPayload newPhotonPayload = (PTPayload)0;
 				newPhotonPayload.PhotonIntensity = payload.PhotonIntensity * ratio / (1 - stopPdf);
 				newPhotonPayload.PhotonBounce = payload.PhotonBounce - 1;
-				
+				newPhotonPayload.seed = payload.seed;
 				OnPhotonScatter(V, surfel, material, ratio, pdf*(1 - stopPdf), direction, newPhotonPayload);
 
 				RayDesc newPhotonRay;
