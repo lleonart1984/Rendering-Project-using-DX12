@@ -166,7 +166,7 @@ int main(int, char**)
 			camera->Position = float3(0.3f, 0.05f, -0.028);
 			camera->Target = float3(0, 0.07f, 0);
 			lightSource->Position = float3(0, 0.45, 0);
-			lightSource->Intensity = float3(100, 100, 100);
+			lightSource->Intensity = float3(250, 250, 250);
 			break;
 		case SIBENIK_OBJ:
 			filePath = desktop_directory();
@@ -177,7 +177,7 @@ int main(int, char**)
 			camera->Position = float3(-0.4, -0.3, 0.0);
 			camera->Target = float3(0, -0.25, 0);
 			lightSource->Position = float3(-0, -0.05, 0);
-			lightSource->Intensity = float3(50, 50, 50);
+			lightSource->Intensity = float3(250, 250, 250);
 			break;
 		case SANMIGUEL_OBJ:
 			filePath = desktop_directory();

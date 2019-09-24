@@ -343,8 +343,6 @@ public:
 		dxrPTPipeline->_Program->Scene = sceneInstances gCreate BakedScene();
 	}
 
-
-
 	void CreateSceneAndPhotonMapOnGPU(gObj<DXRManager> manager) {
 		// Building top-level ADS for SceneAndPhotonMap
 		auto sceneInstances = manager gCreate Instances();
@@ -411,7 +409,11 @@ public:
 
 		perform(Photontracing);
 
+		flush_all_to_gpu;
+
 		perform(ConstructPhotonMap);
+
+		flush_all_to_gpu;
 
 		static bool firstTime = true;
 		if (firstTime) {
@@ -495,36 +497,7 @@ public:
 #pragma endregion
 	}
 
-	void MortonPhotons(gObj<GraphicsManager> manager) {
-
-		auto computeManager = manager.Dynamic_Cast<ComputeManager>();
-
-		computeManager gSet Pipeline(mortonIndexingPipeline);
-		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 1024);
-	}
-
-	void SortPhotons(gObj<GraphicsManager> manager) {
-
-		auto computeManager = manager.Dynamic_Cast<ComputeManager>();
-
-		// Indexing
-		computeManager gSet Pipeline(mortonIndexingPipeline);
-		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 1024);
-
-		// Sorting
-		computeManager gSet Pipeline(sortingPipeline);
-
-		int n = PHOTON_DIMENSION * PHOTON_DIMENSION;
-		for (len = 2; len <= n; len <<= 1)
-			for (dif = len >> 1; dif > 0; dif >>= 1)
-			{
-				sortingPipeline->Stage = BitonicStage{ len, dif };
-				// Bitonic sort wave
-				computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 2048);
-			}
-	}
-
-	void ConstructPhotonMap(gObj<GraphicsManager> manager) {
+	void ConstructPhotonMap(gObj<DXRManager> manager) {
 		auto computeManager = manager.Dynamic_Cast<ComputeManager>();
 
 		// Indexing
