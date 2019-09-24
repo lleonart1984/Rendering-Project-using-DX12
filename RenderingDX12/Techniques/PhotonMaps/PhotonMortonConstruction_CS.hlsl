@@ -47,7 +47,7 @@ float MortonEstimator(in Photon currentPhoton, int index) {
 	return PHOTON_RADIUS;
 }
 
-[numthreads(1024, 1, 1)]
+[numthreads(CS_1D_GROUPSIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
 	int index = DTid.x;

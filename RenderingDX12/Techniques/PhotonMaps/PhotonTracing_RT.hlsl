@@ -93,15 +93,15 @@ void PTMainRays() {
 	Material material;
 	// L is the viewer here
 	float3 L;
-	float2 coord = float2((raysIndex.x + random()) / raysDimensions.x, (raysIndex.y + random()) / raysDimensions.y);
-	//float2 coord = float2((raysIndex.x + 0.5) / raysDimensions.x, (raysIndex.y + 0.5) / raysDimensions.y);
+	//float2 coord = float2((raysIndex.x + random()) / raysDimensions.x, (raysIndex.y + random()) / raysDimensions.y);
+	float2 coord = float2((raysIndex.x + 0.5) / raysDimensions.x, (raysIndex.y + 0.5) / raysDimensions.y);
 	float fact = length(float3(coord, 1));
 
 	int photonIndex = raysIndex.x + raysIndex.y * raysDimensions.x;
 
 	Photons[photonIndex].Intensity = 0;
 
-	if (!GetPrimaryIntersection((raysIndex + 0.5) * SHADOWMAP_DIMENSION / PHOTON_DIMENSION, coord, L, surfel, material))
+	if (!GetPrimaryIntersection((int2)(coord * SHADOWMAP_DIMENSION) + 0.5, coord, L, surfel, material))
 		// no photon hit
 		return;
 

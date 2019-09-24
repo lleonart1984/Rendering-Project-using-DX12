@@ -8,7 +8,7 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE SPONZA_OBJ
+#define USE_SCENE RING_OBJ
 
 #define MOVE_LIGHT false
 
@@ -19,7 +19,7 @@
 //#define WARP
 
 // Uncomment this to Force fallback device
-//#define FORCE_FALLBACK
+#define FORCE_FALLBACK
 
 //class NoTechnique : public Technique {}; gObj<NoTechnique> technique;
 

@@ -2,6 +2,8 @@
 #define PHOTON_WITH_NORMAL
 #define PHOTON_WITH_POSITION
 #include "PhotonDefinition.h"
+#include "../CommonGI/Parameters.h"
+
 StructuredBuffer<Photon> Photons : register(t0);
 RWStructuredBuffer<int> Indices : register (u0);
 RWStructuredBuffer<int> Permutation : register (u1);
@@ -27,7 +29,7 @@ int morton(int3 pos) {
 	return split3(pos.x) | (split3(pos.y) << 1) | (split3(pos.z) << 2);
 }
 
-[numthreads(1024, 1, 1)]
+[numthreads(CS_1D_GROUPSIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
 	int3 pos = saturate(Photons[DTid.x].Position * 0.5 + 0.5) * ((1 << 10) - 1); // map to 1024^3 cells

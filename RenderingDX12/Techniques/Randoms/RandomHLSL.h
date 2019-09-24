@@ -5,7 +5,7 @@
 
 #include "../CommonGI/Definitions.h"
 
-static uint rng_state;
+shared static uint rng_state;
 
 uint rand_xorshift()
 {

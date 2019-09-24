@@ -15661,8 +15661,11 @@ namespace CA4G {
 						}
 						break;
 						case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
-							//resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-							resource->BarrierUAV(cmdList);
+							if (resource->resource->LastUsageState & D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+							{
+								//resource->ChangeStateTo(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+								resource->BarrierUAV(cmdList);
+							}
 							resource->ChangeStateToUAV(cmdList);
 							break;
 						}

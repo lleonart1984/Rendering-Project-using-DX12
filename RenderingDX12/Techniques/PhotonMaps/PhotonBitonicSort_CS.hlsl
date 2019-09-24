@@ -2,6 +2,7 @@
 #define PHOTON_WITH_NORMAL
 #define PHOTON_WITH_POSITION
 #include "PhotonDefinition.h"
+#include "../CommonGI/Parameters.h"
 
 // Photons
 StructuredBuffer<Photon> Photons		: register(t0);
@@ -15,7 +16,7 @@ cbuffer BitonicStage : register(b0) {
 	int dif;
 };
 
-[numthreads(1024, 1, 1)]
+[numthreads(CS_1D_GROUPSIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
 	int index = DTid.x;
