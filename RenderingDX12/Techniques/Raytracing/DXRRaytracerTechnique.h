@@ -34,7 +34,7 @@ public:
 
 		struct DXR_RT_Program : public RTProgram<DXR_RT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(4 * (3 + 1)); // 3- Accum, 1- Bounce
+				_ gSet Payload(6); // 3- Accum, 1- Bounce
 				_ gSet StackSize(RAY_TRACING_MAX_BOUNCES);
 				_ gSet MaxHitGroupIndex(1000); // 1000 == max number of geometries
 				_ gLoad Shader(Context()->RTMainRays);

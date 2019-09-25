@@ -33,14 +33,14 @@ ConstantBuffer<ObjInfo> objectInfo		: register(OBJECT_CB_REG);
 
 struct ZipColor {
 	half intensity;
-	unorm half3 spectrum;
+	half3 spectrum;
 };
 
-float3 Float3ToZipColor(ZipColor c) {
+float3 ZipColorToFloat3(ZipColor c) {
 	return c.intensity * c.spectrum;
 }
 
-ZipColor ZipColorToFloat3(float3 f) {
+ZipColor Float3ToZipColor(float3 f) {
 	float i = max(f.x, max(f.y, f.z));
 	ZipColor z = (ZipColor)0;
 	z.intensity = i;

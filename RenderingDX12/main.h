@@ -8,7 +8,7 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE SPONZA_OBJ
+#define USE_SCENE BUNNY_OBJ
 
 #define MOVE_LIGHT false
 
@@ -53,11 +53,11 @@
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
 //gObj<GridPhotonMapTechnique> technique;
 //gObj<BPP_PhotonMap2Technique> technique;
-gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
+//gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
 
 // APIT
 //gObj<DebugAPIT> technique;
 //gObj<RaymarchRT<APITConstruction, APITDescription>> technique;
 
 // Raytracing
-//gObj<DXRRaytracingTechnique> technique;
+gObj<DXRRaytracingTechnique> technique;

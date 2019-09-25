@@ -31,10 +31,30 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #ifndef RT_CUSTOM_PAYLOAD
 struct RTPayload
 {
-	float3 Accumulation;
-	int Bounce;
+	half Compressed0; // intensity
+	int Compressed1; // RGBX : RGB - normalized color, X - bounces
 };
 #endif
+
+float3 DecodeRTPayloadAccumulation(in RTPayload p) {
+	float3 rgb = (int3(p.Compressed1 >> 24, p.Compressed1 >> 16, p.Compressed1 >> 8) & 255) / 255.0;
+	return rgb * p.Compressed0;
+}
+
+int DecodeRTPayloadBounces(in RTPayload p) {
+	return p.Compressed1 & 255;
+}
+
+void EncodeRTPayloadBounce(inout RTPayload p, int bounces) {
+	p.Compressed1 = (p.Compressed1 & ~255) | bounces;
+}
+
+void EncodeRTPayloadAccumulation(inout RTPayload p, float3 accumulation) {
+	float intensity = max(accumulation.x, max(accumulation.y, accumulation.z));
+	int3 norm = 255 * saturate(accumulation / max(0.00001, intensity));
+	p.Compressed0 = intensity;
+	p.Compressed1 = (p.Compressed1 & 255) | norm.x << 24 | norm.y << 16 | norm.z << 8;
+}
 
 float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int bounces)
 {
@@ -67,9 +87,10 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			reflectionRay.Direction = R.xyz;
 			reflectionRay.TMin = 0.001;
 			reflectionRay.TMax = 10000.0;
-			RTPayload reflectionPayload = { float3(0, 0, 0), bounces - 1 };
+			RTPayload reflectionPayload = (RTPayload)0;
+			EncodeRTPayloadBounce(reflectionPayload, bounces - 1);
 			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 1, 0, 1, 0, reflectionRay, reflectionPayload);
-			total += R.w * material.Specular * reflectionPayload.Accumulation; /// Mirror and fresnel reflection
+			total += R.w * material.Specular * DecodeRTPayloadAccumulation(reflectionPayload); /// Mirror and fresnel reflection
 		}
 
 		if (T.w > 0.01) {
@@ -80,9 +101,10 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 			refractionRay.Direction = T.xyz;
 			refractionRay.TMin = 0.001;
 			refractionRay.TMax = 10000.0;
-			RTPayload refractionPayload = { float3(0, 0, 0), bounces - 1 };
+			RTPayload refractionPayload = (RTPayload)0;
+			EncodeRTPayloadBounce(refractionPayload, bounces - 1);
 			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 1, 0, 1, 0, refractionRay, refractionPayload);
-			total += T.w * material.Specular * refractionPayload.Accumulation;
+			total += T.w * material.Specular * DecodeRTPayloadAccumulation(refractionPayload);
 		}
 	}
 
@@ -125,5 +147,5 @@ void RTScattering(inout RTPayload payload, in BuiltInTriangleIntersectionAttribu
 
 	float3 V = -normalize(WorldRayDirection());
 
-	payload.Accumulation = RaytracingScattering(V, surfel, material, payload.Bounce);
+	EncodeRTPayloadAccumulation(payload, RaytracingScattering(V, surfel, material, DecodeRTPayloadBounces(payload)));
 }
