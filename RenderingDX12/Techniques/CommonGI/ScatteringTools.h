@@ -133,7 +133,7 @@ float3 ComputeDirectLightingNoShadowCast(
 	// Blinn Specular component (normalized multiplying by (2+n)/(2pi)
 	float3 SpecularRatio = SpecularBRDF(V, L, fN, NdotL, material);
 
-	return 
+	return
 		// Direct diffuse and glossy lighting
 		(material.Roulette.x*DiffuseRatio + material.Roulette.y*SpecularRatio)*NdotL
 		*Ip;
@@ -223,7 +223,7 @@ float3 ComputeDirectLighting(
 	return shadowFactor * (
 		// Direct diffuse and glossy lighting
 		(material.Roulette.x*DiffuseRatio + material.Roulette.y*SpecularRatio)*NdotL*Ip
-		+ (R.w * DirectReflection + T.w * DirectRefraction)*I / (2*pi*lightRadius*lightRadius));
+		+ (R.w * DirectReflection + T.w * DirectRefraction)*I / (2 * pi*lightRadius*lightRadius));
 }
 
 
@@ -258,13 +258,13 @@ float3 ComputeDirectLighting(
 // to decide between different illumination models (lambert, blinn, mirror, fresnel).
 // the inverse of pdf value is already multiplied in ratio
 // This method overload can use precomputed Reflectance (R) and Transmittance (T) vectors
-void RandomScatterRay(inout uint seed, float3 V, float3 fN, float4 R, float4 T, Material material,
+void RandomScatterRay(float3 V, float3 fN, float4 R, float4 T, Material material,
 	out float3 ratio,
 	out float3 direction,
 	out float pdf
-	) {
+) {
 	float NdotD;
-	float3 D = randomHSDirection(seed, fN, NdotD);
+	float3 D = randomHSDirection(fN, NdotD);
 
 	float3 Diff = DiffuseBRDFMulTwoPi(V, D, fN, NdotD, material);
 	float3 Spec = SpecularBRDFMulTwoPi(V, D, fN, NdotD, material);
@@ -288,7 +288,7 @@ void RandomScatterRay(inout uint seed, float3 V, float3 fN, float4 R, float4 T, 
 	float4 lowerBound = float4(0, roulette.x, roulette.x + roulette.y, roulette.x + roulette.y + roulette.z);
 	float4 upperBound = lowerBound + roulette;
 
-	float4 scatteringSelection = random(seed);
+	float4 scatteringSelection = random();
 
 	float4 selectionMask =
 		(lowerBound <= scatteringSelection)
@@ -302,7 +302,7 @@ void RandomScatterRay(inout uint seed, float3 V, float3 fN, float4 R, float4 T, 
 // Scatters a ray randomly using the material roulette information
 // to decide between different illumination models (lambert, blinn, mirror, fresnel).
 // the inverse of pdf value is already multiplied in ratio
-void RandomScatterRay(inout uint seed, float3 V, Vertex surfel, Material material,
+void RandomScatterRay(float3 V, Vertex surfel, Material material,
 	out float3 ratio,
 	out float3 direction,
 	out float pdf
@@ -330,7 +330,7 @@ void RandomScatterRay(inout uint seed, float3 V, Vertex surfel, Material materia
 	R.w = material.Roulette.z + R.w * material.Roulette.w;
 	T.w *= material.Roulette.w;
 
-	RandomScatterRay(seed, V, fN, R, T, material, ratio, direction, pdf);
+	RandomScatterRay(V, fN, R, T, material, ratio, direction, pdf);
 }
 
 void ComputeImpulses(float3 V, Vertex surfel, Material material,

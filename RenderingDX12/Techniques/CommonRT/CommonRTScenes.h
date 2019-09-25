@@ -31,6 +31,38 @@ struct ObjInfo {
 // Locals for hit groups (fresnel and lambert)
 ConstantBuffer<ObjInfo> objectInfo		: register(OBJECT_CB_REG);
 
+struct ZipColor {
+	half intensity;
+	unorm half3 spectrum;
+};
+
+float3 Float3ToZipColor(ZipColor c) {
+	return c.intensity * c.spectrum;
+}
+
+ZipColor ZipColorToFloat3(float3 f) {
+	float i = max(f.x, max(f.y, f.z));
+	ZipColor z = (ZipColor)0;
+	z.intensity = i;
+	z.spectrum = i == 0 ? 0 : f / i;
+	return z;
+}
+
+struct ZipNormal {
+	half2 uv;
+};
+
+float3 ZipNormalToFloat3(ZipNormal normal, float3 faceDir) {
+	float3 n = float3(normal.uv, sqrt(1 - dot(normal.uv, normal.uv)));
+	return n * sign(dot(n, faceDir));
+}
+
+ZipNormal Float3ToZipNormal(float3 v) {
+	ZipNormal n = (ZipNormal)0;
+	n.uv = v.xy;
+	return n;
+}
+
 // Given a surfel will modify the normal with texture maps, using
 // Bump mapping and masking textures.
 // Material info is updated as well.

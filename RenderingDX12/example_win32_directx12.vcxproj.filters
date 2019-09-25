@@ -21,17 +21,6 @@
     <FxCompile Include="Techniques\Tutorials\Shaders\SimpleTransform_VS.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\TransformToViewSpace_VS.hlsl" />
     <FxCompile Include="Techniques\Tutorials\Shaders\UpdateAABBs_PS.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\AdaptiveBoxPerGeometry\ABPGAABBConstruction_CS.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\AdaptiveBoxPerGeometry\ABPGPhotonGather_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\AdaptiveBoxPerPhoton\ABPPPhotonGather_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\AdaptiveBoxPerPhoton\ABPPPhotonTracer_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\BoxPerGeometry\BPGAABBConstruction_CS.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\BoxPerGeometry\BPGPhotonGather_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\BoxPerGeometry\BPGPhotonTracer_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\BoxPerPhoton\BPPPhotonGather_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\BoxPerPhoton\BPPPhotonTracer_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\AdaptiveRadiusCompute_CS.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\RadiusAndBoxCompute_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\PhotonTracing_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\GridPhotonMapConstruction_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\GridPhotonGather_RT.hlsl" />
@@ -125,22 +114,8 @@
     <ClInclude Include="Techniques\CommonRT\CommonDeferred.h" />
     <ClInclude Include="Techniques\CommonRT\CommonOutput.h" />
     <ClInclude Include="Techniques\CommonRT\CommonProgressive.h" />
-    <ClInclude Include="Techniques\PhotonMapping\PhotonDefinition.h" />
-    <ClInclude Include="Techniques\PhotonMapping\CommonDeferredTracing.hlsl.h" />
-    <ClInclude Include="Techniques\PhotonMapping\CommonSpatialHashing.hlsl.h" />
-    <ClInclude Include="Techniques\PhotonMapping\CommonTracingSpatialHashGrid.hlsl.h" />
-    <ClInclude Include="Techniques\PhotonMapping\CommonDeferredGathering.hlsl.h" />
-    <ClInclude Include="Techniques\PhotonMapping\CommonGatheringSpatialHashGrid.hlsl.h" />
     <ClInclude Include="Techniques\Pathtracing\IterativePathtracer.h" />
     <ClInclude Include="Techniques\Pathtracing\RecursivePathtracer.h" />
-    <ClInclude Include="Techniques\PhotonMapping\GridPhotonMapping\GPhotonMappingTechnique.h" />
-    <ClInclude Include="Techniques\PhotonMapping\GridPhotonMapping\GPMCommon.hlsl.h" />
-    <ClInclude Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPhotonMapTechnique.h" />
-    <ClInclude Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPMCommon.h" />
-    <ClInclude Include="Techniques\PhotonMapping\AdaptiveBoxPerGeometry\ABPGPhotonMappingTechnique.h" />
-    <ClInclude Include="Techniques\PhotonMapping\AdaptiveBoxPerPhoton\ABPPPhotonMappingTechnique.h" />
-    <ClInclude Include="Techniques\PhotonMapping\BoxPerGeometry\BPGPhotonMappingTechnique.h" />
-    <ClInclude Include="Techniques\PhotonMapping\BoxPerPhoton\BPPPhotonMappingTechnique.h" />
     <ClInclude Include="Techniques\PhotonMaps\CommongPhotonGather_RT.hlsl.h" />
     <ClInclude Include="Techniques\PhotonMaps\GridPhotonMapTechnique.h" />
     <ClInclude Include="Techniques\PhotonMaps\PhotonDefinition.h" />
@@ -184,10 +159,6 @@
     <FxCompile Include="Techniques\Tutorials\Shaders\UpdateAABBs_PS.hlsl" />
     <FxCompile Include="Techniques\Pathtracing\IterativePathtracer_RT.hlsl" />
     <FxCompile Include="Techniques\Pathtracing\RecursivePathtracer_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\GridPhotonMapping\GPhotonGather_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\GridPhotonMapping\GPhotonTracer_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPhotonTracer_RT.hlsl" />
-    <FxCompile Include="Techniques\PhotonMapping\SpatialHashPhotonMapping\SHPhotonGathering_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Readme.md" />

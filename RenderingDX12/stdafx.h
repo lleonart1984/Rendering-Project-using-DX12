@@ -32,13 +32,6 @@ using namespace CA4G;
 
 #include "Techniques/Raytracing/DXRRaytracerTechnique.h"
 
-#include "Techniques/PhotonMapping/GridPhotonMapping/GPhotonMappingTechnique.h"
-#include "Techniques/PhotonMapping/SpatialHashPhotonMapping/SHPhotonMapTechnique.h"
-#include "Techniques/PhotonMapping/BoxPerPhoton/BPPPhotonMappingTechnique.h"
-#include "Techniques/PhotonMapping/BoxPerGeometry/BPGPhotonMappingTechnique.h"
-#include "Techniques/PhotonMapping/AdaptiveBoxPerPhoton/ABPPPhotonMappingTechnique.h"
-#include "Techniques/PhotonMapping/AdaptiveBoxPerGeometry/ABPGPhotonMappingTechnique.h"
-
 #include "Techniques/Pathtracing/IterativePathtracer.h"
 #include "Techniques/Pathtracing/RecursivePathtracer.h"
 

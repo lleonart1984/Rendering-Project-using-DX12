@@ -37,7 +37,7 @@ public:
 
 		struct DXR_RT_Program : public RTProgram<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(4 * 3 * 4 + 4 + 4); // 4 float3
+				_ gSet Payload(4 * 3 * 4 + 4); // 4 float3
 				_ gSet StackSize(1); // No recursion needed!
 				_ gLoad Shader(Context()->PTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);

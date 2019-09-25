@@ -44,14 +44,13 @@ struct RayPayload
 	float3 AccRadiance;
 	Ray ScatteredRay;
 	int bounce;
-	uint seed;
 };
 
 // Represents a single bounce of path tracing
 // Will accumulate emissive and direct lighting modulated by the carrying importance
 // Will update importance with scattered ratio divided by pdf
 // Will output scattered ray to continue with
-void SurfelScattering(uint seed, float3 V, Vertex surfel, Material material, inout RayPayload payload)
+void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPayload payload)
 {
 	// Adding emissive and direct lighting
 	float NdotV;
@@ -69,7 +68,7 @@ void SurfelScattering(uint seed, float3 V, Vertex surfel, Material material, ino
 	float3 ratio;
 	float3 direction;
 	float pdf;
-	RandomScatterRay(seed, V, fN, R, T, material, ratio, direction, pdf);
+	RandomScatterRay(V, fN, R, T, material, ratio, direction, pdf);
 
 	// Update gathered Importance to the viewer
 	payload.Importance *= ratio;// / (1 - russianRoulette);
@@ -78,13 +77,13 @@ void SurfelScattering(uint seed, float3 V, Vertex surfel, Material material, ino
 	payload.ScatteredRay.Position = surfel.P + sign(dot(direction, fN))*0.001*fN;
 }
 
-float3 ComputePath(uint seed, float3 V, Vertex surfel, Material material, int bounces)
+float3 ComputePath(float3 V, Vertex surfel, Material material, int bounces)
 {
 	RayPayload payload = (RayPayload)0;
 	payload.Importance = 1;
 
 	// initial scatter (primary rays)
-	SurfelScattering(seed, V, surfel, material, payload);
+	SurfelScattering(V, surfel, material, payload);
 
 	[loop]
 	for (int bounce = 1; bounce < bounces; bounce++)
@@ -98,7 +97,6 @@ float3 ComputePath(uint seed, float3 V, Vertex surfel, Material material, int bo
 		if (any(payload.Importance > 0.001))
 		{
 			payload.bounce = bounce;
-			payload.seed = seed;
 			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, payload);
 		}
 	}
@@ -117,7 +115,7 @@ void PTMainRays()
 {
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
-	uint seed = StartRandomSeedForRay(raysDimensions, PATH_TRACING_MAX_BOUNCES, raysIndex, 0, PassCount);
+	StartRandomSeedForRay(raysDimensions, PATH_TRACING_MAX_BOUNCES, raysIndex, 0, PassCount);
 
 	Vertex surfel;
 	Material material;
@@ -129,9 +127,9 @@ void PTMainRays()
 		AccumulateOutput(raysIndex, 0);
 		return;
 	}
-	
-	float3 color = ComputePath(seed, V, surfel, material, PATH_TRACING_MAX_BOUNCES);
-	
+
+	float3 color = ComputePath(V, surfel, material, PATH_TRACING_MAX_BOUNCES);
+
 	AccumulateOutput(raysIndex, color);
 }
 
@@ -144,9 +142,9 @@ void PTScattering(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 
 	// Start static seed here... for some reason, in RTX static fields are not shared
 	// between different shader types...
-	//StartRandomSeedForRay(DispatchRaysDimensions(), PATH_TRACING_MAX_BOUNCES, DispatchRaysIndex(), payload.bounce, PassCount);
+	StartRandomSeedForRay(DispatchRaysDimensions(), PATH_TRACING_MAX_BOUNCES, DispatchRaysIndex(), payload.bounce, PassCount);
 
 	// This is not a recursive closest hit but it will accumulate in payload
 	// all the result of the scattering to this surface
-	SurfelScattering(payload.seed, -WorldRayDirection(), surfel, material, payload);
+	SurfelScattering(-WorldRayDirection(), surfel, material, payload);
 }

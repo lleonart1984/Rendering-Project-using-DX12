@@ -51,19 +51,9 @@
 //gObj<RecursivePathtracer> technique;
 
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
-
-//gObj<GPhotonMappingTechnique> technique; // Volume Grid Technique
-//gObj<SHPhotonMappingTechnique> technique; // Spatial Hash Technique
-//gObj<BPPPhotonMappingTechnique> technique; // Box Per Photon Technique
-//gObj<ABPPPhotonMappingTechnique> technique;
-
 //gObj<GridPhotonMapTechnique> technique;
-
 //gObj<BPP_PhotonMap2Technique> technique;
 gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
-
-// --- Discarded implementation
-//gObj<BPGPhotonMappingTechnique> technique; // Box Per Geometry Technique
 
 // APIT
 //gObj<DebugAPIT> technique;
