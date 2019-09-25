@@ -13885,6 +13885,11 @@ namespace CA4G {
 				manager->currentPipeline->__OnDraw(manager);
 
 				manager->cmdList->Dispatch(dimx, dimy, dimz);
+
+				D3D12_RESOURCE_BARRIER b = { };
+				b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+				b.UAV.pResource = nullptr;
+				manager->cmdList->ResourceBarrier(1, &b);
 			}
 		}*const dispatcher;
 

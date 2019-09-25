@@ -46,6 +46,19 @@ void GuiFor(gObj<IHasParalellism> t) {
 	ImGui::SliderInt("Number of workers", &t->NumberOfWorkers, 1, MAX_NUMBER_OF_ASYNC_PROCESSES);
 #endif
 }
+void GuiFor(gObj<IHasLight> t) {
+	float3 light = t->Light->Intensity;
+	float maxCmp = max(light.x, max(light.y, light.z));
+	float3 lightColor = light / maxCmp;
+	bool changedColor = ImGui::ColorEdit3("Light color", (float*)&lightColor);
+	bool changedIntensity = ImGui::SliderFloat("Light Intensity", &maxCmp, 0, 1000, "%.3f", 2);
+	float3 newLight = lightColor * maxCmp;
+	if (changedColor || changedIntensity)
+	{
+		t->Light->Intensity = newLight;
+		t->LightSourceIsDirty = true;
+	}
+}
 
 LPSTR desktop_directory()
 {
@@ -260,6 +273,7 @@ int main(int, char**)
 			RenderGUI<IHasBackcolor>(technique);
 			RenderGUI<IHasTriangleNumberParameter>(technique);
 			RenderGUI<IHasParalellism>(technique);
+			RenderGUI<IHasLight>(technique);
             
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();
@@ -302,7 +316,7 @@ int main(int, char**)
 					asCameraRenderer->CameraIsDirty = cameraChanged || firstFrame || PERMANENT_CAMERA_DIRTY;
 
 				if (asLightRenderer != nullptr)
-					asLightRenderer->LightSourceIsDirty = firstFrame || MOVE_LIGHT;
+					asLightRenderer->LightSourceIsDirty |= firstFrame || MOVE_LIGHT;
 			}
         }
 
@@ -314,6 +328,8 @@ int main(int, char**)
 			ImGui::GetIO().Framerate;
 
 		firstFrame = false;
+
+		asLightRenderer->LightSourceIsDirty = false;
     }
 
 	presenter->Close();

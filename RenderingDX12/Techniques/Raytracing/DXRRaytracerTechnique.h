@@ -254,7 +254,7 @@ public:
 
 		static int Frame = 0;
 
-		if (CameraIsDirty)
+		if (CameraIsDirty || LightSourceIsDirty)
 		{
 			Frame = 0;
 			manager gClear UAV(rtProgram->Output, 0u);
