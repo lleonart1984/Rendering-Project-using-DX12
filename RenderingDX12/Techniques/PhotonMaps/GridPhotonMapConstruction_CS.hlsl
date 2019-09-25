@@ -12,7 +12,7 @@ RWStructuredBuffer<int> NextBuffer		: register (u1);
 
 #include "CommonHashing_RT.h"
 
-[numthreads(CS_2D_GROUPSIZE, CS_2D_GROUPSIZE, 1)]
+[numthreads(32, 32, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
 	int index = DTid.y * PHOTON_DIMENSION + DTid.x;

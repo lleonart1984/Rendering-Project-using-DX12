@@ -50,8 +50,8 @@ cbuffer ViewToWorldTransform : register(VIEWTOWORLD_CB_REG) {
 
 bool GetPrimaryIntersection(uint2 screenCoordinates, float2 coordinates, out float3 V, out Vertex surfel, out Material material) {
 	bool valid = any(surfel.P = Positions[screenCoordinates]);
-	//surfel.N = Normals[screenCoordinates];
-	surfel.N = Normals.SampleGrad(gSmp, coordinates, 0, 0.001, 0.001);// [screenCoordinates];
+	surfel.N = Normals[screenCoordinates];
+	//surfel.N = Normals.SampleGrad(gSmp, coordinates, 0, 0.001, 0.001);// [screenCoordinates];
 	surfel.C = Coordinates[screenCoordinates];
 	surfel.T = float3(1, 0, 0);
 	surfel.B = cross(surfel.N, surfel.T);

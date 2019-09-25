@@ -105,7 +105,7 @@ namespace CA4G {
 						switch (binding.Root_Parameter.DescriptorTable.pDescriptorRanges[0].RangeType)
 						{
 						case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-							if (resource->resource->LastUsageState & D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+							if (resource->resource->LastUsageState == D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
 							{
 								resource->BarrierUAV(cmdList);
 								resource->ChangeStateFromTo(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);

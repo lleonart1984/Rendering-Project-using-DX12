@@ -409,11 +409,11 @@ public:
 
 		perform(Photontracing);
 
-		wait_for(signal(flush_all_to_gpu));
+		flush_all_to_gpu;
 
 		perform(ConstructPhotonMap);
 
-		wait_for(signal(flush_all_to_gpu));
+		flush_all_to_gpu;
 
 		static bool firstTime = true;
 		if (firstTime) {
@@ -422,8 +422,6 @@ public:
 		}
 		else
 			perform(UpdatePhotonMap);
-
-		wait_for(signal(flush_all_to_gpu));
 
 		perform(Raytracing);
 	}
@@ -504,7 +502,7 @@ public:
 
 		// Indexing
 		computeManager gSet Pipeline(mortonIndexingPipeline);
-		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / CS_1D_GROUPSIZE);
+		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 1024);
 
 		// Sorting
 		computeManager gSet Pipeline(sortingPipeline);
@@ -515,12 +513,12 @@ public:
 			{
 				sortingPipeline->Stage = BitonicStage{ len, dif };
 				// Bitonic sort wave
-				computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / (2 * CS_1D_GROUPSIZE));
+				computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 2048);
 			}
 
 		// Constructing AABBs and Computing Radii
 		computeManager gSet Pipeline(photonMapConstruction);
-		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / CS_1D_GROUPSIZE);
+		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / 1024);
 	}
 
 	void Raytracing(gObj<DXRManager> manager) {

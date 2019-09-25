@@ -5,7 +5,9 @@
 
 #include "../CommonGI/Definitions.h"
 
-uint rand_xorshift(inout uint rng_state)
+static uint rng_state;
+
+uint rand_xorshift()
 {
 	// Xorshift algorithm from George Marsaglia's paper
 	rng_state ^= (rng_state << 13);
@@ -14,15 +16,15 @@ uint rand_xorshift(inout uint rng_state)
 	return rng_state;
 }
 
-float random(inout uint rng_state)
+float random()
 {
-	return rand_xorshift(rng_state) * (1.0 / 4294967296.0);
+	return rand_xorshift() * (1.0 / 4294967296.0);
 }
 
-float3 randomDirection(inout uint rng_state)
+float3 randomDirection()
 {
-	float r1 = random(rng_state);
-	float r2 = random(rng_state) * 2 - 1;
+	float r1 = random();
+	float r2 = random() * 2 - 1;
 	float sqrR2 = r2 * r2;
 	float two_pi_by_r1 = two_pi * r1;
 	float sqrt_of_one_minus_sqrR2 = sqrt(1.0 - sqrR2);
@@ -32,10 +34,10 @@ float3 randomDirection(inout uint rng_state)
 	return float3(x, y, z);
 }
 
-float3 randomHSDirection(inout uint rng_state, float3 N, out float NdotD)
+float3 randomHSDirection(float3 N, out float NdotD)
 {
-	float r1 = random(rng_state);
-	float r2 = random(rng_state) * 2 - 1;
+	float r1 = random();
+	float r2 = random() * 2 - 1;
 	float sqrR2 = r2 * r2;
 	float two_pi_by_r1 = two_pi * r1;
 	float sqrt_of_one_minus_sqrR2 = sqrt(1.0 - sqrR2);
@@ -49,15 +51,15 @@ float3 randomHSDirection(inout uint rng_state, float3 N, out float NdotD)
 	return d;
 }
 
-void initializeRandom(inout uint rng_state) {
-	int seed = rng_state;
+void initializeRandom(uint seed) {
+	rng_state = seed;// ^ 0xFEFE;
 	[loop]
 	for (int i = 0; i < seed % 10 + 3; i++)
-		random(rng_state);
+		random();
 }
 
-uint StartRandomSeedForRay(uint2 gridDimensions, int maxBounces, uint2 raysIndex, int bounce, int frame) {
-	uint index = 0;
+void StartRandomSeedForRay(uint2 gridDimensions, int maxBounces, uint2 raysIndex, int bounce, int frame) {
+	int index = 0;
 	int dim = 1;
 	index += raysIndex.x * dim;
 	dim *= gridDimensions.x;
@@ -67,7 +69,6 @@ uint StartRandomSeedForRay(uint2 gridDimensions, int maxBounces, uint2 raysIndex
 	dim *= maxBounces;
 	index += frame * dim;
 	initializeRandom(index);
-	return index;
 }
 
 #endif // RANDOMHLSL_H

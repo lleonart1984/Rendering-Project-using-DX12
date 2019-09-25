@@ -11,10 +11,10 @@
 StructuredBuffer<int> HashTableBuffer	: register(t9);
 StructuredBuffer<int> NextBuffer		: register(t10);
 
-#define T 20
+#define T 100
 
 #ifndef DEBUG_PHOTONS
-float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
+float3 ComputeDirectLightInWorldSpace2(Vertex surfel, Material material, float3 V) {
 	float radius = PHOTON_RADIUS;
 	int3 begCell = FromPositionToCell(surfel.P - radius);
 	int3 endCell = FromPositionToCell(surfel.P + radius);
@@ -77,7 +77,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 		counting -= hist[i];
 		if (counting <= 0)
 		{
-			maxValueInHist = i + 1.0;
+			maxValueInHist = i + 0.5f;
 			break;
 		}
 	}
@@ -94,7 +94,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	return totalLighting / (100000 * pi * radius * radius);
 }
 
-float3 ComputeDirectLightInWorldSpace2(Vertex surfel, Material material, float3 V) {
+float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V) {
 	float radius = PHOTON_RADIUS;
 	int3 begCell = FromPositionToCell(surfel.P - radius);
 	int3 endCell = FromPositionToCell(surfel.P + radius);
