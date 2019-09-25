@@ -58,6 +58,12 @@ void GuiFor(gObj<IHasLight> t) {
 		t->Light->Intensity = newLight;
 		t->LightSourceIsDirty = true;
 	}
+	float lightY = t->Light->Position.y;
+	bool changedPosition = ImGui::SliderFloat("Light position", &lightY, 0.2, 2);
+	if (changedPosition) {
+		t->Light->Position.y = lightY;
+		t->LightSourceIsDirty = true;
+	}
 }
 
 LPSTR desktop_directory()

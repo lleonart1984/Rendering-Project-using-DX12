@@ -409,11 +409,7 @@ public:
 
 		perform(Photontracing);
 
-		flush_all_to_gpu;
-
 		perform(ConstructPhotonMap);
-
-		flush_all_to_gpu;
 
 		static bool firstTime = true;
 		if (firstTime) {
@@ -434,19 +430,20 @@ public:
 
 		static int FrameIndex = 0;
 
-		if (CameraIsDirty)
+		if (CameraIsDirty || LightSourceIsDirty)
 			FrameIndex = 0;
 
 		manager gCopy ValueData(ptRTProgram->ProgressivePass, FrameIndex);
 
 		FrameIndex++;
 
-
-		// Update lighting needed for photon tracing
-		manager gCopy ValueData(ptRTProgram->LightingCB, Lighting{
-			Light->Position, 0,
-			Light->Intensity, 0
-			});
+		if (LightSourceIsDirty) {
+			// Update lighting needed for photon tracing
+			manager gCopy ValueData(ptRTProgram->LightingCB, Lighting{
+				Light->Position, 0,
+				Light->Intensity, 0
+				});
+		}
 
 		manager gCopy ValueData(ptRTProgram->CameraCB, lightView.getInverse());
 
@@ -526,19 +523,23 @@ public:
 		auto rtProgram = dxrRTPipeline->_Program;
 
 		// Update camera
-		// Required during ray-trace stage
-		manager gCopy ValueData(rtProgram->CameraCB, view.getInverse());
+		if (CameraIsDirty) {
+			// Required during ray-trace stage
+			manager gCopy ValueData(rtProgram->CameraCB, view.getInverse());
+		}
 
-		manager gCopy ValueData(rtProgram->LightTransforms, Globals{
-				lightProj,
-				lightView
-			});
+		if (LightSourceIsDirty) {
+			manager gCopy ValueData(rtProgram->LightTransforms, Globals{
+					lightProj,
+					lightView
+				});
 
-		// Update lighting needed for photon tracing
-		manager gCopy ValueData(rtProgram->LightingCB, Lighting{
-			Light->Position, 0,
-			Light->Intensity, 0
-			});
+			// Update lighting needed for photon tracing
+			manager gCopy ValueData(rtProgram->LightingCB, Lighting{
+				Light->Position, 0,
+				Light->Intensity, 0
+				});
+		}
 
 		dxrRTPipeline->_Program->Positions = gBufferFromViewer->pipeline->GBuffer_P;
 		dxrRTPipeline->_Program->Normals = gBufferFromViewer->pipeline->GBuffer_N;
@@ -546,7 +547,7 @@ public:
 		dxrRTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
 		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
 
-		if (CameraIsDirty)
+		if (CameraIsDirty || LightSourceIsDirty)
 			manager gClear UAV(rtProgram->Output, 0u);
 
 		// Set DXR Pipeline
