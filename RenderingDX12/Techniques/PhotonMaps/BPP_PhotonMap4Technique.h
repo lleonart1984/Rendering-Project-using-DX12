@@ -4,7 +4,7 @@
 #include "../DeferredShading/GBufferConstruction.h"
 #include "../CommonGI/Parameters.h"
 
-struct BPP_PhotonMap3Technique : public Technique, public IHasScene, public IHasLight, public IHasCamera {
+struct BPP_PhotonMap4Technique : public Technique, public IHasScene, public IHasLight, public IHasCamera {
 public:
 
 	// Scene loading process to retain scene on the GPU
@@ -33,7 +33,7 @@ public:
 		}
 	};
 
-	
+
 	struct BitonicStage {
 		int len;
 		int dif;
@@ -64,7 +64,7 @@ public:
 
 	struct ConstructPhotonMapPipeline : public ComputePipelineBindings {
 		void Setup() {
-			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\PhotonMortonConstruction_CS.cso"));
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\PhotonMortonKConstruction_CS.cso"));
 		}
 
 		gObj<Buffer> Photons;
@@ -97,7 +97,7 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_RT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\BPP_PhotonGather2_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\BPP_PhotonGather4_RT.cso"));
 
 				_ gLoad Shader(Context()->RTMainRays, L"RTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -138,7 +138,7 @@ public:
 			// GBuffer from light for visibility test during direct lighting
 			gObj<Texture2D> LightPositions;
 
-			gObj<Texture2D> *Textures;
+			gObj<Texture2D>* Textures;
 			int TextureCount;
 
 			gObj<Buffer> CameraCB;
@@ -208,7 +208,7 @@ public:
 	// AABBs buffer for photon map
 	gObj<Buffer> PhotonsAABBs;
 	// Baked photon map used for updates
-	gObj<GeometriesOnGPU> PhotonsAABBsOnTheGPU [PHOTONS_LOD + 1];
+	gObj<GeometriesOnGPU> PhotonsAABBsOnTheGPU[PHOTONS_LOD - BOXED_PHOTONS_LOD + 1];
 	// Baked scene geometries used for toplevel instance updates
 	gObj<GeometriesOnGPU> sceneGeometriesOnGPU;
 	// Vertex buffer for scene triangles
@@ -263,9 +263,9 @@ public:
 	}
 
 	void CreatingAssets(gObj<GraphicsManager> manager) {
-		
+
 		// Photons aabbs used in bottom level structure building and updates
-		PhotonsAABBs = _ gCreate RWAccelerationDatastructureBuffer<D3D12_RAYTRACING_AABB>(PHOTON_DIMENSION*PHOTON_DIMENSION);
+		PhotonsAABBs = _ gCreate RWAccelerationDatastructureBuffer<D3D12_RAYTRACING_AABB>(PHOTON_DIMENSION * PHOTON_DIMENSION / BOXED_PHOTONS);
 
 #pragma region DXR Photon trace Pipeline Objects
 		dxrPTPipeline->_Program->TextureCount = sceneLoader->TextureCount;
@@ -277,13 +277,13 @@ public:
 		dxrPTPipeline->_Program->CameraCB = _ gCreate ConstantBuffer<float4x4>();
 		dxrPTPipeline->_Program->LightingCB = _ gCreate ConstantBuffer<Lighting>();
 		dxrPTPipeline->_Program->ProgressivePass = _ gCreate ConstantBuffer<int>();
-		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION*PHOTON_DIMENSION);
+		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 #pragma endregion
 
 #pragma region Morton indexing and initialization
 		mortonIndexingPipeline->Photons = dxrPTPipeline->_Program->Photons;
 		mortonIndexingPipeline->Indices = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
-		mortonIndexingPipeline->Permutation = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION*PHOTON_DIMENSION);
+		mortonIndexingPipeline->Permutation = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 #pragma endregion
 
 #pragma region Sorting with Bitonic
@@ -294,7 +294,7 @@ public:
 
 #pragma region DXR Pipeline for PM construction using AABBs
 		photonMapConstruction->AABBs = PhotonsAABBs;
-		photonMapConstruction->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION*PHOTON_DIMENSION);
+		photonMapConstruction->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 		photonMapConstruction->Photons = dxrPTPipeline->_Program->Photons;
 		photonMapConstruction->MortonIndices = mortonIndexingPipeline->Indices;
 		photonMapConstruction->Permutation = mortonIndexingPipeline->Permutation;
@@ -347,11 +347,11 @@ public:
 		// Building top-level ADS for SceneAndPhotonMap
 		auto sceneInstances = manager gCreate Instances();
 
-		for (int t = 0; t <= PHOTONS_LOD; t++)
+		for (int t = 0; t <= PHOTONS_LOD - BOXED_PHOTONS_LOD; t++)
 		{
 			auto photonMapBuilder = manager gCreate ProceduralGeometries();
 			photonMapBuilder gSet AABBs(PhotonsAABBs);
-			int start = t == 0 ? 0 : (1 << (t - 1))*PHOTON_DIMENSION;
+			int start = t == 0 ? 0 : (1 << (t - 1)) * PHOTON_DIMENSION;
 			int count = max(PHOTON_DIMENSION, start);
 			photonMapBuilder gLoad Geometry(start, count);
 			PhotonsAABBsOnTheGPU[t] = photonMapBuilder gCreate BakedGeometry(false, true);
@@ -364,14 +364,14 @@ public:
 	}
 
 	void UpdatePhotonMap(gObj<DXRManager> manager) {
-		
+
 		auto sceneInstances = manager gCreate Instances(dxrRTPipeline->_Program->SceneAndPhotonMap);
-		
-		for (int t = 0; t <= PHOTONS_LOD; t++)
+
+		for (int t = 0; t <= PHOTONS_LOD - BOXED_PHOTONS_LOD; t++)
 		{
 			auto photonMapBuilder = manager gCreate ProceduralGeometries(PhotonsAABBsOnTheGPU[t]);
 			photonMapBuilder gSet AABBs(PhotonsAABBs);
-			int start = t == 0 ? 0 : (1 << (t - 1))*PHOTON_DIMENSION;
+			int start = t == 0 ? 0 : (1 << (t - 1)) * PHOTON_DIMENSION;
 			int count = max(PHOTON_DIMENSION, start);
 			photonMapBuilder gLoad Geometry(start, count);
 			PhotonsAABBsOnTheGPU[t] = photonMapBuilder gCreate RebuiltGeometry(false, true);
@@ -514,7 +514,7 @@ public:
 
 		// Constructing AABBs and Computing Radii
 		computeManager gSet Pipeline(photonMapConstruction);
-		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / CS_1D_GROUPSIZE);
+		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / CS_1D_GROUPSIZE / BOXED_PHOTONS);
 	}
 
 	void Raytracing(gObj<DXRManager> manager) {

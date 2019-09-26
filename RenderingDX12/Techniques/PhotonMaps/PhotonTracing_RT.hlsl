@@ -219,7 +219,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 		p.Normal = surfel.N;
 		p.Direction = WorldRayDirection();
 		Photons[rayId] = p;
-		stopPdf = 0.5;// *(material.Diffuse.x + material.Diffuse.y + material.Diffuse.z) / 3;
+		stopPdf = payloadBounce == 0 ? 1 : 0.5 *(material.Diffuse.x + material.Diffuse.y + material.Diffuse.z) / 3;
 	}
 	else
 		stopPdf = 0;

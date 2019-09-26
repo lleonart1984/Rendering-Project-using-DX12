@@ -36,6 +36,8 @@
     <FxCompile Include="Techniques\PhotonMaps\PhotonBitonicSort_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_MortonIndexing_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\PhotonMortonConstruction_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PhotonMortonKConstruction_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonGather4_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -87,19 +89,12 @@
     <ClInclude Include="Techniques\Tutorials\Tutorial9.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial10.h" />
     <ClInclude Include="Techniques\GUI_Traits.h" />
-    <ClInclude Include="Techniques\DXR_Raytracer\DXRRaytracer.h" />
-    <ClInclude Include="Techniques\DXR_Photontracer\DXRPhotonMapping.h" />
     <ClInclude Include="Techniques\DeferredShading\GBufferConstruction.h" />
     <ClInclude Include="Techniques\DeferredShading\DeferredLighting.h" />
-    <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HybridPhotonTracer.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial11.h" />
-    <ClInclude Include="Techniques\AccPathtracing\DXRPathtracer.h" />
-    <ClInclude Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotontracerTechnique.h" />
-    <ClInclude Include="Techniques\FULL_DXR_PhotonMap2\FullDXRPhotontracerTechnique2.h" />
     <ClInclude Include="Techniques\Randoms\RandomHLSL.h" />
     <ClInclude Include="Techniques\CommonGI\Definitions.h" />
     <ClInclude Include="Techniques\CommonGI\ScatteringTools.h" />
-    <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial12.h" />
     <ClInclude Include="Techniques\CommonGI\Parameters.h" />
     <ClInclude Include="Techniques\CommonRT\CommonRTScenes.h" />
@@ -117,6 +112,7 @@
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap3Technique.h" />
     <ClInclude Include="Techniques\PhotonMaps\CommonHashing_RT.h" />
     <ClInclude Include="Techniques\Raytracing\DXRRaytracerTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap4Technique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

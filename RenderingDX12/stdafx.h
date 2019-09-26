@@ -38,5 +38,6 @@ using namespace CA4G;
 #include "Techniques/PhotonMaps/GridPhotonMapTechnique.h"
 #include "Techniques/PhotonMaps/BPP_PhotonMap2Technique.h"
 #include "Techniques/PhotonMaps/BPP_PhotonMap3Technique.h"
+#include "Techniques/PhotonMaps/BPP_PhotonMap4Technique.h"
 
 #include "main.h"

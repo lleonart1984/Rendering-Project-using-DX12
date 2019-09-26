@@ -8,7 +8,7 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE SPONZA_OBJ
+#define USE_SCENE RING_OBJ
 
 #define MOVE_LIGHT false
 
@@ -51,9 +51,10 @@
 //gObj<RecursivePathtracer> technique;
 
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
-gObj<GridPhotonMapTechnique> technique;
+//gObj<GridPhotonMapTechnique> technique;
 //gObj<BPP_PhotonMap2Technique> technique;
-//gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
+gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
+//gObj<BPP_PhotonMap4Technique> technique; // Technique with morton sorting of photons to estimate knn
 
 // APIT
 //gObj<DebugAPIT> technique;

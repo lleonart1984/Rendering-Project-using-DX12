@@ -12,10 +12,10 @@ RWStructuredBuffer<int> NextBuffer		: register (u1);
 
 #include "CommonHashing_RT.h"
 
-[numthreads(32, 32, 1)]
+[numthreads(CS_1D_GROUPSIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-	int index = DTid.y * PHOTON_DIMENSION + DTid.x;
+	int index = DTid.x;
 
 	if (any(Photons[index].Intensity)) {
 		int3 cell = FromPositionToCell(Photons[index].Position);

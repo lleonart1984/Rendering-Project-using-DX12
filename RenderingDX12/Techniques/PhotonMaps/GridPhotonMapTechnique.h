@@ -178,8 +178,8 @@ public:
 
 	gObj<Buffer> screenVertices;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
-	gObj<DXR_PM_Pipeline> dxrPMPipeline;
-	//gObj<PhotonMapConstructionPipeline> constructingPM;
+	//gObj<DXR_PM_Pipeline> dxrPMPipeline;
+	gObj<PhotonMapConstructionPipeline> constructingPM;
 	gObj<DXR_RT_Pipeline> dxrRTPipeline;
 
 	void SetScene(gObj<CA4G::Scene> scene) {
@@ -208,8 +208,8 @@ public:
 		wait_for(signal(flush_all_to_gpu));
 
 		_ gLoad Pipeline(dxrPTPipeline);
-		_ gLoad Pipeline(dxrPMPipeline);
-		//_ gLoad Pipeline(constructingPM);
+		//_ gLoad Pipeline(dxrPMPipeline);
+		_ gLoad Pipeline(constructingPM);
 		_ gLoad Pipeline(dxrRTPipeline);
 
 		// Load assets to render the deferred lighting image
@@ -251,17 +251,17 @@ public:
 
 #pragma region DXR Photon map construction pipeline objects
 
-		//constructingPM->Photons = dxrPTPipeline->_Program->Photons;
-		dxrPMPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
+		constructingPM->Photons = dxrPTPipeline->_Program->Photons;
+		//dxrPMPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 #if USE_VOLUME_GRID
-		//constructingPM->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
-		dxrPMPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
+		constructingPM->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
+		//dxrPMPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_GRID_SIZE * PHOTON_GRID_SIZE * PHOTON_GRID_SIZE);
 #else
-		//constructingPM->HeadBuffer = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
-		dxrPMPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
+		constructingPM->HeadBuffer = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
+		//dxrPMPipeline->_Program->HeadBuffer = _ gCreate RWStructuredBuffer<int>(HASH_CAPACITY);
 #endif
-		//constructingPM->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
-		dxrPMPipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+		constructingPM->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+		//dxrPMPipeline->_Program->NextBuffer = _ gCreate RWStructuredBuffer<int>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 
 #pragma endregion
 
@@ -283,10 +283,10 @@ public:
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		// Bind now as SRVs
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
-		dxrRTPipeline->_Program->HashtableBuffer = dxrPMPipeline->_Program->HeadBuffer;
-		//dxrRTPipeline->_Program->HashtableBuffer = constructingPM->HeadBuffer;
-		dxrRTPipeline->_Program->NextBuffer = dxrPMPipeline->_Program->NextBuffer;
-		//dxrRTPipeline->_Program->NextBuffer = constructingPM->NextBuffer;
+		//dxrRTPipeline->_Program->HashtableBuffer = dxrPMPipeline->_Program->HeadBuffer;
+		dxrRTPipeline->_Program->HashtableBuffer = constructingPM->HeadBuffer;
+		//dxrRTPipeline->_Program->NextBuffer = dxrPMPipeline->_Program->NextBuffer;
+		dxrRTPipeline->_Program->NextBuffer = constructingPM->NextBuffer;
 #pragma endregion
 	}
 
@@ -329,16 +329,18 @@ public:
 #pragma endregion
 		}
 
+		if (LightSourceIsDirty) {
 #pragma region Construct GBuffer from light
-		lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
-		lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
-		gBufferFromLight->ViewMatrix = lightView;
-		gBufferFromLight->ProjectionMatrix = lightProj;
-		ExecuteFrame(gBufferFromLight);
+			lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
+			lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
+			gBufferFromLight->ViewMatrix = lightView;
+			gBufferFromLight->ProjectionMatrix = lightProj;
+			ExecuteFrame(gBufferFromLight);
 #pragma endregion
+		}
 
 		perform(Photontracing);
-		
+
 		perform(PhotonMapConstruction);
 
 		perform(Raytracing);
@@ -348,7 +350,7 @@ public:
 
 		static int FrameIndex = 0;
 
-		if (CameraIsDirty)
+		if (CameraIsDirty || LightSourceIsDirty)
 			FrameIndex = 0;
 
 		manager gCopy ValueData(dxrPTPipeline->_Program->ProgressivePass, FrameIndex);
@@ -357,13 +359,17 @@ public:
 
 		auto ptRTProgram = dxrPTPipeline->_Program;
 
-		// Update lighting needed for photon tracing
-		manager gCopy ValueData(ptRTProgram->LightingCB, Lighting{
-			Light->Position, 0,
-			Light->Intensity, 0
-			});
+		if (LightSourceIsDirty) {
+			// Update lighting needed for photon tracing
+			manager gCopy ValueData(ptRTProgram->LightingCB, Lighting{
+				Light->Position, 0,
+				Light->Intensity, 0
+				});
+		}
 
-		manager gCopy ValueData(ptRTProgram->CameraCB, lightView.getInverse());
+		if (CameraIsDirty) {
+			manager gCopy ValueData(ptRTProgram->CameraCB, lightView.getInverse());
+		}
 
 		dxrPTPipeline->_Program->Positions = gBufferFromLight->pipeline->GBuffer_P;
 		dxrPTPipeline->_Program->Normals = gBufferFromLight->pipeline->GBuffer_N;
@@ -412,31 +418,35 @@ public:
 	}
 
 	void PhotonMapConstruction(gObj<DXRManager> manager) {
-		//auto computeManager = manager.Dynamic_Cast<ComputeManager>();
-		//computeManager gClear UAV(constructingPM->HeadBuffer, (unsigned int)-1); // reset head buffer to null for every list
-		//computeManager gSet Pipeline(constructingPM);
-		//computeManager gDispatch Threads(PHOTON_DIMENSION/32, PHOTON_DIMENSION / 32);
+		auto computeManager = manager.Dynamic_Cast<ComputeManager>();
+		computeManager gClear UAV(constructingPM->HeadBuffer, (unsigned int)-1); // reset head buffer to null for every list
+		computeManager gSet Pipeline(constructingPM);
+		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / CS_1D_GROUPSIZE);
 		
-		auto rtProgram = dxrPMPipeline->_Program;
-		manager gClear UAV(rtProgram->HeadBuffer, (unsigned int)-1); // reset head buffer to null for every list
-		manager gSet Pipeline(dxrPMPipeline);
-		manager gSet Program(rtProgram);
-		manager gSet RayGeneration(dxrPMPipeline->Main);
-		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
+		//auto rtProgram = dxrPMPipeline->_Program;
+		//manager gClear UAV(rtProgram->HeadBuffer, (unsigned int)-1); // reset head buffer to null for every list
+		//manager gSet Pipeline(dxrPMPipeline);
+		//manager gSet Program(rtProgram);
+		//manager gSet RayGeneration(dxrPMPipeline->Main);
+		//manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
 	}
 
 	void Raytracing(gObj<DXRManager> manager) {
 
 		auto rtProgram = dxrRTPipeline->_Program;
 
-		// Update camera
-		// Required during ray-trace stage
-		manager gCopy ValueData(rtProgram->CameraCB, view.getInverse());
+		if (CameraIsDirty) {
+			// Update camera
+			// Required during ray-trace stage
+			manager gCopy ValueData(rtProgram->CameraCB, view.getInverse());
+		}
 
-		manager gCopy ValueData(rtProgram->LightTransforms, Globals{
-				lightProj,
-				lightView
-			});
+		if (LightSourceIsDirty) {
+			manager gCopy ValueData(rtProgram->LightTransforms, Globals{
+					lightProj,
+					lightView
+				});
+		}
 
 		dxrRTPipeline->_Program->Positions = gBufferFromViewer->pipeline->GBuffer_P;
 		dxrRTPipeline->_Program->Normals = gBufferFromViewer->pipeline->GBuffer_N;
@@ -444,7 +454,7 @@ public:
 		dxrRTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
 		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
 
-		if (CameraIsDirty)
+		if (CameraIsDirty || LightSourceIsDirty)
 			manager gClear UAV(rtProgram->Output, 0u);
 
 		// Set DXR Pipeline
