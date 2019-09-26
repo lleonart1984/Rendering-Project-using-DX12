@@ -37,7 +37,7 @@ float MortonEstimator(in Photon currentPhoton, int index) {
 			r++;
 		if ((r - l) >= DESIRED_PHOTONS * 4 / 3.14159)
 		{
-			return pow(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l) * 4 / 3.14, 1.0 / 2);
+			return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l) * 4 / 3.14);
 		}
 		if (mortonBlockRadius >= PHOTON_RADIUS)
 			return PHOTON_RADIUS;
@@ -47,7 +47,7 @@ float MortonEstimator(in Photon currentPhoton, int index) {
 	return PHOTON_RADIUS;
 }
 
-[numthreads(1024, 1, 1)]
+[numthreads(CS_1D_GROUPSIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
 	int index = DTid.x;
@@ -67,11 +67,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	else {
 		radius = 0;
 
-		float3 pos = 0;// 2 * float3(x, y, z) - 1;
-		//float3 pos = Photons[Permutation[0]].Position;
+		//float3 pos = 0;// 2 * float3(x, y, z) - 1;
+		float3 pos = Photons[Permutation[0]].Position;
 
-		box.minimum = pos - 0.00001;// -radius * 0.0001;
-		box.maximum = pos + 0.00001;// +radius * 0.0001;
+		box.minimum = pos - 0.000001;// -radius * 0.0001;
+		box.maximum = pos + 0.000001;// +radius * 0.0001;
 	}
 	radii[Permutation[index]] = radius;
 	PhotonAABBs[index] = box;

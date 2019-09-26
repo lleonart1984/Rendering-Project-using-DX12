@@ -60,13 +60,59 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define OBJECT_CB_REG				b3
 #endif
 
-#ifndef PT_CUSTOM_PAYLOAD
+#include "../CommonGI/Parameters.h"
+
+#ifdef COMPACT_PAYLOAD
 struct PTPayload
 {
-	float3 PhotonIntensity;
-	int PhotonBounce;
+	half Compressed0; // intensity
+	int Compressed1; // RGBX : RGB - normalized color, X - bounces
 };
+
+float3 DecodePTPayloadAccumulation(in PTPayload p) {
+	float3 rgb = (int3(p.Compressed1 >> 24, p.Compressed1 >> 16, p.Compressed1 >> 8) & 255) / 255.0;
+	return rgb * p.Compressed0;
+}
+
+int DecodePTPayloadBounces(in PTPayload p) {
+	return p.Compressed1 & 255;
+}
+
+void EncodePTPayloadBounce(inout PTPayload p, int bounces) {
+	p.Compressed1 = (p.Compressed1 & ~255) | bounces;
+}
+
+void EncodePTPayloadAccumulation(inout PTPayload p, float3 accumulation) {
+	float intensity = max(accumulation.x, max(accumulation.y, accumulation.z));
+	int3 norm = 255 * saturate(accumulation / max(0.00001, intensity));
+	p.Compressed0 = intensity;
+	p.Compressed1 = (p.Compressed1 & 255) | norm.x << 24 | norm.y << 16 | norm.z << 8;
+}
+#else
+struct PTPayload
+{
+	float3 Accumulation; // intensity
+	int Bounce; // RGBX : RGB - normalized color, X - bounces
+};
+
+float3 DecodePTPayloadAccumulation(in PTPayload p) {
+	return p.Accumulation;
+}
+
+int DecodePTPayloadBounces(in PTPayload p) {
+	return p.Bounce;
+}
+
+void EncodePTPayloadBounce(inout PTPayload p, int bounces) {
+	p.Bounce = bounces;
+}
+
+void EncodePTPayloadAccumulation(inout PTPayload p, float3 accumulation) {
+	p.Accumulation = accumulation;
+}
 #endif
+
+
 
 RWStructuredBuffer<Photon> Photons		: register(u0);
 
@@ -93,8 +139,8 @@ void PTMainRays() {
 	Material material;
 	// L is the viewer here
 	float3 L;
-	//float2 coord = float2((raysIndex.x + random()) / raysDimensions.x, (raysIndex.y + random()) / raysDimensions.y);
-	float2 coord = float2((raysIndex.x + 0.5) / raysDimensions.x, (raysIndex.y + 0.5) / raysDimensions.y);
+	float2 coord = float2((raysIndex.x + random()) / raysDimensions.x, (raysIndex.y + random()) / raysDimensions.y);
+	//float2 coord = float2((raysIndex.x + 0.5) / raysDimensions.x, (raysIndex.y + 0.5) / raysDimensions.y);
 	float fact = length(float3(coord, 1));
 
 	int photonIndex = raysIndex.x + raysIndex.y * raysDimensions.x;
@@ -105,13 +151,10 @@ void PTMainRays() {
 		// no photon hit
 		return;
 
-	PTPayload payload = (PTPayload)0;
-	payload.PhotonIntensity = // Photon Intensity
+	float3 photonIntensity = 
 		LightIntensity * 100000
 		/
 		(3 * pi * pi * fact * fact * raysDimensions.x * raysDimensions.y);
-	payload.PhotonBounce = // Photon Bounces Left
-		PHOTON_TRACE_MAX_BOUNCES - 1;
 
 	float3 direction, ratio;
 	float pdf;
@@ -125,11 +168,17 @@ void PTMainRays() {
 		ray.TMin = 0.001;
 		ray.TMax = 10;
 
-		payload.PhotonIntensity *= ratio;
+		PTPayload payload = (PTPayload)0;
+		EncodePTPayloadAccumulation(payload,
+			// Photon Intensity after first bounce
+			photonIntensity * ratio);
+		EncodePTPayloadBounce(payload,
+			// Photon Bounces Left
+			PHOTON_TRACE_MAX_BOUNCES - 1);
+		
 		// Trace the ray.
 		// Set the ray's extents.
-		if (any(payload.PhotonIntensity))
-			TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, ray, payload); // Will be used with Photon scattering function
+		TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, ray, payload); // Will be used with Photon scattering function
 	}
 }
 
@@ -145,9 +194,12 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 	Material material;
 	GetHitInfo(attr, surfel, material);
 
+	float3 payloadAccumulation = DecodePTPayloadAccumulation(payload);
+	int payloadBounce = DecodePTPayloadBounces(payload);
+
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
-	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, payload.PhotonBounce, PassCount);
+	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, payloadBounce, PassCount);
 
 	int rayId = raysIndex.x + raysIndex.y * raysDimensions.x;
 
@@ -158,14 +210,16 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 	float russianRoulette = random();
 	float stopPdf;
 
+
+
 	if (NdotV > 0.001 && material.Roulette.x > 0) { // store photon assuming this is the last bounce
 		Photon p = (Photon)0;
-		p.Intensity = payload.PhotonIntensity;
+		p.Intensity = payloadAccumulation;
 		p.Position = surfel.P;
 		p.Normal = surfel.N;
 		p.Direction = WorldRayDirection();
 		Photons[rayId] = p;
-		stopPdf = material.Roulette.x * 0.5;
+		stopPdf = 0.5;// *(material.Diffuse.x + material.Diffuse.y + material.Diffuse.z) / 3;
 	}
 	else
 		stopPdf = 0;
@@ -175,7 +229,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 		Photons[rayId].Intensity *= (1 / stopPdf);
 	}
 	else
-		if (payload.PhotonBounce > 0) // Photon can bounce one more time
+		if (payloadBounce > 0) // Photon can bounce one more time
 		{
 			float3 ratio;
 			float3 direction;
@@ -184,9 +238,8 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 
 			if (any(ratio))
 			{
-				PTPayload newPhotonPayload = (PTPayload)0;
-				newPhotonPayload.PhotonIntensity = payload.PhotonIntensity * ratio / (1 - stopPdf);
-				newPhotonPayload.PhotonBounce = payload.PhotonBounce - 1;
+				EncodePTPayloadAccumulation(payload, payloadAccumulation * ratio / (1 - stopPdf));
+				EncodePTPayloadBounce(payload, payloadBounce - 1);
 
 				RayDesc newPhotonRay;
 				newPhotonRay.TMin = 0.001;
@@ -194,7 +247,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 				newPhotonRay.Direction = direction;
 				newPhotonRay.Origin = surfel.P + sign(dot(direction, surfel.N))*0.001*surfel.N; // avoid self shadowing
 
-				TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, ~0, 0, 1, 0, newPhotonRay, newPhotonPayload); // Will be used with Photon scattering function
+				TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, ~0, 0, 1, 0, newPhotonRay, payload); // Will be used with Photon scattering function
 			}
 		}
 }

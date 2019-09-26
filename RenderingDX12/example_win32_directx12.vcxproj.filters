@@ -57,7 +57,6 @@
     <ClInclude Include="Imgui\imstb_truetype.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="stdafx.h" />
-    <ClInclude Include="Techniques\AccPathtracing\DXRPathtracer.h" />
     <ClInclude Include="Techniques\CommonGI\Definitions.h" />
     <ClInclude Include="Techniques\CommonGI\Parameters.h" />
     <ClInclude Include="Techniques\CommonGI\ScatteringTools.h" />
@@ -70,14 +69,8 @@
     <ClInclude Include="Techniques\Common\RetainedSceneLoader.h" />
     <ClInclude Include="Techniques\DeferredShading\DeferredLighting.h" />
     <ClInclude Include="Techniques\DeferredShading\GBufferConstruction.h" />
-    <ClInclude Include="Techniques\DXR_Photontracer\DXRPhotonMapping.h" />
-    <ClInclude Include="Techniques\DXR_Raytracer\DXRRaytracer.h" />
-    <ClInclude Include="Techniques\FULL_DXR_PhotonMap2\FullDXRPhotontracerTechnique2.h" />
-    <ClInclude Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotontracerTechnique.h" />
     <ClInclude Include="Techniques\GUI_Traits.h" />
-    <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
     <ClInclude Include="Techniques\Randoms\RandomHLSL.h" />
-    <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HybridPhotonTracer.h" />
     <ClInclude Include="Techniques\RetainedBasic\RetainedBasicRenderer.h" />
     <ClInclude Include="Techniques\Sample\Sample.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial1.h" />

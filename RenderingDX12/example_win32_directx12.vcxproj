@@ -43,7 +43,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -57,7 +57,7 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='HLSL|Win32'">
     <PlatformToolset>v141</PlatformToolset>
@@ -199,7 +199,6 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="Imgui\imstb_truetype.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="stdafx.h" />
-    <ClInclude Include="Techniques\AccPathtracing\DXRPathtracer.h" />
     <ClInclude Include="Techniques\CommonGI\Definitions.h" />
     <ClInclude Include="Techniques\CommonGI\Parameters.h" />
     <ClInclude Include="Techniques\CommonGI\ScatteringTools.h" />
@@ -212,12 +211,7 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="Techniques\Common\RetainedSceneLoader.h" />
     <ClInclude Include="Techniques\DeferredShading\DeferredLighting.h" />
     <ClInclude Include="Techniques\DeferredShading\GBufferConstruction.h" />
-    <ClInclude Include="Techniques\DXR_Photontracer\DXRPhotonMapping.h" />
-    <ClInclude Include="Techniques\DXR_Raytracer\DXRRaytracer.h" />
-    <ClInclude Include="Techniques\FULL_DXR_PhotonMap2\FullDXRPhotontracerTechnique2.h" />
-    <ClInclude Include="Techniques\FULL_DXR_PhotonMap\FullDXRPhotontracerTechnique.h" />
     <ClInclude Include="Techniques\GUI_Traits.h" />
-    <ClInclude Include="Techniques\ItAccPathtracing\DXRItPathtracer.h" />
     <ClInclude Include="Techniques\Pathtracing\IterativePathtracer.h" />
     <ClInclude Include="Techniques\Pathtracing\RecursivePathtracer.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap2Technique.h" />
@@ -226,7 +220,6 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="Techniques\PhotonMaps\GridPhotonMapTechnique.h" />
     <ClInclude Include="Techniques\PhotonMaps\PhotonDefinition.h" />
     <ClInclude Include="Techniques\Randoms\RandomHLSL.h" />
-    <ClInclude Include="Techniques\RASTER_DXR_Photontracer\HybridPhotonTracer.h" />
     <ClInclude Include="Techniques\Raytracing\DXRRaytracerTechnique.h" />
     <ClInclude Include="Techniques\RetainedBasic\RetainedBasicRenderer.h" />
     <ClInclude Include="Techniques\Sample\Sample.h" />
