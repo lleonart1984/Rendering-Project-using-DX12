@@ -64,7 +64,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
 	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection() * 0.5;
 	
-	[unroll(BOXED_PHOTONS)]
+	[loop]
 	for (int i = 0; i < BOXED_PHOTONS; i++) {
 		int photonIdx = Permutation[attr.AABBIdx * BOXED_PHOTONS + i];
 
@@ -78,7 +78,6 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 		float NdotN = dot(payload.SurfelNormal, p.Normal);
 
 		// Aggregate current Photon contribution if inside radius
-		
 		float kernel = (photonDistance < radius && NdotL > 0.001) * 2 * (1 - photonDistance / radius);
 		payload.Accum += kernel * p.Intensity * saturate(NdotN) / area;
 	}

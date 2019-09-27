@@ -35,7 +35,7 @@ float MortonEstimator(in Photon currentPhoton, int index) {
 		int currentBlock = currentMorton & currentMask;
 		float mortonBlockRadius = (1 << i) / 1024.0;
 
-		int inc = 1;
+		int inc = BOXED_PHOTONS;
 
 		// expand l and r considering all photons inside current block (currentMask)
 		while (l >= 0 && ((Morton[Permutation[l]] & currentMask) == currentBlock))
@@ -44,7 +44,7 @@ float MortonEstimator(in Photon currentPhoton, int index) {
 			inc <<= 1;
 		}
 
-		inc = 1;
+		inc = BOXED_PHOTONS;
 
 		while (r < bufferSize && ((Morton[Permutation[r]] & currentMask) == currentBlock))
 		{
@@ -87,13 +87,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
 			box.maximum = max(box.maximum, currentPhoton.Position + radius);
 		}
 
-		radii[Permutation[photonIdx]] = radius;
+		radii[Permutation[photonIdx]] = max(0.0001,radius);
 	}
 
 	if (box.maximum.x <= box.minimum.x)
 	{
-		//float3 pos = 0;// 2 * float3(x, y, z) - 1;
-		float3 pos = Photons[Permutation[0]].Position;
+		float3 pos = 0;// 2 * float3(x, y, z) - 1;
+		//float3 pos = Photons[Permutation[0]].Position;
 		box.minimum = pos - 0.0001;// -radius * 0.0001;
 		box.maximum = pos + 0.0001;// +radius * 0.0001;
 	}

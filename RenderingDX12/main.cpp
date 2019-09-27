@@ -103,6 +103,10 @@ public:
 
 bool DeviceManager::FORCE_FALLBACK_DEVICE = false;
 
+float3 cameraPositions[] = { float3(0,0.6,0), float3(0.14, 0.17, 0.14), float3(-0.14, 0.17, 0.14), float3(-0.14, 0.17, -0.15), float3(0.2, 0.02, 0.1) };
+float3 cameraTargets[] = { float3(0,0,-0.1), float3(-0.44, 0.1, 0.14 - 1),float3(0.44, 0.20, 0.14 - 1), float3(1+0.14, 0.3, 0.2+0.14),float3(0.2-1, 0.02, 0.1) };
+int movingCamera = -1;
+
 int main(int, char**)
 {
     // Create application window
@@ -180,11 +184,11 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			//MixMirrorMaterial(&scene->Materials()[9], 0.4); // floor
+			MixMirrorMaterial(&scene->Materials()[9], 0.2); // floor
 			camera->Position = float3(0.3f, 0.05f, -0.028);
 			camera->Target = float3(0, 0.07f, 0);
 			lightSource->Position = float3(0, 0.45, 0);
-			lightSource->Intensity = float3(250, 250, 250);
+			lightSource->Intensity = float3(450, 450, 450);
 			break;
 		case SIBENIK_OBJ:
 			filePath = desktop_directory();
@@ -284,35 +288,56 @@ int main(int, char**)
             ImGui::End();
 
 			{
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Tab)))
+				{
+					movingCamera++;
+					if (movingCamera == ARRAYSIZE(cameraPositions))
+						movingCamera = 0;
+				}
+				bool cameraChanged = false;
+
+				if (movingCamera >= 0) {
+					float d = length(camera->Position - cameraPositions[movingCamera]);
+					cameraChanged = d > 0;
+					float alpha = d == 0 ? 1 : min(d, 0.005) / d;
+					camera->Position = lerp(camera->Position, cameraPositions[movingCamera], alpha);
+					camera->Target = camera->Position + normalize(lerp(camera->Target, cameraTargets[movingCamera], alpha) - camera->Position) * 0.03;
+				}
+
 				auto delta = ImGui::GetMouseDragDelta(1);
 				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))
 					camera->RotateAround(delta.x*0.01f, -delta.y*0.01f);
 				else
 					camera->Rotate(delta.x*0.01f, -delta.y*0.01f);
 
-				bool cameraChanged = false;
+
 				if (delta.x != 0 || delta.y != 0)
 				{
+					movingCamera = -1;
 					cameraChanged = true;
 					ImGui::ResetMouseDragDelta(1);
 				}
 				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_UpArrow)))
 				{
+					movingCamera = -1;
 					camera->MoveForward(deltaTime);
 					cameraChanged = true;
 				}
 				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_DownArrow)))
 				{
+					movingCamera = -1;
 					camera->MoveBackward(deltaTime);
 					cameraChanged = true;
 				}
 				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_LeftArrow)))
 				{
+					movingCamera = -1;
 					camera->MoveLeft(deltaTime);
 					cameraChanged = true;
 				}
 				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_RightArrow)))
 				{
+					movingCamera = -1;
 					camera->MoveRight(deltaTime);
 					cameraChanged = true;
 				}
