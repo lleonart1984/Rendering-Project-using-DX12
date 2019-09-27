@@ -72,17 +72,16 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	box.minimum = 10000;
 	box.maximum = -10000;
 
-	int photonIdx = index * BOXED_PHOTONS;
-
-	[loop]
-	for (int i = 0; i < BOXED_PHOTONS; i++, photonIdx ++)
+	for (int i = 0; i < BOXED_PHOTONS; i++)
 	{
+		int photonIdx = index * BOXED_PHOTONS + i;
+
 		Photon currentPhoton = Photons[Permutation[photonIdx]];
 		float radius = 0;
 
 		if (any(currentPhoton.Intensity))
 		{
-			radius = clamp(MortonEstimator(currentPhoton, photonIdx), PHOTON_RADIUS * 0.0001, PHOTON_RADIUS);
+			radius = clamp(MortonEstimator(currentPhoton, photonIdx), PHOTON_RADIUS * 0.001, PHOTON_RADIUS);
 
 			box.minimum = min(box.minimum, currentPhoton.Position - radius);
 			box.maximum = max(box.maximum, currentPhoton.Position + radius);
@@ -90,12 +89,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 		radii[Permutation[photonIdx]] = radius;
 	}
-	if (box.maximum.x < box.minimum.x)
+
+	if (box.maximum.x <= box.minimum.x)
 	{
-		float3 pos = 0;// 2 * float3(x, y, z) - 1;
-		//float3 pos = Photons[Permutation[0]].Position;
-		box.minimum = pos - 0.000001;// -radius * 0.0001;
-		box.maximum = pos + 0.000001;// +radius * 0.0001;
+		//float3 pos = 0;// 2 * float3(x, y, z) - 1;
+		float3 pos = Photons[Permutation[0]].Position;
+		box.minimum = pos - 0.0001;// -radius * 0.0001;
+		box.maximum = pos + 0.0001;// +radius * 0.0001;
 	}
 	PhotonAABBs[index] = box;
 }

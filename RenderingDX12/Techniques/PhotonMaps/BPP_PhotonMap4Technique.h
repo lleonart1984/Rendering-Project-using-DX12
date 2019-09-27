@@ -351,8 +351,8 @@ public:
 		{
 			auto photonMapBuilder = manager gCreate ProceduralGeometries();
 			photonMapBuilder gSet AABBs(PhotonsAABBs);
-			int start = t == 0 ? 0 : (1 << (t - 1)) * PHOTON_DIMENSION;
-			int count = max(PHOTON_DIMENSION, start);
+			int start = t == 0 ? 0 : (1 << (t - 1)) * PHOTON_DIMENSION / (1 << BOXED_PHOTONS_LOD);
+			int count = max(PHOTON_DIMENSION / (1 << BOXED_PHOTONS_LOD), start);
 			photonMapBuilder gLoad Geometry(start, count);
 			PhotonsAABBsOnTheGPU[t] = photonMapBuilder gCreate BakedGeometry(false, true);
 			sceneInstances gLoad Instance(PhotonsAABBsOnTheGPU[t], 2, 0, start);
@@ -371,8 +371,8 @@ public:
 		{
 			auto photonMapBuilder = manager gCreate ProceduralGeometries(PhotonsAABBsOnTheGPU[t]);
 			photonMapBuilder gSet AABBs(PhotonsAABBs);
-			int start = t == 0 ? 0 : (1 << (t - 1)) * PHOTON_DIMENSION;
-			int count = max(PHOTON_DIMENSION, start);
+			int start = t == 0 ? 0 : (1 << (t - 1)) * PHOTON_DIMENSION / (1 << BOXED_PHOTONS_LOD);
+			int count = max(PHOTON_DIMENSION / (1 << BOXED_PHOTONS_LOD), start);
 			photonMapBuilder gLoad Geometry(start, count);
 			PhotonsAABBsOnTheGPU[t] = photonMapBuilder gCreate RebuiltGeometry(false, true);
 			sceneInstances gLoad Instance(PhotonsAABBsOnTheGPU[t], 2, 0, start);
