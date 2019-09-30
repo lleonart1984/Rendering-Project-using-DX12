@@ -278,6 +278,7 @@ public:
 		dxrPTPipeline->_Program->LightingCB = _ gCreate ConstantBuffer<Lighting>();
 		dxrPTPipeline->_Program->ProgressivePass = _ gCreate ConstantBuffer<int>();
 		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+		dxrPTPipeline->_Program->RadiusFactors = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 #pragma endregion
 
 #pragma region Morton indexing and initialization
@@ -294,7 +295,7 @@ public:
 
 #pragma region DXR Pipeline for PM construction using AABBs
 		photonMapConstruction->AABBs = PhotonsAABBs;
-		photonMapConstruction->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+		photonMapConstruction->Radii = dxrPTPipeline->_Program->RadiusFactors;
 		photonMapConstruction->Photons = dxrPTPipeline->_Program->Photons;
 		photonMapConstruction->MortonIndices = mortonIndexingPipeline->Indices;
 		photonMapConstruction->Permutation = mortonIndexingPipeline->Permutation;

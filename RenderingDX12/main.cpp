@@ -299,7 +299,7 @@ int main(int, char**)
 				if (movingCamera >= 0) {
 					float d = length(camera->Position - cameraPositions[movingCamera]);
 					cameraChanged = d > 0;
-					float alpha = d == 0 ? 1 : min(d, 0.005) / d;
+					float alpha = d == 0 ? 1 : min(d, 10) / d;
 					camera->Position = lerp(camera->Position, cameraPositions[movingCamera], alpha);
 					camera->Target = camera->Position + normalize(lerp(camera->Target, cameraTargets[movingCamera], alpha) - camera->Position) * 0.03;
 				}

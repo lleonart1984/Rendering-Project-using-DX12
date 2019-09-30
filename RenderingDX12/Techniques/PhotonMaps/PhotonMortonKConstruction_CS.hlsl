@@ -87,7 +87,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 			box.maximum = max(box.maximum, currentPhoton.Position + radius);
 		}
 
-		radii[Permutation[photonIdx]] = max(0.0001,radius);
+		radii[Permutation[photonIdx]] *= max(0.0001,radius);
 	}
 
 	if (box.maximum.x <= box.minimum.x)

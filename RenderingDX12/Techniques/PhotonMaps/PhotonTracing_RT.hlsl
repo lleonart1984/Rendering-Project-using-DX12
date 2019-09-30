@@ -115,6 +115,7 @@ void EncodePTPayloadAccumulation(inout PTPayload p, float3 accumulation) {
 
 
 RWStructuredBuffer<Photon> Photons		: register(u0);
+RWStructuredBuffer<float> Radii			: register(u1);
 
 cbuffer AccumulativeInfo : register(ACCUMULATIVE_CB_REG) {
 	int PassCount;
@@ -130,6 +131,11 @@ void PTMainRays() {
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
 
+	int photonIndex = raysIndex.x + raysIndex.y * raysDimensions.x;
+
+	Photons[photonIndex].Intensity = 0;
+	Radii[photonIndex] = 1; // radius factor by default
+
 	if (PHOTON_TRACE_MAX_BOUNCES == 0) // no photon trace
 		return;
 
@@ -142,10 +148,6 @@ void PTMainRays() {
 	float2 coord = float2((raysIndex.x + random()) / raysDimensions.x, (raysIndex.y + random()) / raysDimensions.y);
 	//float2 coord = float2((raysIndex.x + 0.5) / raysDimensions.x, (raysIndex.y + 0.5) / raysDimensions.y);
 	float fact = length(float3(coord, 1));
-
-	int photonIndex = raysIndex.x + raysIndex.y * raysDimensions.x;
-
-	Photons[photonIndex].Intensity = 0;
 
 	if (!GetPrimaryIntersection((int2)(coord * SHADOWMAP_DIMENSION) + 0.5, coord, L, surfel, material))
 		// no photon hit
@@ -205,12 +207,12 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 
 	float3 V = -WorldRayDirection();
 
+	float d = distance(WorldRayOrigin(), surfel.P);
+
 	float NdotV = dot(V, surfel.N);
 
 	float russianRoulette = random();
 	float stopPdf;
-
-
 
 	if (NdotV > 0.001 && material.Roulette.x > 0) { // store photon assuming this is the last bounce
 		Photon p = (Photon)0;
@@ -219,7 +221,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 		p.Normal = surfel.N;
 		p.Direction = WorldRayDirection();
 		Photons[rayId] = p;
-		stopPdf = payloadBounce == 0 ? 1 : 0.5 *(material.Diffuse.x + material.Diffuse.y + material.Diffuse.z) / 3;
+		stopPdf = payloadBounce == 0 ? 1 : 0.5 * material.Roulette.x * (material.Diffuse.x + material.Diffuse.y + material.Diffuse.z) / 3;
 	}
 	else
 		stopPdf = 0;
@@ -227,6 +229,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 	if (russianRoulette < stopPdf) // photon stay here
 	{
 		Photons[rayId].Intensity *= (1 / stopPdf);
+		Radii[rayId] *= (1 / stopPdf) * (1 + min(4, d*4));
 	}
 	else
 		if (payloadBounce > 0) // Photon can bounce one more time

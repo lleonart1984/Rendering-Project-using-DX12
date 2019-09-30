@@ -50,6 +50,7 @@ struct DXR_PT_Pipeline : public RTPipelineManager {
 
 		// Photon map binding objects
 		gObj<Buffer> Photons; // Photon map in a lineal buffer
+		gObj<Buffer> RadiusFactors; // Photon radius factor
 
 		struct ObjInfo {
 			int TriangleOffset;
@@ -58,6 +59,7 @@ struct DXR_PT_Pipeline : public RTPipelineManager {
 
 		void Globals() {
 			UAV(0, Photons);
+			UAV(1, RadiusFactors);
 
 			ADS(0, Scene);
 			SRV(1, Vertices);
