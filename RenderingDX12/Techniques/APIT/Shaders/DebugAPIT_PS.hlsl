@@ -108,7 +108,7 @@ float4 main(float4 P: SV_POSITION, float2 C : TEXCOORD) : SV_TARGET
     int view = px.x / (Width >> 2);
     int index = get_index(px % (Width >> 2), view, 5);
 
-    return float4((MipMaps[index].y - MipMaps[index].x) * float3(0.00, 0.57, 0.59), 1);
+    //return float4((MipMaps[index].y - MipMaps[index].x) * float3(0.00, 0.57, 0.59), 1);
 
     /*float maxDepth = boundaryBuffer[currentNode].w;
     float minDepth = boundaryBuffer[currentNode].z;*/

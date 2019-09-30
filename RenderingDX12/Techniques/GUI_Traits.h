@@ -47,4 +47,11 @@ struct IHasParalellism {
 	int NumberOfWorkers = 1;
 };
 
+struct IHasRaymarchDebugInfo {
+    bool CountHits;
+    bool CountSteps;
+private:
+    virtual void Boo() {}
+};
+
 #pragma endregion

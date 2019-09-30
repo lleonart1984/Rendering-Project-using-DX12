@@ -131,8 +131,7 @@ protected:
 };
 
 template<typename C, typename D>
-class RaymarchRT : public Technique, public IHasScene, public IHasCamera, public IHasLight, public IHasBackcolor,
-    public DebugRaymarchRT {
+class RaymarchRT : public Technique, public IHasScene, public IHasCamera, public IHasLight, public IHasBackcolor, public IHasRaymarchDebugInfo {
 public:
     gObj<RetainedSceneLoader> sceneLoader;
     gObj<C> constructing;

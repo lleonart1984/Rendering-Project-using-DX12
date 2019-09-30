@@ -41,6 +41,10 @@ void GuiFor(gObj<IHasBackcolor> t) {
 void GuiFor(gObj<IHasTriangleNumberParameter> t) {
 	ImGui::SliderInt("Number of tris", &t->NumberOfTriangles, t->MinimumOfTriangles, t->MaximumOfTriangles);
 }
+void GuiFor(gObj<IHasRaymarchDebugInfo> t) {
+    ImGui::Checkbox("Show Count Steps", &t->CountSteps);
+    ImGui::Checkbox("Show Count Hits", &t->CountHits);
+}
 void GuiFor(gObj<IHasParalellism> t) {
 #ifdef MAX_NUMBER_OF_ASYNC_PROCESSES
 	ImGui::SliderInt("Number of workers", &t->NumberOfWorkers, 1, MAX_NUMBER_OF_ASYNC_PROCESSES);
@@ -115,6 +119,7 @@ int main(int, char**)
 	gObj<IHasScene> asSceneRenderer = technique.Dynamic_Cast<IHasScene>();
 	gObj<IHasCamera> asCameraRenderer = technique.Dynamic_Cast<IHasCamera>();
 	gObj<IHasLight> asLightRenderer = technique.Dynamic_Cast<IHasLight>();
+    gObj<IHasRaymarchDebugInfo> asRaymarchDebugInfoRenderer = technique.Dynamic_Cast<IHasRaymarchDebugInfo>();
 
 	static Scene* scene = nullptr;
 	static Camera* camera = new Camera { float3(1,1.5f,2.0f), float3(0,0,0), float3(0,1,0), PI / 4, 0.001f, 1000.0f };
@@ -257,6 +262,7 @@ int main(int, char**)
 			RenderGUI<IHasBackcolor>(technique);
 			RenderGUI<IHasTriangleNumberParameter>(technique);
 			RenderGUI<IHasParalellism>(technique);
+            RenderGUI<IHasRaymarchDebugInfo>(technique);
             
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();

@@ -339,8 +339,6 @@ protected:
         PreorderBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         SkipBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         perform(CreatingAssets);
-        
-        flush_all_to_gpu;
 
         buildPipeline->fragments = Fragments;
         buildPipeline->firstBuffer = FirstBuffer;
@@ -459,7 +457,6 @@ protected:
         for (int i = 1; i <= description.Power; i++) {
             buildMipMapsPipeline->levelInfo = LevelInfos[i - 1];
             manager gSet Pipeline(buildMipMapsPipeline);
-            //manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(6 * (resolution >> i), resolution >> i);
             DrawScreen(manager, 6 * (resolution >> i), resolution >> i);
         }
     }
