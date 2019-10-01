@@ -8,12 +8,12 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE BUNNY_OBJ
+#define USE_SCENE CORNELL_OBJ
 
 #define MOVE_LIGHT false
 
 // Change this to force every frame camera dirty
-#define PERMANENT_CAMERA_DIRTY false
+#define PERMANENT_CAMERA_DIRTY true
 
 // Uncomment this to use warp device for unsupported DX12 functionalities in your device
 //#define WARP
@@ -47,14 +47,14 @@
 //gObj<FullDXRPhotonTracer> technique;
 
 //----- Pathtracing approaches on the GPU using RT cores
-gObj<IterativePathtracer> technique;
+//gObj<IterativePathtracer> technique;
 //gObj<RecursivePathtracer> technique;
 
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
 //gObj<GridPhotonMapTechnique> technique;
 //gObj<BPP_PhotonMap2Technique> technique;
 //gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
-//gObj<BPP_PhotonMap4Technique> technique; // Technique with morton sorting of photons to estimate knn
+gObj<BPP_PhotonMap4Technique> technique; // Technique with morton sorting of photons to estimate knn
 
 // APIT
 //gObj<DebugAPIT> technique;

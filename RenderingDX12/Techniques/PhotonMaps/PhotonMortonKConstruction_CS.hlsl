@@ -25,8 +25,8 @@ static const int bufferSize = PHOTON_DIMENSION * PHOTON_DIMENSION - 1;
 
 float MortonEstimator(in Photon currentPhoton, int index) {
 
-	int l = index - 1;
-	int r = index + 1;
+	int l = index ;
+	int r = index ;
 
 	int currentMorton = Morton[Permutation[index]];
 
@@ -81,13 +81,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 		if (any(currentPhoton.Intensity))
 		{
-			radius = clamp(MortonEstimator(currentPhoton, photonIdx), PHOTON_RADIUS * 0.001, PHOTON_RADIUS);
+			radius = radii[Permutation[photonIdx]] * clamp(MortonEstimator(currentPhoton, photonIdx), PHOTON_RADIUS * 0.001, PHOTON_RADIUS);
 
 			box.minimum = min(box.minimum, currentPhoton.Position - radius);
 			box.maximum = max(box.maximum, currentPhoton.Position + radius);
 		}
 
-		radii[Permutation[photonIdx]] *= max(0.0001,radius);
+		radii[Permutation[photonIdx]] = max(0.0001,radius);
 	}
 
 	if (box.maximum.x <= box.minimum.x)

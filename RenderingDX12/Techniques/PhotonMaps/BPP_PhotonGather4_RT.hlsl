@@ -78,7 +78,8 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 		float NdotN = dot(payload.SurfelNormal, p.Normal);
 
 		// Aggregate current Photon contribution if inside radius
-		float kernel = (photonDistance < radius && NdotL > 0.001) * 2 * (1 - photonDistance / radius);
+		//float kernel = (photonDistance < radius && NdotL > 0.001) * 2 * (1 - (photonDistance / radius));
+		float kernel = (photonDistance < radius && NdotL > 0.001) * 2 * (1 - pow(photonDistance / radius,2)) / pi;
 		payload.Accum += kernel * p.Intensity * saturate(NdotN) / area;
 	}
 
