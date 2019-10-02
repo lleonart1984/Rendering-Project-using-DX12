@@ -48,4 +48,6 @@ using namespace CA4G;
 #include "Techniques/APIT/DebugAPIT.h"
 #include "Techniques/RaymarchRT/RaymarchRT.h"
 
+#include "Techniques/WSAPIT/DebugWSAPIT.h"
+
 #include "main.h"

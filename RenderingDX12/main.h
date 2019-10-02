@@ -8,7 +8,7 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE SPONZA_OBJ
+#define USE_SCENE CORNELL_OBJ
 
 #define MOVE_LIGHT false
 
@@ -66,4 +66,5 @@
 
 // APIT
 //gObj<DebugAPIT> technique;
-gObj<RaymarchRT<APITConstruction, APITDescription>> technique;
+//gObj<RaymarchRT<APITConstruction, APITDescription>> technique;
+gObj<DebugWSAPIT> technique;
