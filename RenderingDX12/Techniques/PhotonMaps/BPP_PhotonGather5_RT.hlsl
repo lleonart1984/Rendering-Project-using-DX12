@@ -2,14 +2,15 @@
 #define PHOTON_WITH_NORMAL
 #define PHOTON_WITH_POSITION
 
-#define TEXTURES_REG				t11
+#define TEXTURES_REG				t12
 
 #define RAY_CONTRIBUTION_TO_HITGROUPS 1
 
 #include "CommongPhotonGather_RT.hlsl.h"
 
-StructuredBuffer<float> Radii : register(t9);
-StructuredBuffer<int> Permutation : register(t10);
+RaytracingAccelerationStructure PhotonMap : register(t9);
+StructuredBuffer<float> Radii : register(t10);
+StructuredBuffer<int> Permutation : register(t11);
 
 struct PhotonHitAttributes {
 	// AABB Index where you can find photons from AABBIdx*BOXED_PHOTONS + 0 to AABBIdx*BOXED_PHOTONS + BOXED_PHOTONS - 1
@@ -63,7 +64,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 [shader("anyhit")]
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
 	float3 surfelPosition = WorldRayOrigin() + WorldRayDirection() * 0.5;
-	
+
 	[loop]
 	for (int i = 0; i < BOXED_PHOTONS; i++) {
 		int photonIdx = Permutation[attr.AABBIdx * BOXED_PHOTONS + i];
@@ -120,7 +121,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// 1 : Miss index for PhotonGatheringMiss shader
 	// ray
 	// raypayload
-	TraceRay(Scene, RAY_FLAG_FORCE_NON_OPAQUE, 2, 0, 0, 1, ray, photonGatherPayload);
+	TraceRay(PhotonMap, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 0, 1, ray, photonGatherPayload);
 
 #ifdef DEBUG_PHOTONS
 #if DEBUG_STRATEGY == 0

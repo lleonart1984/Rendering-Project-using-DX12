@@ -81,7 +81,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 		if (any(currentPhoton.Intensity))
 		{
-			radius = radii[Permutation[photonIdx]] * clamp(MortonEstimator(currentPhoton, photonIdx), PHOTON_RADIUS * 0.001, PHOTON_RADIUS);
+			radius = clamp(radii[Permutation[photonIdx]], 1, 4) * clamp(MortonEstimator(currentPhoton, photonIdx), PHOTON_RADIUS * 0.1, PHOTON_RADIUS);
 
 			box.minimum = min(box.minimum, currentPhoton.Position - radius);
 			box.maximum = max(box.maximum, currentPhoton.Position + radius);

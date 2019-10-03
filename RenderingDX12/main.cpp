@@ -184,7 +184,7 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			//MixMirrorMaterial(&scene->Materials()[9], 0.2); // floor
+			MixMirrorMaterial(&scene->Materials()[9], 0.1); // floor
 			camera->Position = float3(0.3f, 0.05f, -0.028);
 			camera->Target = float3(0, 0.07f, 0);
 			lightSource->Position = float3(0, 0.45, 0);
@@ -299,7 +299,7 @@ int main(int, char**)
 				if (movingCamera >= 0) {
 					float d = length(camera->Position - cameraPositions[movingCamera]);
 					cameraChanged = d > 0;
-					float alpha = d == 0 ? 1 : min(d, 10) / d;
+					float alpha = d == 0 ? 1 : min(d, 0.01) / d;
 					camera->Position = lerp(camera->Position, cameraPositions[movingCamera], alpha);
 					camera->Target = camera->Position + normalize(lerp(camera->Target, cameraTargets[movingCamera], alpha) - camera->Position) * 0.03;
 				}

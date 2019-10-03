@@ -210,7 +210,7 @@ float3 ComputeDirectLighting(
 	// Lambert Diffuse component (normalized dividing by pi)
 	float3 DiffuseRatio = DiffuseBRDF(V, L, fN, NdotL, material);
 	// Blinn Specular component (normalized multiplying by (2+n)/(2pi)
-	float3 SpecularRatio = SpecularBRDF(V, L, fN, NdotL, material);
+	float3 SpecularRatio = 0;// SpecularBRDF(V, L, fN, NdotL, material);
 
 	// gets the light radius constant
 	float lightRadius = LightSphereRadius();
