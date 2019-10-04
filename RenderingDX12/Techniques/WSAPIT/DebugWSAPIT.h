@@ -2,41 +2,55 @@
 
 #include "WorldSpaceAPIT.h"
 
-class DebugWSAPIT_Pipeline : public GraphicsPipelineBindings {
+class DebugWSAPIT_Pipeline : public ShowTexturePipeline {
 public:
     gObj<Texture2D> renderTarget;
 
     // CBVs
     gObj<Buffer> cameraCB;
+    gObj<Buffer> screenInfo;
 
     // SRVs
     gObj<Buffer> wsVertices;
     gObj<Buffer> sceneBoundaries;
+
+    gObj<Buffer> fragments;
+    gObj<Buffer> rootBuffer;
+    gObj<Buffer> nextBuffer;
 protected:
     void Setup() {
-        _ gSet InputLayout({});
-        _ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\WSAPIT\\Shaders\\DebugWSAPIT_VS.cso"));
+        ShowTexturePipeline::Setup();
+        //_ gSet InputLayout({});
+        //_ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\WSAPIT\\Shaders\\DebugWSAPIT_VS.cso"));
         _ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\WSAPIT\\Shaders\\DebugWSAPIT_PS.cso"));
     }
 
     void Globals() {
         RTV(0, renderTarget);
-
+/*
         CBV(0, cameraCB, ShaderType_Vertex);
-        SRV(0, wsVertices, ShaderType_Vertex);
-        
+        SRV(0, wsVertices, ShaderType_Vertex);*/
+
+        CBV(0, screenInfo, ShaderType_Pixel);
         SRV(0, sceneBoundaries, ShaderType_Pixel);
+        SRV(1, fragments, ShaderType_Pixel);
+        SRV(2, rootBuffer, ShaderType_Pixel);
+        SRV(3, nextBuffer, ShaderType_Pixel);
     }
 };
 
 class DebugWSAPIT : public Technique, public IHasScene, public IHasCamera, public IHasLight, public IHasBackcolor {
 public:
     gObj<RetainedSceneLoader> sceneLoader;
-    gObj<WorldSpaceTransformer> worldSpaceTransformer;
-
+    gObj<WorldSpaceAPIT> worldSpaceAPIT;
     gObj<DebugWSAPIT_Pipeline> pipeline;
+    APITDescription aPITDescription;
 
-    gObj<Buffer> vertices;
+    gObj<Buffer> debugVertices;
+
+    DebugWSAPIT(APITDescription description) {
+        this->aPITDescription = description;
+    }
 
 protected:
     void SetScene(gObj<CA4G::Scene> scene) {
@@ -52,25 +66,29 @@ protected:
             _ gLoad Subprocess(sceneLoader);
         }
 
-        worldSpaceTransformer = new WorldSpaceTransformer();
-        worldSpaceTransformer->sceneLoader = sceneLoader;
-        _ gLoad Subprocess(worldSpaceTransformer);
+        worldSpaceAPIT = new WorldSpaceAPIT(aPITDescription);
+        worldSpaceAPIT->sceneLoader = sceneLoader;
+        _ gLoad Subprocess(worldSpaceAPIT);
 
         // Load and setup pipeline resource
         _ gLoad Pipeline(pipeline);
         pipeline->cameraCB = _ gCreate ConstantBuffer<Globals>();
-        pipeline->wsVertices = worldSpaceTransformer->WorldSpaceVertices;
-        pipeline->sceneBoundaries = worldSpaceTransformer->SceneBoundaries;
+        pipeline->wsVertices = worldSpaceAPIT->WorldSpaceVertices;
+        pipeline->sceneBoundaries = worldSpaceAPIT->SceneBoundaries;
+        pipeline->fragments = worldSpaceAPIT->Fragments;
+        pipeline->rootBuffer = worldSpaceAPIT->RootBuffer;
+        pipeline->nextBuffer = worldSpaceAPIT->NextBuffer;
+        pipeline->screenInfo = worldSpaceAPIT->screenInfo;
 
         perform(CreatingAssets);
     }
 
     // A copy engine can be used to populate buffers using GPU commands.
     void CreatingAssets(gObj<CopyingManager> manager) {
-        vertices = _ gCreate VertexBuffer<float2>(6);
+        debugVertices = _ gCreate VertexBuffer<float2>(6);
 
         // Copies a buffer written using an initializer_list
-        manager gCopy ListData(vertices, {
+        manager gCopy ListData(debugVertices, {
                 float2(-1, 1),
                 float2(1, 1),
                 float2(1, -1),
@@ -82,23 +100,15 @@ protected:
     }
 
     void Graphics(gObj<GraphicsManager> manager) {
+        ExecuteFrame(worldSpaceAPIT);
+        
         pipeline->renderTarget = render_target;
-
-        float4x4 view, proj;
-        Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
-        ExecuteFrame(worldSpaceTransformer);
-
-        manager gCopy ValueData(pipeline->cameraCB, Globals{ proj, view });
-
         manager gClear RT(render_target, float4(Backcolor, 1));
         manager gSet Viewport(render_target->Width, render_target->Height);
         manager gSet Pipeline(pipeline);
-        manager gDispatch Triangles(sceneLoader->VertexBuffer->ElementCount);
-        /*manager gSet Viewport(render_target->Height * 3.0 / 4.0, render_target->Height);
-        manager gSet Pipeline(pipeline);
-        manager gSet VertexBuffer(vertices);
+        manager gSet VertexBuffer(debugVertices);
 
-        manager gDispatch Triangles(6);*/
+        manager gDispatch Triangles(6);
     }
 
     void Frame() {

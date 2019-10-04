@@ -8,7 +8,7 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE CORNELL_OBJ
+#define USE_SCENE SPONZA_OBJ
 
 #define MOVE_LIGHT false
 

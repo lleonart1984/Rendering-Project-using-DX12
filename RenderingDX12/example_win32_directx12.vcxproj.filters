@@ -63,6 +63,9 @@
     <FxCompile Include="Techniques\WSAPIT\Shaders\DebugWSAPIT_PS.hlsl" />
     <FxCompile Include="Techniques\WSAPIT\Shaders\DebugWSAPIT_VS.hlsl" />
     <FxCompile Include="Techniques\WSAPIT\Shaders\WorldSpaceTransform_CS.hlsl" />
+    <FxCompile Include="Techniques\WSAPIT\Shaders\WSPIT_Fill_VS.hlsl" />
+    <FxCompile Include="Techniques\WSAPIT\Shaders\WSPIT_Fill_GS.hlsl" />
+    <FxCompile Include="Techniques\WSAPIT\Shaders\WSPIT_Fill_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />

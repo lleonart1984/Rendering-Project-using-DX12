@@ -34,7 +34,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     output.T = normalize(mul(float4(v.T, 0), world).xyz);
     output.B = normalize(mul(float4(v.B, 0), world).xyz);
     transformedVertices[vertexIndex] = output;
-    
+
     int3 lowerP = int3((output.P - EPSILON) * PRECISION);
     int3 upperP = int3((output.P + EPSILON) * PRECISION);
 
