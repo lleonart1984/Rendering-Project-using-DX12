@@ -82,7 +82,7 @@ void AugmentHitInfoWithTextureMapping(inout Vertex surfel, inout Material materi
 
 // Given a surfel will modify the material using texture mapping.
 void AugmentMaterialWithTextureMapping(inout Vertex surfel, inout Material material) {
-	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
+	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0.01*length(surfel.P), 0.01 * length(surfel.P)) : float4(1, 1, 1, 1);
 	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0, 0).xyz : material.Specular;
 	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, 0, 0).xyz : float3(0.5, 0.5, 1);
 	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, 0, 0).xyz : 1;

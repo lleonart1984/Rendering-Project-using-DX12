@@ -229,11 +229,14 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 	if (russianRoulette < stopPdf) // photon stay here
 	{
 		Photons[rayId].Intensity *= (1 / stopPdf);
-		Radii[rayId] *= (1 / stopPdf) * (1 + min(4, d*4));
+		Radii[rayId] = min(8, Radii[rayId] * (1 / stopPdf) );
 	}
 	else
-		if (payloadBounce > 0) // Photon can bounce one more time
+		if (payloadBounce > 0)
+		// Photon can bounce one more time
 		{
+			Radii[rayId] = min(8, Radii[rayId] * (1 / (1 - stopPdf)) * (1 + d * 3));
+
 			float3 ratio;
 			float3 direction;
 			float pdf;

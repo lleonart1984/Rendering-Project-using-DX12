@@ -23,10 +23,10 @@ RWStructuredBuffer<float> radii			: register (u1);
 
 static const int bufferSize = PHOTON_DIMENSION * PHOTON_DIMENSION - 1;
 
-float MortonEstimator(in Photon currentPhoton, int index) {
+float MortonEstimator(in Photon currentPhoton, int index, float maximumRadius) {
 
-	int l = index ;
-	int r = index ;
+	int l = index - BOXED_PHOTONS;
+	int r = index - BOXED_PHOTONS;
 
 	int currentMorton = Morton[Permutation[index]];
 
@@ -55,12 +55,12 @@ float MortonEstimator(in Photon currentPhoton, int index) {
 		{
 			return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l) * 4 / 3.14);
 		}
-		if (mortonBlockRadius >= PHOTON_RADIUS)
-			return PHOTON_RADIUS;
+		if (mortonBlockRadius >= maximumRadius)
+			return maximumRadius;
 
 		//return mortonBlockRadius * 1.73 / pow((r - l)/ (float)DESIRED_PHOTONS, 0.5);
 	}
-	return PHOTON_RADIUS;
+	return maximumRadius;
 }
 
 [numthreads(CS_1D_GROUPSIZE, 1, 1)]
@@ -81,7 +81,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 		if (any(currentPhoton.Intensity))
 		{
-			radius = clamp(radii[Permutation[photonIdx]], 1, 4) * clamp(MortonEstimator(currentPhoton, photonIdx), PHOTON_RADIUS * 0.1, PHOTON_RADIUS);
+			radius = clamp(MortonEstimator(currentPhoton, photonIdx, clamp(radii[Permutation[photonIdx]], 1, 8) * PHOTON_RADIUS), PHOTON_RADIUS * 0.01, PHOTON_RADIUS * 8);
 
 			box.minimum = min(box.minimum, currentPhoton.Position - radius);
 			box.maximum = max(box.maximum, currentPhoton.Position + radius);

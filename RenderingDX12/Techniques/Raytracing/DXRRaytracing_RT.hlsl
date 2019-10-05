@@ -22,19 +22,19 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define ACCUMULATIVE_CB_REG			b3
 #define OBJECT_CB_REG				b4
 
-#include "..\CommonRT\CommonDeferred.h"
-#include "..\CommonRT\CommonShadowMaping.h"
-#include "..\CommonRT\CommonProgressive.h"
-#include "..\CommonRT\CommonOutput.h"
-#include "..\CommonGI\ScatteringTools.h"
+#include "../CommonRT/CommonDeferred.h"
+#include "../CommonRT/CommonShadowMaping.h"
+#include "../CommonRT/CommonProgressive.h"
+#include "../CommonRT/CommonOutput.h"
+#include "../CommonGI/ScatteringTools.h"
+#include "../CommonGI/Parameters.h"
 
-#ifndef RT_CUSTOM_PAYLOAD
+#ifdef COMPACT_PAYLOAD
 struct RTPayload
 {
 	half Compressed0; // intensity
 	int Compressed1; // RGBX : RGB - normalized color, X - bounces
 };
-#endif
 
 float3 DecodeRTPayloadAccumulation(in RTPayload p) {
 	float3 rgb = (int3(p.Compressed1 >> 24, p.Compressed1 >> 16, p.Compressed1 >> 8) & 255) / 255.0;
@@ -55,6 +55,29 @@ void EncodeRTPayloadAccumulation(inout RTPayload p, float3 accumulation) {
 	p.Compressed0 = intensity;
 	p.Compressed1 = (p.Compressed1 & 255) | norm.x << 24 | norm.y << 16 | norm.z << 8;
 }
+#else
+struct RTPayload
+{
+	float3 Intensity; // intensity
+	int Bounces; // RGBX : RGB - normalized color, X - bounces
+};
+
+float3 DecodeRTPayloadAccumulation(in RTPayload p) {
+	return p.Intensity;
+}
+
+int DecodeRTPayloadBounces(in RTPayload p) {
+	return p.Bounces;
+}
+
+void EncodeRTPayloadBounce(inout RTPayload p, int bounces) {
+	p.Bounces = bounces;
+}
+
+void EncodeRTPayloadAccumulation(inout RTPayload p, float3 accumulation) {
+	p.Intensity = accumulation;
+}
+#endif
 
 float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int bounces)
 {
