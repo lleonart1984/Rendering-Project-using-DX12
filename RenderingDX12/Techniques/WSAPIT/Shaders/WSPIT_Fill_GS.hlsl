@@ -12,7 +12,8 @@ struct GS_OUT {
     int TriangleIndex : TRIANGLEINDEX;
 };
 
-cbuffer ScreenInfo : register (b0) {
+cbuffer ScreenInfo : register (b0)
+{
     int Width;
     int Height;
 }
@@ -26,16 +27,16 @@ void main(triangle GS_IN input[3], inout TriangleStream<GS_OUT> output)
     gsOut.P2 = input[2].P;
     gsOut.TriangleIndex = input[0].VertexIndex / 3;
 
-    float2 dimensions = float2(Width, Height);
-
-    /* CORNERS */
+    // Compute Corners
     float2 minim = min(input[0].P.xy, min(input[1].P.xy, input[2].P.xy));
     float2 maxim = max(input[0].P.xy, max(input[1].P.xy, input[2].P.xy));
 
-    // Move HalfPixel
-    minim -= float2(1, 1) / dimensions;
-    maxim += float2(1, 1) / dimensions;
+    // Offset of a half pixel
+    float2 halfPixelSize = float2(1, 1) / float2(Width, Height);
+    minim -= halfPixelSize;
+    maxim += halfPixelSize;
 
+    // Project quad
     gsOut.proj = float4(minim.x, minim.y, 0.5, 1);
     output.Append(gsOut);
 

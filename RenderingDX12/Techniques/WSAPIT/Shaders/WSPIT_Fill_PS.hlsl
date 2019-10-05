@@ -13,19 +13,16 @@ struct GS_OUT {
     int TriangleIndex : TRIANGLEINDEX;
 };
 
-cbuffer ScreenInfo : register (b0) {
+cbuffer ScreenInfo : register (b0)
+{
     int Width;
     int Height;
 }
 
-// Linked lists of fragments for each pixel
-RWStructuredBuffer<Fragment> fragments  : register(u0);
-// index of root node of each pixel
-RWTexture2D<int> firstBuffer            : register(u1);
-// References to next fragment node index for each node in linked list
-RWStructuredBuffer<int> nextBuffer      : register(u2);
-// buffer for fragment allocation
-RWStructuredBuffer<int> malloc          : register(u3);
+RWStructuredBuffer<Fragment> fragments  : register(u0); // Linked lists of fragments for each pixel
+RWTexture2D<int> firstBuffer            : register(u1); // index of root node of each pixel
+RWStructuredBuffer<int> nextBuffer      : register(u2); // References to next fragment node index for each node in linked list
+RWStructuredBuffer<int> malloc          : register(u3); // buffer for fragment allocation
 
 void Intersect(float2 c, float3 p, float3 N, inout float minim, inout float maxim)
 {

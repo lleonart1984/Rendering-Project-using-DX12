@@ -1,13 +1,21 @@
 
-struct PS_IN {
-    float4 P: SV_POSITION;
-    float2 C: TEXCOORD;
-};
-
 struct Fragment {
     int Index;
     float Min;
     float Max;
+};
+
+struct PITNode {
+    int Parent;
+    int LeftChild;
+    int RightChild;
+
+    float Discriminant;
+};
+
+struct PS_IN {
+    float4 P: SV_POSITION;
+    float2 C: TEXCOORD;
 };
 
 cbuffer ScreenInfo : register (b0) {
@@ -15,10 +23,15 @@ cbuffer ScreenInfo : register (b0) {
     int Height;
 }
 
-StructuredBuffer<int3> sceneBoundaries  : register(t0);
-StructuredBuffer<Fragment> fragments  : register(t1);
-Texture2D<int> rootBuffer             : register(t2);
-StructuredBuffer<int> nextBuffer      : register(t3);
+StructuredBuffer<int3> sceneBoundaries : register(t0);
+StructuredBuffer<Fragment> fragments    : register(t1);
+Texture2D<int> rootBuffer               : register(t2);
+StructuredBuffer<PITNode> nodeBuffer    : register(t3);
+StructuredBuffer<float4> boundaryBuffer : register(t4);
+StructuredBuffer<int> firstBuffer       : register(t5);
+StructuredBuffer<int> nextBuffer        : register(t6);
+StructuredBuffer<int> preorderBuffer    : register(t7);
+StructuredBuffer<int> skipBuffer        : register(t8);
 
 float3 GetColor(int complexity) {
     if (complexity == 0) {
@@ -52,27 +65,66 @@ float4 main(PS_IN input) : SV_TARGET
     int2 dimensions = int2(Width, Height);
     int2 pxy = input.C.xy * dimensions;
 
-    //return float4(GetColor(pxy.x + pxy.y), 1);
-    int count = 1;
-    int current = rootBuffer[pxy];
-    /*if (current == -1) {
-        return float4(1, 0.5, 0, 1);
+    int nodeCount = 0;
+    int fragmentCount = 0;
+    int currentNode = rootBuffer[pxy];
+
+    /*float maxDepth = boundaryBuffer[currentNode].w;
+    float minDepth = boundaryBuffer[currentNode].z;
+
+    return float4((maxDepth - minDepth) * float3(0.00, 0.27, 0.29), 1);*/
+
+    int maxFragsInANode = 0;
+
+    for (int i = 0; i < 5 && currentNode != -1; i++)
+    {
+        while (currentNode != -1)
+        {
+            nodeCount++;
+            int currentFragment = firstBuffer[currentNode];
+            int nodeFrags = 0;
+            while (currentFragment != -1)
+            {
+                nodeFrags++;
+                fragmentCount++;
+                currentFragment = nextBuffer[currentFragment];
+            }
+
+            maxFragsInANode = max(maxFragsInANode, nodeFrags);
+            currentNode = preorderBuffer[currentNode];
+        }
     }
-    else {
-        return float4(0, 0.5, 0.3, 1);
-    }*/
-    while (current != -1) {
-        current = nextBuffer[current];
-        count++;
+
+    float average = fragmentCount / (float)nodeCount;
+
+    // Variance
+    currentNode = rootBuffer[pxy];
+    float difference = 0;
+
+    while (currentNode != -1)
+    {
+        int currentFragment = firstBuffer[currentNode];
+        int nodeFrags = 0;
+        while (currentFragment != -1)
+        {
+            nodeFrags++;
+            currentFragment = nextBuffer[currentFragment];
+        }
+
+        difference += abs(nodeFrags - average);
+        currentNode = preorderBuffer[currentNode];
     }
-    
-    return float4(GetColor(count), 1);
+
+    if (nodeCount == 0)
+        return float4(1, 0, 0.5, 1);
+
+    return float4(GetColor(fragmentCount / nodeCount), 1);
 
     /*float3 lowerCorner = sceneBoundaries[0] / 1e7;
     float3 upperCorner = sceneBoundaries[1] / 1e7;
     float3 unit = upperCorner - lowerCorner;
 
     float3 d = input.Position - lowerCorner;
-    
+
     return float4(d / unit, 1);*/
 }

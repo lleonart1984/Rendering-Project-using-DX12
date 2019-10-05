@@ -118,57 +118,58 @@ float4 main(float4 P: SV_POSITION, float2 C : TEXCOORD) : SV_TARGET
     int maxNodeDepth = 0;
 
     int maxFragsInANode = 0;
+    return float4(0.5, 0.3, 0.1, 1);
 
     //for (int i=0; i<5 && currentNode != -1; i++)
-    while (currentNode != -1)
-    {
-        nodeCount++;
-        int currentFragment = firstBuffer[currentNode];
+    //while (currentNode != -1)
+    //{
+    //    nodeCount++;
+    //    int currentFragment = firstBuffer[currentNode];
 
-        int nodeFrags = 0;
-        //for (int k=0; k<100 && currentFragment != -1; k++)
-        while (currentFragment != -1)
-        {
-            nodeFrags++;
-            fragmentCount++;
+    //    int nodeFrags = 0;
+    //    //for (int k=0; k<100 && currentFragment != -1; k++)
+    //    while (currentFragment != -1)
+    //    {
+    //        nodeFrags++;
+    //        fragmentCount++;
 
-            currentFragment = nextBuffer[currentFragment];
-        }
+    //        currentFragment = nextBuffer[currentFragment];
+    //    }
 
-        maxFragsInANode = max(maxFragsInANode, nodeFrags);
+    //    maxFragsInANode = max(maxFragsInANode, nodeFrags);
 
-        maxNodeDepth = max(maxNodeDepth, depth[currentNode]);
+    //    maxNodeDepth = max(maxNodeDepth, depth[currentNode]);
 
-        currentNode = preorderBuffer[currentNode];
-    }
+    //    currentNode = preorderBuffer[currentNode];
+    //}
 
-    float ave = fragmentCount / (float)nodeCount;
+    //float ave = fragmentCount / (float)nodeCount;
 
-    // Variance
-    currentNode = rootBuffer[coord];
-    float difference = 0;
+    //// Variance
+    //currentNode = rootBuffer[coord];
+    //float difference = 0;
 
-    //for (int i=0; i<5 && currentNode != -1; i++)
-    while (currentNode != -1)
-    {
-        int currentFragment = firstBuffer[currentNode];
+    ////for (int i=0; i<5 && currentNode != -1; i++)
+    //while (currentNode != -1)
+    //{
+    //    int currentFragment = firstBuffer[currentNode];
 
-        int nodeFrags = 0;
-        //for (int k=0; k<100 && currentFragment != -1; k++)
-        while (currentFragment != -1)
-        {
-            nodeFrags++;
+    //    int nodeFrags = 0;
+    //    //for (int k=0; k<100 && currentFragment != -1; k++)
+    //    while (currentFragment != -1)
+    //    {
+    //        nodeFrags++;
 
-            currentFragment = nextBuffer[currentFragment];
-        }
+    //        currentFragment = nextBuffer[currentFragment];
+    //    }
 
-        difference += abs(nodeFrags - ave);
+    //    difference += abs(nodeFrags - ave);
 
-        currentNode = preorderBuffer[currentNode];
-    }
+    //    currentNode = preorderBuffer[currentNode];
+    //}
 
-    if (nodeCount == 0)
-        return float4(1, 0, 0.5, 1);
+    //if (nodeCount == 0)
+    //    return float4(1, 0, 0.5, 1);
 
     //return float4(GetColor(maxNodeDepth / log(nodeCount) + 1), 1);
     return float4(GetColor(fragmentCount / nodeCount), 1);

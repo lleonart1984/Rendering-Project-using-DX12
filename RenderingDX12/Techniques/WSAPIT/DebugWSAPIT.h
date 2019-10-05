@@ -7,35 +7,37 @@ public:
     gObj<Texture2D> renderTarget;
 
     // CBVs
-    gObj<Buffer> cameraCB;
     gObj<Buffer> screenInfo;
 
     // SRVs
-    gObj<Buffer> wsVertices;
     gObj<Buffer> sceneBoundaries;
-
     gObj<Buffer> fragments;
-    gObj<Buffer> rootBuffer;
+    gObj<Texture2D> rootBuffer;
+    gObj<Buffer> nodeBuffer;
+    gObj<Buffer> boundaryNodeBuffer;
+    gObj<Buffer> firstBuffer;
     gObj<Buffer> nextBuffer;
+    gObj<Buffer> preorderBuffer;
+    gObj<Buffer> skipBuffer;
 protected:
     void Setup() {
         ShowTexturePipeline::Setup();
-        //_ gSet InputLayout({});
-        //_ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\WSAPIT\\Shaders\\DebugWSAPIT_VS.cso"));
         _ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\WSAPIT\\Shaders\\DebugWSAPIT_PS.cso"));
     }
 
     void Globals() {
         RTV(0, renderTarget);
-/*
-        CBV(0, cameraCB, ShaderType_Vertex);
-        SRV(0, wsVertices, ShaderType_Vertex);*/
 
         CBV(0, screenInfo, ShaderType_Pixel);
         SRV(0, sceneBoundaries, ShaderType_Pixel);
         SRV(1, fragments, ShaderType_Pixel);
         SRV(2, rootBuffer, ShaderType_Pixel);
-        SRV(3, nextBuffer, ShaderType_Pixel);
+        SRV(3, nodeBuffer, ShaderType_Pixel);
+        SRV(4, boundaryNodeBuffer, ShaderType_Pixel);
+        SRV(5, firstBuffer, ShaderType_Pixel);
+        SRV(6, nextBuffer, ShaderType_Pixel);
+        SRV(7, preorderBuffer, ShaderType_Pixel);
+        SRV(8, skipBuffer, ShaderType_Pixel);
     }
 };
 
@@ -72,13 +74,16 @@ protected:
 
         // Load and setup pipeline resource
         _ gLoad Pipeline(pipeline);
-        pipeline->cameraCB = _ gCreate ConstantBuffer<Globals>();
-        pipeline->wsVertices = worldSpaceAPIT->WorldSpaceVertices;
+        pipeline->screenInfo = worldSpaceAPIT->screenInfo;
         pipeline->sceneBoundaries = worldSpaceAPIT->SceneBoundaries;
         pipeline->fragments = worldSpaceAPIT->Fragments;
         pipeline->rootBuffer = worldSpaceAPIT->RootBuffer;
+        pipeline->nodeBuffer = worldSpaceAPIT->NodeBuffer;
+        pipeline->boundaryNodeBuffer = worldSpaceAPIT->BoundaryNodeBuffer;
+        pipeline->firstBuffer = worldSpaceAPIT->FirstBuffer;
         pipeline->nextBuffer = worldSpaceAPIT->NextBuffer;
-        pipeline->screenInfo = worldSpaceAPIT->screenInfo;
+        pipeline->preorderBuffer = worldSpaceAPIT->PreorderBuffer;
+        pipeline->skipBuffer = worldSpaceAPIT->SkipBuffer;
 
         perform(CreatingAssets);
     }
