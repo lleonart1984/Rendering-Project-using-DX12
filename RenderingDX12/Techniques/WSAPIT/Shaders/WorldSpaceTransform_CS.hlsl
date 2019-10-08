@@ -1,6 +1,6 @@
 #include "../../Common/CS_Constants.h"
 #define PRECISION 1e7
-#define EPSILON 0.0001
+#define EPSILON 0.001
 
 struct Vertex
 {
@@ -35,13 +35,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
     output.B = normalize(mul(float4(v.B, 0), world).xyz);
     transformedVertices[vertexIndex] = output;
 
-    int3 lowerP = int3((output.P - EPSILON) * PRECISION);
-    int3 upperP = int3((output.P + EPSILON) * PRECISION);
+    int3 lowerBound = int3((output.P - EPSILON) * PRECISION);
+    int3 upperBound = int3((output.P + EPSILON) * PRECISION);
 
-    InterlockedMin(sceneBoundaries[0].x, lowerP.x);
-    InterlockedMin(sceneBoundaries[0].y, lowerP.y);
-    InterlockedMin(sceneBoundaries[0].z, lowerP.z);
-    InterlockedMax(sceneBoundaries[1].x, upperP.x);
-    InterlockedMax(sceneBoundaries[1].y, upperP.y);
-    InterlockedMax(sceneBoundaries[1].z, upperP.z);
+    InterlockedMin(sceneBoundaries[0].x, lowerBound.x);
+    InterlockedMin(sceneBoundaries[0].y, lowerBound.y);
+    InterlockedMin(sceneBoundaries[0].z, lowerBound.z);
+    InterlockedMax(sceneBoundaries[1].x, upperBound.x);
+    InterlockedMax(sceneBoundaries[1].y, upperBound.y);
+    InterlockedMax(sceneBoundaries[1].z, upperBound.z);
 }

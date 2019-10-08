@@ -1,5 +1,6 @@
 #include "../../Common/CS_Constants.h"
 #define PRECISION 1e7
+#define EPSILON 0.0001
 
 // Data for each fragment
 struct VertexData {
@@ -160,7 +161,11 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
     bool hit;
     int counter = 0;
 
+    float3 C1 = bMin - P;
+    float3 C2 = 
     float3 corners[2] = { bMin - P, bMax - P };
+
+    float2 tX = D.x == 0 ? float2(-1000, 1000) : corners[0].x;
 
     float tMin = all(bMin < P && P < bMax) ? 0 : 1000;
     float tMax = 0;
@@ -171,7 +176,7 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
             {
                 float t = corners[j][i] / D[i];
                 float3 intersection = P + D * t;
-                if (t > 0 && all(bMin < intersection && intersection < bMax)) {
+                if (t > 0 && all(bMin <= intersection + EPSILON && intersection - EPSILON <= bMax)) {
                     tMin = min(tMin, t);
                     tMax = max(tMax, t);
                 }

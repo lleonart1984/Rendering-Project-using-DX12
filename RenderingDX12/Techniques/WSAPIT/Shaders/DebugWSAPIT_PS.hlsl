@@ -112,12 +112,27 @@ float4 GetDensityPerNode(uint2 pxy)
     return float4(GetColor(fragmentCount / nodeCount), 1);
 }
 
+float4 GetFragmentCount(int2 px) {
+    int current = rootBuffer[px];
+    /*if (current != -1) {
+        return fragments[current].Min;
+    }*/
+    int count = 0;
+    while (current != -1) {
+        count++;
+        current = nextBuffer[current];
+    }
+
+    return float4(GetColor(count), 1);
+}
+
 float4 main(PS_IN input) : SV_TARGET
 {
     int2 dimensions = int2(Width, Height);
     int2 pxy = input.C.xy * dimensions;
 
     return GetDensityPerNode(pxy);
+    //return GetFragmentCount(pxy);
     //return float4(GetColor(pxy[0] + pxy.y), 1);
 
     /*float maxDepth = boundaryBuffer[currentNode].w;

@@ -24,7 +24,7 @@ RWTexture2D<int> firstBuffer            : register(u1); // index of root node of
 RWStructuredBuffer<int> nextBuffer      : register(u2); // References to next fragment node index for each node in linked list
 RWStructuredBuffer<int> malloc          : register(u3); // buffer for fragment allocation
 
-void Intersect(float2 c, float3 p, float3 N, inout float minim, inout float maxim)
+void Intersect(float2 c, float3 P, float3 N, inout float minim, inout float maxim)
 {
     if (N.z == 0.00) {
         minim = 0;
@@ -32,7 +32,8 @@ void Intersect(float2 c, float3 p, float3 N, inout float minim, inout float maxi
         return;
     }
 
-    float z = p.z + dot(p.xy - c, N.xy) / N.z;
+    //float z = P.z + dot(P.xy - c, N.xy) / N.z;
+    float z = dot(P - float3(c, 0), N) / N.z;
     minim = min(z, minim);
     maxim = max(z, maxim);
 }
@@ -90,7 +91,6 @@ void main(GS_OUT input)
             return;*/
             // * End test
 
-            // Computing fragment interval [min,max]
     float minDepth = 1000000;
     float maxDepth = 0;
 
