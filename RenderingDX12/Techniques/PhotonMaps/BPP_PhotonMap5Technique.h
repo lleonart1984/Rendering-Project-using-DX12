@@ -69,16 +69,20 @@ public:
 		gObj<Buffer> Photons;
 		gObj<Buffer> AABBs;
 		gObj<Buffer> Radii;
+		gObj<Buffer> RadiusFactors;
 		gObj<Buffer> MortonIndices;
 		gObj<Buffer> Permutation;
+		gObj<Buffer> AllocatedPhotons;
 
 		void Globals() {
 			UAV(0, AABBs, ShaderType_Any);
 			UAV(1, Radii, ShaderType_Any);
+			UAV(2, AllocatedPhotons, ShaderType_Any);
 
 			SRV(0, Photons, ShaderType_Any);
 			SRV(1, MortonIndices, ShaderType_Any);
-			SRV(2, Permutation, ShaderType_Any);
+			SRV(2, RadiusFactors, ShaderType_Any);
+			SRV(3, Permutation, ShaderType_Any);
 		}
 	};
 
@@ -125,7 +129,6 @@ public:
 			gObj<SceneOnGPU> PhotonMap;
 			gObj<Buffer> Photons;
 			gObj<Buffer> Radii;
-			gObj<Buffer> Permutation;
 
 			gObj<Buffer> Vertices;
 			gObj<Buffer> Materials;
@@ -173,9 +176,8 @@ public:
 
 				ADS(9, PhotonMap);
 				SRV(10, Radii);
-				SRV(11, Permutation);
 
-				SRV_Array(12, Textures, TextureCount);
+				SRV_Array(11, Textures, TextureCount);
 
 				Static_SMP(0, Sampler::Linear());
 				Static_SMP(1, Sampler::LinearWithoutMipMaps());
@@ -296,10 +298,12 @@ public:
 
 #pragma region DXR Pipeline for PM construction using AABBs
 		photonMapConstruction->AABBs = PhotonsAABBs;
-		photonMapConstruction->Radii = dxrPTPipeline->_Program->RadiusFactors;
+		photonMapConstruction->RadiusFactors = dxrPTPipeline->_Program->RadiusFactors;
+		photonMapConstruction->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 		photonMapConstruction->Photons = dxrPTPipeline->_Program->Photons;
 		photonMapConstruction->MortonIndices = mortonIndexingPipeline->Indices;
 		photonMapConstruction->Permutation = mortonIndexingPipeline->Permutation;
+		photonMapConstruction->AllocatedPhotons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 #pragma endregion
 
 #pragma region DXR Photon gathering Pipeline Objects
@@ -318,9 +322,8 @@ public:
 
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		// Bind now Photon map as SRVs
-		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
+		dxrRTPipeline->_Program->Photons = photonMapConstruction->AllocatedPhotons;
 		dxrRTPipeline->_Program->Radii = photonMapConstruction->Radii;
-		dxrRTPipeline->_Program->Permutation = photonMapConstruction->Permutation;
 #pragma endregion
 	}
 
@@ -407,6 +410,7 @@ public:
 		}
 		else
 			perform(UpdatePhotonMap);
+
 
 		perform(Raytracing);
 	}

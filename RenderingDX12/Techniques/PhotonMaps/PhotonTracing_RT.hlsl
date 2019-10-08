@@ -115,7 +115,7 @@ void EncodePTPayloadAccumulation(inout PTPayload p, float3 accumulation) {
 
 
 RWStructuredBuffer<Photon> Photons		: register(u0);
-RWStructuredBuffer<float> Radii			: register(u1);
+RWStructuredBuffer<float> RadiiFactor	: register(u1);
 
 cbuffer AccumulativeInfo : register(ACCUMULATIVE_CB_REG) {
 	int PassCount;
@@ -134,7 +134,7 @@ void PTMainRays() {
 	int photonIndex = raysIndex.x + raysIndex.y * raysDimensions.x;
 
 	Photons[photonIndex].Intensity = 0;
-	Radii[photonIndex] = 1; // radius factor by default
+	RadiiFactor[photonIndex] = 1; // radius factor by default
 
 	if (PHOTON_TRACE_MAX_BOUNCES == 0) // no photon trace
 		return;
@@ -229,13 +229,13 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 	if (russianRoulette < stopPdf) // photon stay here
 	{
 		Photons[rayId].Intensity *= (1 / stopPdf);
-		Radii[rayId] = min(8, Radii[rayId] * (1 / stopPdf) );
+		RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / stopPdf) );
 	}
 	else
 		if (payloadBounce > 0)
 		// Photon can bounce one more time
 		{
-			Radii[rayId] = min(8, Radii[rayId] * (1 / (1 - stopPdf)) * (1 + d * 3));
+			RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)) * (1 + d * 3));
 
 			float3 ratio;
 			float3 direction;

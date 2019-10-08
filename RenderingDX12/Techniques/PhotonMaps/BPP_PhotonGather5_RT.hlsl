@@ -2,7 +2,7 @@
 #define PHOTON_WITH_NORMAL
 #define PHOTON_WITH_POSITION
 
-#define TEXTURES_REG				t12
+#define TEXTURES_REG				t11
 
 #define RAY_CONTRIBUTION_TO_HITGROUPS 1
 
@@ -10,7 +10,6 @@
 
 RaytracingAccelerationStructure PhotonMap : register(t9);
 StructuredBuffer<float> Radii : register(t10);
-StructuredBuffer<int> Permutation : register(t11);
 
 struct PhotonHitAttributes {
 	// AABB Index where you can find photons from AABBIdx*BOXED_PHOTONS + 0 to AABBIdx*BOXED_PHOTONS + BOXED_PHOTONS - 1
@@ -67,7 +66,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 
 	[loop]
 	for (int i = 0; i < BOXED_PHOTONS; i++) {
-		int photonIdx = Permutation[attr.AABBIdx * BOXED_PHOTONS + i];
+		int photonIdx = attr.AABBIdx * BOXED_PHOTONS + i;
 
 		Photon p = Photons[photonIdx];
 		float radius = Radii[photonIdx];

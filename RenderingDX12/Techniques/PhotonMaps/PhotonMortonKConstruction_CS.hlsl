@@ -16,10 +16,12 @@ struct AABB {
 
 StructuredBuffer<Photon> Photons		: register (t0);
 StructuredBuffer<int> Morton			: register (t1);
-StructuredBuffer<int> Permutation		: register (t2);
+StructuredBuffer<float> RadiiFactor		: register (t2);
+StructuredBuffer<int> Permutation		: register (t3);
 
 RWStructuredBuffer<AABB> PhotonAABBs	: register (u0);
 RWStructuredBuffer<float> radii			: register (u1);
+RWStructuredBuffer<Photon> AllocatedPhotons : register(u2);
 
 static const int bufferSize = PHOTON_DIMENSION * PHOTON_DIMENSION - 1;
 
@@ -81,13 +83,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 		if (any(currentPhoton.Intensity))
 		{
-			radius = clamp(MortonEstimator(currentPhoton, photonIdx, clamp(radii[Permutation[photonIdx]], 1, 8) * PHOTON_RADIUS), PHOTON_RADIUS * 0.01, PHOTON_RADIUS * 8);
+			radius = clamp(MortonEstimator(currentPhoton, photonIdx, clamp(RadiiFactor[Permutation[photonIdx]], 1, 8) * PHOTON_RADIUS), PHOTON_RADIUS * 0.01, PHOTON_RADIUS * 8);
+			//radius = clamp(MortonEstimator(currentPhoton, photonIdx, PHOTON_RADIUS), PHOTON_RADIUS * 0.01, PHOTON_RADIUS);
 
 			box.minimum = min(box.minimum, currentPhoton.Position - radius);
 			box.maximum = max(box.maximum, currentPhoton.Position + radius);
 		}
 
-		radii[Permutation[photonIdx]] = max(0.0001,radius);
+		radii[photonIdx] = max(0.0001,radius);
+		AllocatedPhotons[photonIdx] = currentPhoton;
 	}
 
 	if (box.maximum.x <= box.minimum.x)
