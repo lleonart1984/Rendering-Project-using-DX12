@@ -42,11 +42,11 @@ void main(GS_OUT input)
     uint2 pxy = input.proj.xy;
     int triangleIndex = input.TriangleIndex;
 
-    float2 dimensions = float2(Width, Height);
     // * Test real pixels
 
     // half pixel size in view coordinates
-    float2 halfPixelSize = 1 /dimensions;
+    float2 dimensions = float2(Width, Height);
+    float2 halfPixelSize = 1 / dimensions;
 
     float2 ndc = input.proj.xy / dimensions * 2 - 1;
     ndc.y *= -1;
@@ -65,7 +65,7 @@ void main(GS_OUT input)
     float2 abN = float2(b.y - a.y, a.x - b.x);
     float2 bcN = float2(c.y - b.y, b.x - c.x);
     float2 caN = float2(a.y - c.y, c.x - a.x);
-    float sign = dot(c, abN) < 0 ? 1 : -1;
+    float sign = dot(c - a, abN) > 0 ? 1 : -1;
 
     abN *= sign;
     bcN *= sign;
@@ -82,15 +82,15 @@ void main(GS_OUT input)
     all(float4(dot(caN, c00), dot(caN, c01), dot(caN, c11), dot(caN, c10)) - dot(caN, c) < 0))
         return;*/
 
-    /*int3x4 m = mul(
-        float3x3(float3(abN, dot(abN, a)), float3(bcN, dot(bcN, b)), float3(caN, dot(caN, c))) * sign,
-        float3x4(transpose(float4x2(c00, c01, c11, c10)), -float4(1, 1, 1, 1))) < 0;
+        /*int3x4 m = mul(
+            float3x3(float3(abN, dot(abN, a)), float3(bcN, dot(bcN, b)), float3(caN, dot(caN, c))) * sign,
+            float3x4(transpose(float4x2(c00, c01, c11, c10)), -float4(1, 1, 1, 1))) < 0;
 
-    if (any(int3(all(m._m00_m01_m02_m03), all(m._m10_m11_m12_m13), all(m._m20_m21_m22_m23))))
-        return;*/
-    // * End test
+        if (any(int3(all(m._m00_m01_m02_m03), all(m._m10_m11_m12_m13), all(m._m20_m21_m22_m23))))
+            return;*/
+            // * End test
 
-    // Computing fragment interval [min,max]
+            // Computing fragment interval [min,max]
     float minDepth = 1000000;
     float maxDepth = 0;
 

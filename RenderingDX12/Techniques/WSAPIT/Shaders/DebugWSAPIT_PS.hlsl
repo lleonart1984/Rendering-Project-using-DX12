@@ -60,20 +60,11 @@ float3 GetColor(int complexity) {
     return lerp(stopPoints[(int)level], stopPoints[(int)level + 1], level % 1);
 }
 
-float4 main(PS_IN input) : SV_TARGET
+float4 GetDensityPerNode(uint2 pxy)
 {
-    int2 dimensions = int2(Width, Height);
-    int2 pxy = input.C.xy * dimensions;
-
     int nodeCount = 0;
     int fragmentCount = 0;
     int currentNode = rootBuffer[pxy];
-
-    /*float maxDepth = boundaryBuffer[currentNode].w;
-    float minDepth = boundaryBuffer[currentNode].z;
-
-    return float4((maxDepth - minDepth) * float3(0.00, 0.27, 0.29), 1);*/
-
     int maxFragsInANode = 0;
 
     for (int i = 0; i < 5 && currentNode != -1; i++)
@@ -119,6 +110,22 @@ float4 main(PS_IN input) : SV_TARGET
         return float4(1, 0, 0.5, 1);
 
     return float4(GetColor(fragmentCount / nodeCount), 1);
+}
+
+float4 main(PS_IN input) : SV_TARGET
+{
+    int2 dimensions = int2(Width, Height);
+    int2 pxy = input.C.xy * dimensions;
+
+    return GetDensityPerNode(pxy);
+    //return float4(GetColor(pxy[0] + pxy.y), 1);
+
+    /*float maxDepth = boundaryBuffer[currentNode].w;
+    float minDepth = boundaryBuffer[currentNode].z;
+
+    return float4((maxDepth - minDepth) * float3(0.00, 0.27, 0.29), 1);*/
+
+    
 
     /*float3 lowerCorner = sceneBoundaries[0] / 1e7;
     float3 upperCorner = sceneBoundaries[1] / 1e7;

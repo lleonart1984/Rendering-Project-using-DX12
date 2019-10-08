@@ -11,7 +11,7 @@ struct Vertex
 };
 
 struct GS_IN {
-    float3 NormalizedPosition : POSITION;
+    float3 P : POSITION;
     uint VertexIndex : VERTEXINDEX;
 };
 
@@ -19,8 +19,8 @@ struct VS_IN {
     uint Index : SV_VertexID;
 };
 
-StructuredBuffer<Vertex> wsVertices : register(t0);
-StructuredBuffer<int3> sceneBoundaries : register(t1);
+StructuredBuffer<Vertex> wsVertices     : register(t0);
+StructuredBuffer<int3> sceneBoundaries  : register(t1);
 
 GS_IN main(VS_IN input)
 {
@@ -33,7 +33,7 @@ GS_IN main(VS_IN input)
     position.xy = position.xy * 2 - 1;
 
     GS_IN output = (GS_IN)0;
-    output.NormalizedPosition = position;
+    output.P = position;
     output.VertexIndex = index;
 
     return output;

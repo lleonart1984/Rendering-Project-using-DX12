@@ -67,6 +67,58 @@ int get_index(int2 px, int view, int level)
     return StartMipMaps[level] + Morton[px.x] + Morton[px.y] * 2 + view * res * res;
 }
 
+float4 GetDensityPerNode(uint2 pxy)
+{
+    int nodeCount = 0;
+    int fragmentCount = 0;
+    int currentNode = rootBuffer[pxy];
+    int maxFragsInANode = 0;
+
+    for (int i = 0; i < 5 && currentNode != -1; i++)
+    {
+        while (currentNode != -1)
+        {
+            nodeCount++;
+            int currentFragment = firstBuffer[currentNode];
+            int nodeFrags = 0;
+            while (currentFragment != -1)
+            {
+                nodeFrags++;
+                fragmentCount++;
+                currentFragment = nextBuffer[currentFragment];
+            }
+
+            maxFragsInANode = max(maxFragsInANode, nodeFrags);
+            currentNode = preorderBuffer[currentNode];
+        }
+    }
+
+    float average = fragmentCount / (float)nodeCount;
+
+    // Variance
+    currentNode = rootBuffer[pxy];
+    float difference = 0;
+
+    while (currentNode != -1)
+    {
+        int currentFragment = firstBuffer[currentNode];
+        int nodeFrags = 0;
+        while (currentFragment != -1)
+        {
+            nodeFrags++;
+            currentFragment = nextBuffer[currentFragment];
+        }
+
+        difference += abs(nodeFrags - average);
+        currentNode = preorderBuffer[currentNode];
+    }
+
+    if (nodeCount == 0)
+        return float4(1, 0, 0.5, 1);
+
+    return float4(GetColor(fragmentCount / nodeCount), 1);
+}
+
 float4 main(float4 P: SV_POSITION, float2 C : TEXCOORD) : SV_TARGET
 {
     float2 pNorm = C;
@@ -100,6 +152,8 @@ float4 main(float4 P: SV_POSITION, float2 C : TEXCOORD) : SV_TARGET
 
     uint2 coord = uint2(fpx * Width + Width * faceIndex, fpy * Height);
 
+    return GetDensityPerNode(coord);
+    
     int nodeCount = 0;
     int fragmentCount = 0;
     int currentNode = rootBuffer[coord];

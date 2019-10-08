@@ -478,6 +478,6 @@ protected:
 
     void Frame() {
         perform(Graphics);
-        perform(BuildMipMaps);
+        //perform(BuildMipMaps);
     }
 };

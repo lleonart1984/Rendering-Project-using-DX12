@@ -21,24 +21,6 @@ RWStructuredBuffer<int> firstBuffer             : register(u3);
 RWStructuredBuffer<int> nextBuffer              : register(u4);
 RWStructuredBuffer<int> malloc                  : register(u5);
 
-//[numthreads(CS_GROUPSIZE_2D, CS_GROUPSIZE_2D, 1)]
-//void main(uint3 DTid : SV_DispatchThreadID)
-//{
-//    int rootNodeIndex = -1;
-//    int currentFragmentIndex = rootBuffer[DTid.xy];
-//    while (currentFragmentIndex != -1) {
-//        Fragment frag = fragments[currentFragmentIndex];
-//
-//        int nodeIndex = rootNodeIndex;
-//        while (nodeIndex != -1) {
-//            PITNode node = nodeBuffer[nodeIndex];
-//            if (frag.Interval[1] < node.Discriminant || node.Discriminant < frag.Interval[0]) {
-//                break;
-//            }
-//        }
-//    }
-//}
-
 int AllocateNode(int parent, int idxFragment, float2 interval)
 {
     int ptrNode;
@@ -86,8 +68,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
             interval.z = nodeBuffer[currentNode].Discriminant;
             int2 test = interval.xz < interval.zy;
 
-            if (all(test))
+            if (all(test)) {
                 break;
+            }
 
             lastMoveToRight = test.y;
             parentNode = currentNode;
@@ -98,9 +81,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
         {
             currentNode = AllocateNode(parentNode, currentFragmentIdx, interval.xy);
             if (parentNode == NONE)
+            {
                 ROOT = currentNode;
+            }
             else
+            {
                 nodeBuffer[parentNode].Children[lastMoveToRight] = currentNode;
+            }
         }
         else
         {

@@ -32,7 +32,7 @@ void main(triangle GS_IN input[3], inout TriangleStream<GS_OUT> output)
     float2 maxim = max(input[0].P.xy, max(input[1].P.xy, input[2].P.xy));
 
     // Offset of a half pixel
-    float2 halfPixelSize = float2(1, 1) / float2(Width, Height);
+    float2 halfPixelSize = 1 / float2(Width, Height);
     minim -= halfPixelSize;
     maxim += halfPixelSize;
 

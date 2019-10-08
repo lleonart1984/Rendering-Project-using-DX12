@@ -165,7 +165,7 @@ int main(int, char**)
 		case SPONZA_OBJ:
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			MixMirrorMaterial(&scene->Materials()[9], 0.4); // floor
+			MixMirrorMaterial(&scene->Materials()[9], 1); // floor
 			camera->Position = float3(0.3f, 0.05f, -0.028);
 			camera->Target = float3(0, 0.07f, 0);
 			lightSource->Position = float3(0, 0.45, 0);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../stdafx.h"
+#include "RaymarchRT_Constants.h"
 
 #define BOUNCES 2
 
@@ -35,7 +36,7 @@ protected:
 
 class InitializeRayDirectionsPipeline : public ShowTexturePipeline {
 public:
-    gObj<Buffer> inverseProjection;
+    gObj<Buffer> inverseCamera;
     gObj<Buffer> screenInfo;
     gObj<Texture2D> initialTriangleIndices;
     gObj<Texture2D> initialCoordinates;
@@ -51,7 +52,7 @@ protected:
     }
 
     void Globals() {
-        CBV(0, inverseProjection, ShaderType_Pixel);
+        CBV(0, inverseCamera, ShaderType_Pixel);
         CBV(1, screenInfo, ShaderType_Pixel);
 
         SRV(0, initialTriangleIndices, ShaderType_Pixel);
@@ -199,13 +200,13 @@ protected:
         Malloc = _ gCreate RWStructuredBuffer<int>(1);
         Hits = _ gCreate RWStructuredBuffer<RayIntersection>(maxSupportedRaysPerBounce);
 
-        initialRaysPipeline->cameraCB = _ gCreate ConstantBuffer<float4x4>();
+        initialRaysPipeline->cameraCB = _ gCreate ConstantBuffer<Globals>();
         initialRaysPipeline->vertices = constructing->Vertices;
         initialRaysPipeline->initialTriangleIndices = _ gCreate DrawableTexture2D<int>(render_target->Width, render_target->Height);
         initialRaysPipeline->initialCoordinates = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
         initialRaysPipeline->depthBuffer = depthBuffer;
 
-        initialRayDirectionsPipeline->inverseProjection = _ gCreate ConstantBuffer<float4x4>();
+        initialRayDirectionsPipeline->inverseCamera = _ gCreate ConstantBuffer<Globals>();
         initialRayDirectionsPipeline->screenInfo = _ gCreate ConstantBuffer<ScreenInfo>();
         initialRayDirectionsPipeline->initialTriangleIndices = initialRaysPipeline->initialTriangleIndices;
         initialRayDirectionsPipeline->initialCoordinates = initialRaysPipeline->initialCoordinates;
@@ -242,20 +243,23 @@ protected:
         float4x4 view, projection;
         Camera->GetMatrices(render_target->Width, render_target->Height, view, projection);
 
+#ifndef WORLD_SPACE_RAYS
         constructing->ViewMatrix = view;
+#endif
+
         ExecuteFrame(constructing);
         manager gClear RT(render_target, float4(Backcolor, 1));
 
         manager gClear Depth(depthBuffer);
 
-        manager gCopy ValueData(initialRaysPipeline->cameraCB, projection);
+        manager gCopy ValueData(initialRaysPipeline->cameraCB, Globals{ projection, view });
         manager gClear RT(initialRaysPipeline->initialCoordinates, float4(0));
         manager gClear UAV(initialRaysPipeline->initialTriangleIndices, (unsigned int)-1);
         manager gSet Viewport(render_target->Width, render_target->Height);
         manager gSet Pipeline(initialRaysPipeline);
         manager gDispatch Triangles(sceneLoader->VertexBuffer->ElementCount);
 
-        manager gCopy ValueData(initialRayDirectionsPipeline->inverseProjection, projection.getInverse());
+        manager gCopy ValueData(initialRayDirectionsPipeline->inverseCamera, Globals{ projection.getInverse(), view.getInverse() });
         manager gCopy ValueData(initialRayDirectionsPipeline->screenInfo, ScreenInfo{ render_target->Width, render_target->Height });
         initialRayDirectionsPipeline->rayInfo = Rays;
         initialRayDirectionsPipeline->headBuffer = RayHeadBuffer;
@@ -273,7 +277,11 @@ protected:
         int N = BOUNCES;
         bounceRaysPipeline->accumulations = render_target;
 
+#ifdef WORLD_SPACE_RAYS
+        float3 position = Light->Position;
+#else
         float3 position = xyz(mul(float4(Light->Position, 1), view));
+#endif
         float3 intensity = Light->Intensity;
         manager gCopy ValueData(bounceRaysPipeline->lighting, Lighting{ position, 0, intensity, 0 });
         manager gCopy ValueData(bounceRaysPipeline->inverseViewing, Globals{ projection, view.getInverse() });

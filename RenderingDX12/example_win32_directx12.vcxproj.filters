@@ -68,6 +68,7 @@
     <FxCompile Include="Techniques\WSAPIT\Shaders\WSPIT_Fill_PS.hlsl" />
     <FxCompile Include="Techniques\WSAPIT\Shaders\WSPIT_Build_CS.hlsl" />
     <FxCompile Include="Techniques\WSAPIT\Shaders\WSPIT_Link_CS.hlsl" />
+    <FxCompile Include="Techniques\WSAPIT\Shaders\WSPIT_Traversal_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -178,6 +179,7 @@
     <ClInclude Include="Techniques\RaymarchRT\Common_RaymarchRT.h" />
     <ClInclude Include="Techniques\WSAPIT\WorldSpaceAPIT.h" />
     <ClInclude Include="Techniques\WSAPIT\DebugWSAPIT.h" />
+    <ClInclude Include="Techniques\RaymarchRT\RaymarchRT_Constants.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

@@ -115,11 +115,62 @@ protected:
     }
 };
 
-class WorldSpaceAPIT : public Technique, public IHasScene {
+class WorldSpaceTraversalPipeline : public ComputePipelineBindings {
+public:
+    // SRV
+    gObj<Buffer> rays;
+    gObj<Texture2D> rayHeadBuffer;
+    gObj<Buffer> rayNextBuffer;
+    // Scene Geometry
+    gObj<Buffer> wsVertices;
+    gObj<Buffer> sceneBoundaries;
+    // APIT
+    gObj<Buffer> fragments;
+    gObj<Buffer> firstBuffer;
+    gObj<Buffer> boundaryNodeBuffer;
+    gObj<Texture2D> rootBuffer; // First buffer, then root buffer
+    gObj<Buffer> nextBuffer; // NextBuffer, then per-node next buffer
+    gObj<Buffer> preorderBuffer; // next node in preorder
+    gObj<Buffer> skipBuffer; // next node in preorder skipping current subtree
+
+    gObj<Buffer> hits;
+    gObj<Texture2D> complexity; // Complexity buffer for debugging
+
+    // Constant buffers
+    gObj<Buffer> screenInfo;
+    gObj<Buffer> raymarchingInfo;
+protected:
+    void Setup() {
+        _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\WSAPIT\\Shaders\\WSPIT_Traversal_CS.cso"));
+    }
+
+    void Globals() {
+        SRV(0, rays, ShaderType_Any);
+        SRV(1, rayHeadBuffer, ShaderType_Any);
+        SRV(2, rayNextBuffer, ShaderType_Any);
+        SRV(3, wsVertices, ShaderType_Any);
+        SRV(4, sceneBoundaries, ShaderType_Any);
+        SRV(5, fragments, ShaderType_Any);
+        SRV(6, firstBuffer, ShaderType_Any);
+        SRV(7, boundaryNodeBuffer, ShaderType_Any);
+        SRV(8, rootBuffer, ShaderType_Any);
+        SRV(9, nextBuffer, ShaderType_Any);
+        SRV(10, preorderBuffer, ShaderType_Any);
+        SRV(11, skipBuffer, ShaderType_Any);
+
+        UAV(0, hits, ShaderType_Any);
+        UAV(1, complexity, ShaderType_Any);
+
+        CBV(0, screenInfo, ShaderType_Any);
+        CBV(1, raymarchingInfo, ShaderType_Any);
+    }
+};
+
+class WorldSpaceAPIT : public Technique, public IHasScene, public DebugRaymarchRT {
 public:
     // Scene loading process to retain scene on the GPU
     gObj<RetainedSceneLoader> sceneLoader;
-    gObj<Buffer> WorldSpaceVertices;
+    gObj<Buffer> Vertices;
     gObj<Buffer> SceneBoundaries;
     gObj<Buffer> Fragments;
     gObj<Texture2D> RootBuffer;
@@ -136,11 +187,37 @@ public:
     gObj<WorldSpaceABufferPipeline> aBufferPipeline;
     gObj<WorldSpaceBuildPipeline> buildPipeline;
     gObj<WorldSpaceLinkPipeline> linkPipeline;
+    gObj<WorldSpaceTraversalPipeline> traversalPipeline;
 
     APITDescription description;
 
     WorldSpaceAPIT(APITDescription description) {
         this->description = description;
+    }
+
+    void ComputeCollision(gObj<GraphicsManager> manager)
+    {
+        manager gCopy ValueData(traversalPipeline->raymarchingInfo, RaymarchingDebug{
+            CountSteps ? 1 : 0,
+            CountHits ? 1 : 0
+            });
+
+        int width = traversalPipeline->rayHeadBuffer->Width;
+        int height = traversalPipeline->rayHeadBuffer->Height;
+
+        manager gSet Pipeline(traversalPipeline);
+        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_SQUAREGROUP(width, height));
+    }
+
+    void DetectCollision(gObj<Buffer> rays, gObj<Texture2D> rayHeadBuffer, gObj<Buffer> rayNextBuffer, gObj<Buffer> hits, gObj<Texture2D> complexity)
+    {
+        traversalPipeline->rays = rays;
+        traversalPipeline->rayHeadBuffer = rayHeadBuffer;
+        traversalPipeline->rayNextBuffer = rayNextBuffer;
+        traversalPipeline->hits = hits;
+        traversalPipeline->complexity = complexity;
+
+        perform(ComputeCollision);
     }
 
 protected:
@@ -160,7 +237,7 @@ protected:
         }
 
         int resolution = description.getResolution();
-        WorldSpaceVertices = _ gCreate RWStructuredBuffer<SCENE_VERTEX>(sceneLoader->VertexBuffer->ElementCount);
+        Vertices = _ gCreate RWStructuredBuffer<SCENE_VERTEX>(sceneLoader->VertexBuffer->ElementCount);
         SceneBoundaries = _ gCreate RWStructuredBuffer<int3>(2);
         Fragments = _ gCreate RWStructuredBuffer<Fragment>(MAX_NUMBER_OF_FRAGMENTS);
         RootBuffer = _ gCreate DrawableTexture2D<int>(resolution, resolution);
@@ -175,14 +252,14 @@ protected:
 
         // Load and setup pipeline resources
         _ gLoad Pipeline(wsTransformPipeline);
-        wsTransformPipeline->worldSpaceVertices = WorldSpaceVertices;
+        wsTransformPipeline->worldSpaceVertices = Vertices;
         wsTransformPipeline->sceneBoundaries = SceneBoundaries;
         wsTransformPipeline->vertices = sceneLoader->VertexBuffer;
         wsTransformPipeline->objectIds = sceneLoader->ObjectBuffer;
         wsTransformPipeline->transforms = sceneLoader->TransformBuffer;
 
         _ gLoad Pipeline(aBufferPipeline);
-        aBufferPipeline->wsVertices = WorldSpaceVertices;
+        aBufferPipeline->wsVertices = Vertices;
         aBufferPipeline->sceneBoundaries = SceneBoundaries;
         aBufferPipeline->fragments = Fragments;
         aBufferPipeline->firstBuffer = RootBuffer;
@@ -205,6 +282,19 @@ protected:
         linkPipeline->boundaryNodeBuffer = BoundaryNodeBuffer;
         linkPipeline->preorderBuffer = PreorderBuffer;
         linkPipeline->skipBuffer = SkipBuffer;
+
+        _ gLoad Pipeline(traversalPipeline);
+        traversalPipeline->wsVertices = Vertices;
+        traversalPipeline->sceneBoundaries = SceneBoundaries;
+        traversalPipeline->fragments = Fragments;
+        traversalPipeline->firstBuffer = FirstBuffer;
+        traversalPipeline->boundaryNodeBuffer = BoundaryNodeBuffer;
+        traversalPipeline->rootBuffer = RootBuffer;
+        traversalPipeline->nextBuffer = NextBuffer;
+        traversalPipeline->preorderBuffer = PreorderBuffer;
+        traversalPipeline->skipBuffer = SkipBuffer;
+        traversalPipeline->screenInfo = screenInfo;
+        traversalPipeline->raymarchingInfo = _ gCreate ConstantBuffer<RaymarchingDebug>();
     }
 
     void TransformVertices(gObj<GraphicsManager> manager) {
