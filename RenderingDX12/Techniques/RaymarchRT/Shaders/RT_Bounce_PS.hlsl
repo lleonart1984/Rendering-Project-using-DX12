@@ -164,7 +164,7 @@ float3 AnalizeRay(int2 px, int index)
         bRay.Direction = reflectingDirection;
         bRay.AccumulationFactor = fac * reflection;
         int newIndex;
-        InterlockedAdd(Malloc[0], 1, newIndex);
+        InterlockedAdd(Malloc[0], 1, newIndex); 
         Output[newIndex] = bRay;
         OutputNextBuffer[newIndex] = OutputHeadBuffer[px];
         OutputHeadBuffer[px] = newIndex;
@@ -173,7 +173,7 @@ float3 AnalizeRay(int2 px, int index)
     if (refraction > 0)
     {
         RayInfo bRay = inp;
-        bRay.Position = position - facedNormal * 0.005;
+        bRay.Position = position - facedNormal * 0.002;
         bRay.Direction = refractingDirection;
         bRay.AccumulationFactor = fac * refraction;
         int newIndex;

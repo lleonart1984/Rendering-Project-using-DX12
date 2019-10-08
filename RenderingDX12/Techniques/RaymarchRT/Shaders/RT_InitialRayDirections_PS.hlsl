@@ -46,7 +46,7 @@ void main(float4 proj : SV_POSITION, float2 C : TEXCOORD)
     float3 rayPosition = observerPoint.xyz / observerPoint.w;
     float3 rayDirection = normalize(screenPoint.xyz / screenPoint.w - observerPoint.xyz / observerPoint.w);
 #else
-    float3 NPC = float3((C.x * 2 - 1), 1 - C.y * 2, -0);
+    float3 NPC = float3((C.x * 2 - 1), 1 - C.y * 2, 0);
     float3 dir = mul(float4(NPC, 1), InverseProj).xyz;
     float3 rayPosition = 0;
     float3 rayDirection = dir;

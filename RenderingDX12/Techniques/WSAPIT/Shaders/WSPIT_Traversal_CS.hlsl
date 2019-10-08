@@ -161,32 +161,16 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
     bool hit;
     int counter = 0;
 
-    float3 C1 = bMin - P;
-    float3 C2 = 
-    float3 corners[2] = { bMin - P, bMax - P };
-
-    float2 tX = D.x == 0 ? float2(-1000, 1000) : corners[0].x;
-
-    float tMin = all(bMin < P && P < bMax) ? 0 : 1000;
-    float tMax = 0;
-    for (int i = 0; i < 3; i++) // component
-    {
-        if (D[i] != 0) {
-            for (int j = 0; j < 2; j++) // bounds
-            {
-                float t = corners[j][i] / D[i];
-                float3 intersection = P + D * t;
-                if (t > 0 && all(bMin <= intersection + EPSILON && intersection - EPSILON <= bMax)) {
-                    tMin = min(tMin, t);
-                    tMax = max(tMax, t);
-                }
-            }
-        }
-    }
-
-    if (tMin == 1000) {
+    float2x3 C = float2x3(bMin - P, bMax - P);
+    float2x3 D2 = float2x3(D, D);
+    float2x3 T = D2 == 0 ? float2x3(float3(-1000, -1000, -1000), float3(1000, 1000, 1000)) : C / D2;
+    float tMin = max(max(min(T._m00, T._m10), min(T._m01, T._m11)), min(T._m02, T._m12));
+    float tMax = min(min(max(T._m00, T._m10), max(T._m01, T._m11)), max(T._m02, T._m12));
+    if (tMax < tMin || tMax < 0) {
         return;
     }
+
+    tMin = max(0, tMin);
 
     float3 wsRayOrigin = P + D * tMin;
     float3 wsRayDirection = D * (tMax - tMin);
@@ -197,33 +181,20 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
 
     // Screen positions of the ray
     float2 dimensions = float2(Width, Height);
-    float2 pixelSize = float2(1, 1) / dimensions;
 
-    float2 screenIn  = float2(a.x, 1 - a.y) / pixelSize;
-    float2 screenOut = float2(b.x, 1 - b.y) / pixelSize;
+    float2 screenIn  = float2(a.x, 1 - a.y) * dimensions;
+    float2 screenOut = float2(b.x, 1 - b.y) * dimensions;
     float2 screenDirection = screenOut - screenIn;
 
-    int2 nextPixel = (screenOut > screenIn) + int2(screenIn);
-    float2 Ds = normalize(screenDirection);
-    float2 step = 0;
-    if (screenDirection.x == 0)
-    {
-        step.x = 1000; // parallel to x axis
-        step.y = 1.0 / length(screenDirection);
-    }
-    else
-    {
-        float slope = screenDirection.y / screenDirection.x;
-        step.x = length(float2(1, slope)) / length(screenDirection);
-        step.y = slope == 0 ? 1000 : (length(float2(1.0 / slope, 1.0)) / length(screenDirection));
-    }
+    int2 pixelBorder = (screenOut > screenIn) + int2(screenIn);
+    float2 step = screenDirection == 0 ? 100 : 1 / abs(screenDirection);
 
-    float2 alpha = screenDirection == 0 ? 1000 : (nextPixel - screenIn) / screenDirection;
-    int2 pixelInc = int2(screenDirection.x > 0 ? 1 : -1, screenDirection.y > 0 ? 1 : -1);
+    float2 alpha = screenDirection == 0 ? 1000 : (pixelBorder - screenIn) / screenDirection;
+    int2 pixelInc = screenDirection > 0 ? 1 : -1;
     
     float currentAlpha = 0;
-    float currentZ = wsRayOrigin.z;
-    uint2 currentPixel = uint2(screenIn);
+    float currentZ = a.z;
+    int2 currentPixel = int2(screenIn);
     float t = 1.0;
     while (currentAlpha < t)
     {
@@ -231,7 +202,8 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
         float nextAlpha = min(t, dot(selection, alpha));
         float nextZ = a.z + (b.z - a.z) * nextAlpha;
 
-        QueryRange(currentPixel, min(currentZ, nextZ), max(currentZ, nextZ), wsRayOrigin, wsRayDirection, t, intersection.Coordinates, intersection.TriangleIndex, counter);
+        QueryRange(currentPixel, min(currentZ, nextZ), max(currentZ, nextZ), wsRayOrigin, wsRayDirection, t,
+            intersection.Coordinates, intersection.TriangleIndex, counter);
         
         alpha += selection * step;
         currentPixel += selection * pixelInc;
