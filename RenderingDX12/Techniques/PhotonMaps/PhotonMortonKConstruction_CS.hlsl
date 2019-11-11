@@ -14,14 +14,14 @@ struct AABB {
 	float3 maximum;
 };
 
-StructuredBuffer<Photon> Photons		: register (t0);
-StructuredBuffer<int> Morton			: register (t1);
-StructuredBuffer<float> RadiiFactor		: register (t2);
-StructuredBuffer<int> Permutation		: register (t3);
+StructuredBuffer<Photon> Photons				: register (t0);
+StructuredBuffer<int> Morton					: register (t1);
+StructuredBuffer<float> RadiiFactor				: register (t2);
+StructuredBuffer<int> Permutation				: register (t3);
 
-RWStructuredBuffer<AABB> PhotonAABBs	: register (u0);
-RWStructuredBuffer<float> radii			: register (u1);
-RWStructuredBuffer<Photon> AllocatedPhotons : register(u2);
+RWStructuredBuffer<AABB> PhotonAABBs			: register (u0);
+RWStructuredBuffer<float> radii					: register (u1);
+RWStructuredBuffer<Photon> AllocatedPhotons		: register (u2);
 
 static const int bufferSize = PHOTON_DIMENSION * PHOTON_DIMENSION - 1;
 

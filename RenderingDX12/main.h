@@ -19,7 +19,7 @@
 //#define WARP
 
 // Uncomment this to Force fallback device
-#define FORCE_FALLBACK
+//#define FORCE_FALLBACK
 
 //class NoTechnique : public Technique {}; gObj<NoTechnique> technique;
 
@@ -55,11 +55,11 @@
 //gObj<BPP_PhotonMap2Technique> technique;
 //gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
 //gObj<BPP_PhotonMap4Technique> technique; // Technique with morton sorting of photons to estimate knn
-//gObj<BPP_PhotonMap5Technique> technique; // Technique with morton sorting of photons to estimate knn
+gObj<BPP_PhotonMap5Technique> technique; // Technique with morton sorting of photons to estimate knn
 
 // APIT
 //gObj<DebugAPIT> technique;
 //gObj<RaymarchRT<APITConstruction, APITDescription>> technique;
 
 // Raytracing
-gObj<DXRRaytracingTechnique> technique;
+//gObj<DXRRaytracingTechnique> technique;

@@ -400,7 +400,7 @@ public:
 		}
 
 		perform(Photontracing);
-		
+
 		perform(ConstructPhotonMap);
 
 		static bool firstTime = true;
@@ -410,7 +410,6 @@ public:
 		}
 		else
 			perform(UpdatePhotonMap);
-
 
 		perform(Raytracing);
 	}
@@ -505,7 +504,7 @@ public:
 				// Bitonic sort wave
 				computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / (2 * CS_1D_GROUPSIZE));
 			}
-		
+
 		// Constructing AABBs and Computing Radii
 		computeManager gSet Pipeline(photonMapConstruction);
 		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / CS_1D_GROUPSIZE / BOXED_PHOTONS);
