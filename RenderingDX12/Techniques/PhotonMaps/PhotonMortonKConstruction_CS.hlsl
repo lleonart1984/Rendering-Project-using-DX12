@@ -21,7 +21,7 @@ StructuredBuffer<int> Permutation				: register (t3);
 
 RWStructuredBuffer<AABB> PhotonAABBs			: register (u0);
 RWStructuredBuffer<float> radii					: register (u1);
-RWStructuredBuffer<Photon> AllocatedPhotons		: register (u2);
+RWStructuredBuffer<Photon> SortedPhotons		: register (u2);
 
 static const int bufferSize = PHOTON_DIMENSION * PHOTON_DIMENSION - 1;
 
@@ -42,7 +42,8 @@ float MortonEstimator(in Photon currentPhoton, int index, float maximumRadius) {
 		// expand l and r considering all photons inside current block (currentMask)
 		while (l >= 0 && ((Morton[Permutation[l]] & currentMask) == currentBlock))
 		{
-			l -= inc;
+			int ratio = 1 + pow(Permutation[l],5) % 4;
+			l -= max(1, inc * ratio / 4);
 			inc <<= 1;
 		}
 
@@ -50,15 +51,19 @@ float MortonEstimator(in Photon currentPhoton, int index, float maximumRadius) {
 
 		while (r < bufferSize && ((Morton[Permutation[r]] & currentMask) == currentBlock))
 		{
-			r += inc;
+			int ratio = 1 + pow(Permutation[r],3) % 4;
+			r += max(1, inc * ratio / 4);
 			inc <<= 1;
 		}
-		if ((r - l) >= DESIRED_PHOTONS * 4 / 3.14159)
-		{
-			return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l) * 4 / 3.14);
-		}
+
 		if (mortonBlockRadius >= maximumRadius)
 			return maximumRadius;
+		
+		if ((r - l) >= DESIRED_PHOTONS)// * 4 / 3.14159)
+		{
+			//return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l) * 4 / 3.14);
+			return mortonBlockRadius;// *sqrt(max(0.125, DESIRED_PHOTONS / (r - l) * 4 / 3.14159));
+		}
 
 		//return mortonBlockRadius * 1.73 / pow((r - l)/ (float)DESIRED_PHOTONS, 0.5);
 	}
@@ -91,15 +96,17 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		}
 
 		radii[photonIdx] = max(0.0001,radius);
-		AllocatedPhotons[photonIdx] = currentPhoton;
+		SortedPhotons[photonIdx] = currentPhoton;
 	}
 
 	if (box.maximum.x <= box.minimum.x)
 	{
 		float3 pos = 0;// 2 * float3(x, y, z) - 1;
 		//float3 pos = Photons[Permutation[0]].Position;
-		box.minimum = pos - 0.0001;// -radius * 0.0001;
-		box.maximum = pos + 0.0001;// +radius * 0.0001;
+		//box.minimum = pos - 0.0001;// -radius * 0.0001;
+		//box.maximum = pos + 0.0001;// +radius * 0.0001;
+		box.minimum = 0;
+		box.maximum = 0;
 	}
 	PhotonAABBs[index] = box;
 }

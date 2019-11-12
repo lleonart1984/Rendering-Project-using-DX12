@@ -139,7 +139,7 @@ void PTMainRays() {
 	if (PHOTON_TRACE_MAX_BOUNCES == 0) // no photon trace
 		return;
 
-	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, PHOTON_TRACE_MAX_BOUNCES, PassCount);
+	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES+1, raysIndex, PHOTON_TRACE_MAX_BOUNCES, PassCount);
 
 	Vertex surfel;
 	Material material;
@@ -201,7 +201,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
-	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES, raysIndex, payloadBounce, PassCount);
+	StartRandomSeedForRay(raysDimensions, PHOTON_TRACE_MAX_BOUNCES + 1, raysIndex, payloadBounce, PassCount);
 
 	int rayId = raysIndex.x + raysIndex.y * raysDimensions.x;
 
@@ -217,11 +217,11 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 	if (NdotV > 0.001 && material.Roulette.x > 0) { // store photon assuming this is the last bounce
 		Photon p = (Photon)0;
 		p.Intensity = payloadAccumulation;
-		p.Position = surfel.P;
+		p.Position = surfel.P;// +surfel.N * random() * 0.00001;// (float3(random(), random(), random()) * 2 - 1) * 0.0001; // epsilon photon perturbation to prevent Morton patterns
 		p.Normal = surfel.N;
 		p.Direction = WorldRayDirection();
 		Photons[rayId] = p;
-		stopPdf = payloadBounce == 0 ? 1 : 0.5 * material.Roulette.x * (material.Diffuse.x + material.Diffuse.y + material.Diffuse.z) / 3;
+		stopPdf = payloadBounce == 0 ? 1 : 0.5 * (material.Diffuse.x + material.Diffuse.y + material.Diffuse.z) / 3;
 	}
 	else
 		stopPdf = 0;
@@ -235,7 +235,8 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 		if (payloadBounce > 0)
 		// Photon can bounce one more time
 		{
-			RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)) * (1 + d * 3));
+			//RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)) * (1 + d * 3));
+			RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)));
 
 			float3 ratio;
 			float3 direction;
