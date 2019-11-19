@@ -59,10 +59,10 @@ float MortonEstimator(in Photon currentPhoton, int index, float maximumRadius) {
 		if (mortonBlockRadius >= maximumRadius)
 			return maximumRadius;
 		
-		if ((r - l) >= DESIRED_PHOTONS)// * 4 / 3.14159)
+		if ((r - l) >= DESIRED_PHOTONS * 4 / 3.14159)
 		{
-			//return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l) * 4 / 3.14);
-			return mortonBlockRadius;// *sqrt(max(0.125, DESIRED_PHOTONS / (r - l) * 4 / 3.14159));
+			return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l) * 4 / 3.14);
+			//return mortonBlockRadius;// *sqrt(max(0.125, DESIRED_PHOTONS / (r - l) * 4 / 3.14159));
 		}
 
 		//return mortonBlockRadius * 1.73 / pow((r - l)/ (float)DESIRED_PHOTONS, 0.5);
@@ -88,8 +88,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 		if (any(currentPhoton.Intensity))
 		{
-			radius = clamp(MortonEstimator(currentPhoton, photonIdx, clamp(RadiiFactor[Permutation[photonIdx]], 1, 8) * PHOTON_RADIUS), PHOTON_RADIUS * 0.01, PHOTON_RADIUS * 8);
+#if ADAPTIVE_STRATEGY == 1
+			radius = clamp(MortonEstimator(currentPhoton, photonIdx, clamp(RadiiFactor[Permutation[photonIdx]], 1, 8) * PHOTON_RADIUS), 0.0001, PHOTON_RADIUS * 8);
 			//radius = clamp(MortonEstimator(currentPhoton, photonIdx, PHOTON_RADIUS), PHOTON_RADIUS * 0.01, PHOTON_RADIUS);
+#else
+			radius = PHOTON_RADIUS;
+#endif
 
 			box.minimum = min(box.minimum, currentPhoton.Position - radius);
 			box.maximum = max(box.maximum, currentPhoton.Position + radius);

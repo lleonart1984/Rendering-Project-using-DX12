@@ -32,7 +32,9 @@ int morton(int3 pos) {
 [numthreads(CS_1D_GROUPSIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-	int3 pos = saturate(Photons[DTid.x].Position * 0.5 + 0.5) * ((1 << 10) - 1); // map to 1024^3 cells
+	float3 pPos = Photons[DTid.x].Position;
+	//pPos += Photons[DTid.x].Normal * (((int)(pPos.x * 1001 + pPos.y * 010 - pPos.z * 10203)) % 100) * 0.01 * 0.1;
+	int3 pos = saturate(pPos * 0.5 + 0.5) * ((1 << 10) - 1); // map to 1024^3 cells
 	Indices[DTid.x] = any(Photons[DTid.x].Intensity) ? morton(pos) : 0x7FFFFFFF;
 	Permutation[DTid.x] = DTid.x;
 }

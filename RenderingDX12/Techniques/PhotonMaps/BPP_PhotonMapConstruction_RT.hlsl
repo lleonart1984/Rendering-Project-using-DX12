@@ -169,11 +169,12 @@ void Main()
 	else {
 		radii[index] = 0;// radius;
 
-		float x = raysIndex.x / (float)PHOTON_DIMENSION;
+		/*float x = raysIndex.x / (float)PHOTON_DIMENSION;
 		float y = raysIndex.y / (float)PHOTON_DIMENSION;
 		float z = 2*(abs(index * 0x888888) % 128) / 128.0 - 1;
 
-		float3 pos = 2 * float3(x, y, z) - 1;
+		float3 pos = 2 * float3(x, y, z) - 1;*/
+		float3 pos = 0;
 
 		AABB box = (AABB)0;
 		box.minimum = pos - 0.00001;// -radius * 0.0001;

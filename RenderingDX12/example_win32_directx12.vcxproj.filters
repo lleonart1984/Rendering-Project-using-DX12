@@ -39,6 +39,7 @@
     <FxCompile Include="Techniques\PhotonMaps\PhotonMortonKConstruction_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonGather4_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonGather5_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PhotonConstruction_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />

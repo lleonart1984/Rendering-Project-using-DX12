@@ -311,35 +311,34 @@ int main(int, char**)
 				else
 					camera->Rotate(delta.x*0.01f, -delta.y*0.01f);
 
-
 				if (delta.x != 0 || delta.y != 0)
 				{
 					movingCamera = -1;
 					cameraChanged = true;
 					ImGui::ResetMouseDragDelta(1);
 				}
-				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_UpArrow)))
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveForward(deltaTime);
+					camera->MoveForward(deltaTime* 0.1);
 					cameraChanged = true;
 				}
-				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_DownArrow)))
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveBackward(deltaTime);
+					camera->MoveBackward(deltaTime* 0.1);
 					cameraChanged = true;
 				}
-				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_LeftArrow)))
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_LeftArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveLeft(deltaTime);
+					camera->MoveLeft(deltaTime*0.1);
 					cameraChanged = true;
 				}
-				if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_RightArrow)))
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_RightArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveRight(deltaTime);
+					camera->MoveRight(deltaTime*0.1);
 					cameraChanged = true;
 				}
 
