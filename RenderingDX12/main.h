@@ -8,12 +8,12 @@
 #define SIBENIK_OBJ 4
 #define SANMIGUEL_OBJ 5
 
-#define USE_SCENE SPONZA_OBJ
+#define USE_SCENE RING_OBJ
 
-#define MOVE_LIGHT false
+#define MOVE_LIGHT true
 
 // Change this to force every frame camera dirty
-#define PERMANENT_CAMERA_DIRTY true
+#define PERMANENT_CAMERA_DIRTY false
 
 // Uncomment this to use warp device for unsupported DX12 functionalities in your device
 //#define WARP

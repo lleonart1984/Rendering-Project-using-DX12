@@ -61,28 +61,62 @@ public:
 		}
 	};
 
-	struct ConstructPhotonMapPipeline : public ComputePipelineBindings {
+	struct RadiiDeterminationPipeline : public ComputePipelineBindings {
 		void Setup() {
-			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\PhotonMortonKConstruction_CS.cso"));
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\BPP_RadiusDetermination_CS.cso"));
 		}
 
 		gObj<Buffer> Photons;
-		gObj<Buffer> AABBs;
-		gObj<Buffer> Radii;
-		gObj<Buffer> RadiusFactors;
 		gObj<Buffer> MortonIndices;
+		gObj<Buffer> RadiusFactors;
 		gObj<Buffer> Permutation;
+
+		gObj<Buffer> Radii;
 		gObj<Buffer> AllocatedPhotons;
 
 		void Globals() {
-			UAV(0, AABBs, ShaderType_Any);
-			UAV(1, Radii, ShaderType_Any);
-			UAV(2, AllocatedPhotons, ShaderType_Any);
+			UAV(0, Radii, ShaderType_Any);
+			UAV(1, AllocatedPhotons, ShaderType_Any);
 
 			SRV(0, Photons, ShaderType_Any);
 			SRV(1, MortonIndices, ShaderType_Any);
 			SRV(2, RadiusFactors, ShaderType_Any);
 			SRV(3, Permutation, ShaderType_Any);
+		}
+	};
+
+	struct RadiusConvolutionPipeline : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\BPP_RadiusConvolution_CS.cso"));
+		}
+
+		gObj<Buffer> Photons;
+		gObj<Buffer> In_Radii;
+
+		gObj<Buffer> Out_Radii;
+
+		void Globals() {
+			UAV(0, Out_Radii, ShaderType_Any);
+
+			SRV(0, Photons, ShaderType_Any);
+			SRV(1, In_Radii, ShaderType_Any);
+		}
+	};
+
+	struct ConstructPhotonMapPipeline : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\BPP_PhotonPacking_CS.cso"));
+		}
+
+		gObj<Buffer> Photons;
+		gObj<Buffer> Radii;
+		gObj<Buffer> AABBs;
+
+		void Globals() {
+			UAV(0, AABBs, ShaderType_Any);
+
+			SRV(0, Photons, ShaderType_Any);
+			SRV(1, Radii, ShaderType_Any);
 		}
 	};
 
@@ -207,6 +241,8 @@ public:
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
 	gObj<MortonIndexing> mortonIndexingPipeline;
 	gObj<SortingPipeline> sortingPipeline;
+	gObj<RadiiDeterminationPipeline> photonRadius;
+	gObj<RadiusConvolutionPipeline> photonRadiusConvolution;
 	gObj<ConstructPhotonMapPipeline> photonMapConstruction;
 	gObj<DXR_RT_Pipeline> dxrRTPipeline;
 
@@ -247,6 +283,8 @@ public:
 		_ gLoad Pipeline(dxrPTPipeline);
 		_ gLoad Pipeline(mortonIndexingPipeline);
 		_ gLoad Pipeline(sortingPipeline);
+		_ gLoad Pipeline(photonRadius);
+		_ gLoad Pipeline(photonRadiusConvolution);
 		_ gLoad Pipeline(photonMapConstruction);
 		_ gLoad Pipeline(dxrRTPipeline);
 
@@ -298,14 +336,25 @@ public:
 		sortingPipeline->Permutation = mortonIndexingPipeline->Permutation;
 #pragma endregion
 
-#pragma region DXR Pipeline for PM construction using AABBs
+#pragma region Radius determination and photon reallocation into sequencial buffer
+		photonRadius->Photons = dxrPTPipeline->_Program->Photons;
+		photonRadius->RadiusFactors = dxrPTPipeline->_Program->RadiusFactors;
+		photonRadius->MortonIndices = sortingPipeline->Indices;
+		photonRadius->Permutation = sortingPipeline->Permutation;
+		photonRadius->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+		photonRadius->AllocatedPhotons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+#pragma endregion
+
+#pragma region Radius convolution
+		photonRadiusConvolution->Photons = photonRadius->AllocatedPhotons;
+		photonRadiusConvolution->In_Radii = photonRadius->Radii;
+		photonRadiusConvolution->Out_Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION * PHOTON_DIMENSION);
+#pragma endregion
+
+#pragma region Packing photons and building AABBs
+		photonMapConstruction->Photons = photonRadius->AllocatedPhotons;
+		photonMapConstruction->Radii = photonRadiusConvolution->Out_Radii;
 		photonMapConstruction->AABBs = PhotonsAABBs;
-		photonMapConstruction->RadiusFactors = dxrPTPipeline->_Program->RadiusFactors;
-		photonMapConstruction->Radii = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION * PHOTON_DIMENSION);
-		photonMapConstruction->Photons = dxrPTPipeline->_Program->Photons;
-		photonMapConstruction->MortonIndices = mortonIndexingPipeline->Indices;
-		photonMapConstruction->Permutation = mortonIndexingPipeline->Permutation;
-		photonMapConstruction->AllocatedPhotons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 #pragma endregion
 
 #pragma region DXR Photon gathering Pipeline Objects
@@ -326,8 +375,8 @@ public:
 		dxrRTPipeline->_Program->Accum = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 
 		// Bind now Photon map as SRVs
-		dxrRTPipeline->_Program->Photons = photonMapConstruction->AllocatedPhotons;
-		dxrRTPipeline->_Program->Radii = photonMapConstruction->Radii;
+		dxrRTPipeline->_Program->Photons = photonRadius->AllocatedPhotons;
+		dxrRTPipeline->_Program->Radii = photonRadiusConvolution->Out_Radii;
 #pragma endregion
 	}
 
@@ -508,6 +557,14 @@ public:
 				// Bitonic sort wave
 				computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / (2 * CS_1D_GROUPSIZE));
 			}
+
+		// Radius Determination
+		computeManager gSet Pipeline(photonRadius);
+		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / CS_1D_GROUPSIZE);
+
+		// Radius Convolution
+		computeManager gSet Pipeline(photonRadiusConvolution);
+		computeManager gDispatch Threads(PHOTON_DIMENSION * PHOTON_DIMENSION / CS_1D_GROUPSIZE);
 
 		// Constructing AABBs and Computing Radii
 		computeManager gSet Pipeline(photonMapConstruction);
