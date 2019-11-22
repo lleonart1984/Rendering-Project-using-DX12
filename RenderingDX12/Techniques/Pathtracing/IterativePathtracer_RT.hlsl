@@ -20,6 +20,7 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define SHADOW_MAP_SAMPLER_REG		s1
 
 #define OUTPUT_IMAGE_REG			u0
+#define ACCUM_IMAGE_REG				u1
 
 #define VIEWTOWORLD_CB_REG			b0
 #define LIGHTING_CB_REG				b1
@@ -71,7 +72,7 @@ void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPaylo
 	RandomScatterRay(V, fN, R, T, material, ratio, direction, pdf);
 
 	// Update gathered Importance to the viewer
-	payload.Importance *= ratio;// / (1 - russianRoulette);
+	payload.Importance *= max(0, ratio);// / (1 - russianRoulette);
 	// Update scattered ray
 	payload.ScatteredRay.Direction = direction;
 	payload.ScatteredRay.Position = surfel.P + sign(dot(direction, fN))*0.001*fN;
@@ -115,7 +116,7 @@ void PTMainRays()
 {
 	uint2 raysIndex = DispatchRaysIndex();
 	uint2 raysDimensions = DispatchRaysDimensions();
-	StartRandomSeedForRay(raysDimensions, PATH_TRACING_MAX_BOUNCES, raysIndex, 0, PassCount);
+	StartRandomSeedForRay(raysDimensions, PATH_TRACING_MAX_BOUNCES + 1, raysIndex, 0, PassCount);
 
 	Vertex surfel;
 	Material material;
@@ -142,7 +143,7 @@ void PTScattering(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 
 	// Start static seed here... for some reason, in RTX static fields are not shared
 	// between different shader types...
-	StartRandomSeedForRay(DispatchRaysDimensions(), PATH_TRACING_MAX_BOUNCES, DispatchRaysIndex(), payload.bounce, PassCount);
+	StartRandomSeedForRay(DispatchRaysDimensions(), PATH_TRACING_MAX_BOUNCES + 1, DispatchRaysIndex(), payload.bounce, PassCount);
 
 	// This is not a recursive closest hit but it will accumulate in payload
 	// all the result of the scattering to this surface

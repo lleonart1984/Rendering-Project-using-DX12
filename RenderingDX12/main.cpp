@@ -149,15 +149,15 @@ int main(int, char**)
 		switch (USE_SCENE) {
 		case BUNNY_OBJ:
 			filePath = desktop_directory();
-			strcat(filePath, "\\Models\\bunnyOnAPlate.obj");
+			strcat(filePath, "\\Models\\bunnyScene.obj");
 			//strcat(filePath, "\\Models\\CornellWithSphere\\sphereBoxScene.obj");
 			//strcat(filePath, "\\Models\\CornellBox\\BoxBox.obj");
 			scene = new Scene(filePath);
-			camera->Position = float3(0.1f, 0.2f, 0.8f);
+			camera->Position = float3(0.1f, 0.2f, 1.8f);
 			camera->Target = float3(0, 0, 0);
-			lightSource->Position = float3(0.3, 0.4, 0.1);
+			lightSource->Position = float3(0.0, 0.4, 0.1);
 			lightSource->Intensity = float3(400, 400, 400);
-			MixGlassMaterial(&scene->Materials()[0], 1);
+			MixGlassMaterial(&scene->Materials()[5], 1);
 			break;
 		case CORNELL_OBJ:
 			filePath = desktop_directory();
@@ -185,7 +185,7 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			MixMirrorMaterial(&scene->Materials()[9], 0.3); // floor
+			//MixMirrorMaterial(&scene->Materials()[9], 0.3); // floor
 			camera->Position = float3(0.3f, 0.05f, -0.028);
 			camera->Target = float3(0, 0.07f, 0);
 			lightSource->Position = float3(0, 0.45, 0);
@@ -320,25 +320,25 @@ int main(int, char**)
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveForward(deltaTime* 0.1);
+					camera->MoveForward(deltaTime);
 					cameraChanged = true;
 				}
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveBackward(deltaTime* 0.1);
+					camera->MoveBackward(deltaTime);
 					cameraChanged = true;
 				}
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_LeftArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveLeft(deltaTime*0.1);
+					camera->MoveLeft(deltaTime);
 					cameraChanged = true;
 				}
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_RightArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveRight(deltaTime*0.1);
+					camera->MoveRight(deltaTime);
 					cameraChanged = true;
 				}
 

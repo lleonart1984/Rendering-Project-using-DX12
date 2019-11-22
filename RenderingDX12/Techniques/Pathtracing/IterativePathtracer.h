@@ -65,6 +65,7 @@ public:
 			gObj<Buffer> PathtracingInfo;
 
 			gObj<Texture2D> Output;
+			gObj<Texture2D> Accum;
 
 
 			struct ObjInfo {
@@ -74,6 +75,7 @@ public:
 
 			void Globals() {
 				UAV(0, Output);
+				UAV(1, Accum);
 
 				ADS(0, Scene);
 				SRV(1, Vertices);
@@ -161,6 +163,7 @@ public:
 		dxrPTPipeline->_Program->PathtracingInfo = _ gCreate ConstantBuffer <int>();
 
 		dxrPTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
+		dxrPTPipeline->_Program->Accum = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 #pragma endregion
 
 	}
@@ -212,7 +215,7 @@ public:
 		ExecuteFrame(gBufferFromLight);
 #pragma endregion
 
-		perform(Raytracing);
+		perform(Raytracing);	
 	}
 
 	void Raytracing(gObj<DXRManager> manager) {
@@ -221,26 +224,31 @@ public:
 
 		auto rtProgram = dxrPTPipeline->_Program;
 
-		if (CameraIsDirty)
+		if (CameraIsDirty || LightSourceIsDirty)
 		{
 			FrameIndex = 0;
 			manager gClear UAV(rtProgram->Output, float4(0, 0, 0, 0));
+			manager gClear UAV(rtProgram->Accum, float4(0, 0, 0, 0));
 		}
 
-		// Update camera
-		// Required during ray-trace stage
-		manager gCopy ValueData(rtProgram->CameraCB, view.getInverse());
+		if (CameraIsDirty) {
+			// Update camera
+			// Required during ray-trace stage
+			manager gCopy ValueData(rtProgram->CameraCB, view.getInverse());
+		}
 
-		manager gCopy ValueData(rtProgram->LightTransforms, Globals{
-				lightProj,
-				lightView
-			});
+		if (LightSourceIsDirty) {
+			manager gCopy ValueData(rtProgram->LightTransforms, Globals{
+					lightProj,
+					lightView
+				});
 
-		// Update lighting needed for photon tracing
-		manager gCopy ValueData(rtProgram->LightingCB, Lighting{
-			Light->Position, 0,
-			Light->Intensity, 0
-			});
+			// Update lighting needed for photon tracing
+			manager gCopy ValueData(rtProgram->LightingCB, Lighting{
+				Light->Position, 0,
+				Light->Intensity, 0
+				});
+		}
 
 		manager gCopy ValueData(rtProgram->PathtracingInfo, FrameIndex);
 
@@ -259,23 +267,29 @@ public:
 
 #pragma region Single Pathtrace Stage
 
-		// Set Miss in slot 0
-		manager gSet Miss(dxrPTPipeline->EnvironmentMap, 0);
+		static bool firstTime = true;
 
-		// Setup a simple hitgroup per object
-		// each object knows the offset in triangle buffer
-		// and the material index for further light scattering
-		startTriangle = 0;
-		for (int i = 0; i < Scene->ObjectsCount(); i++)
-		{
-			auto sceneObject = Scene->Objects()[i];
+		if (firstTime) {
+			// Set Miss in slot 0
+			manager gSet Miss(dxrPTPipeline->EnvironmentMap, 0);
 
-			rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
-			rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
+			// Setup a simple hitgroup per object
+			// each object knows the offset in triangle buffer
+			// and the material index for further light scattering
+			startTriangle = 0;
+			for (int i = 0; i < Scene->ObjectsCount(); i++)
+			{
+				auto sceneObject = Scene->Objects()[i];
 
-			manager gSet HitGroup(dxrPTPipeline->PTMaterial, i);
+				rtProgram->CurrentObjectInfo.TriangleOffset = startTriangle;
+				rtProgram->CurrentObjectInfo.MaterialIndex = Scene->MaterialIndices()[i];
 
-			startTriangle += sceneObject.vertexesCount / 3;
+				manager gSet HitGroup(dxrPTPipeline->PTMaterial, i);
+
+				startTriangle += sceneObject.vertexesCount / 3;
+			}
+
+			firstTime = false;
 		}
 
 		// Setup a raygen shader

@@ -5,21 +5,67 @@
 
 #include "../CommonGI/Definitions.h"
 
-shared static uint rng_state;
-
-uint rand_xorshift()
+struct ULONG
 {
-	// Xorshift algorithm from George Marsaglia's paper
-	rng_state ^= (rng_state << 13);
-	rng_state ^= (rng_state >> 17);
-	rng_state ^= (rng_state << 5);
-	return rng_state;
+	uint h, l;
+};
+
+ULONG XOR (ULONG x, ULONG y) {
+	ULONG r = { 0, 0 };
+	r.h = x.h ^ y.h;
+	r.l = x.l ^ y.l;
+	return r;
 }
 
-float random()
-{
-	return rand_xorshift() * (1.0 / 4294967296.0);
+ULONG RSHIFT(ULONG x, int p) {
+	ULONG r = { 0, 0 };
+	r.l = (x.l >> p) | (x.h << (32 - p));
+	r.h = x.h >> p;
+	return r;
 }
+
+ULONG LSHIFT(ULONG x, int p) {
+	ULONG r = { 0, 0 };
+	r.h = (x.h << p) | (x.l >> (32 - p));
+	r.l = x.l << p;
+	return r;
+}
+
+ULONG ADD(ULONG x, ULONG y) {
+	ULONG r = { 0, 0 };
+	r.l = x.l + y.l;
+	r.h = x.h + y.h + (r.l < x.l); // carry a 1 when ls addition overflow
+	return r;
+}
+
+ULONG MUL(uint x, uint y) {
+	int h1 = x >> 16;
+	int l1 = x & 0xFFFF;
+	int h2 = y >> 16;
+	int l2 = y & 0xFFFF;
+
+	ULONG r1;
+	r1.h = h1 * h2;
+	r1.l = l1 * l2;
+
+	ULONG r2 = { l1 * h2, 0 };
+	ULONG r3 = { l2 * h1, 0 };
+
+	return ADD(r1, ADD(r2, r3));
+}
+
+ULONG MUL(ULONG x, ULONG y) {
+	return ADD(
+		LSHIFT(MUL(x.h, y.l), 32),
+		ADD(
+			LSHIFT(MUL(x.l, y.h), 32),
+			MUL(x.l, y.l)
+		));
+}
+
+//#include "MarsagliaRandoms.h"
+//#include "MarsagliasXorWow.h"
+#include "XorShiftAster.h"
 
 float3 randomDirection()
 {
@@ -51,24 +97,27 @@ float3 randomHSDirection(float3 N, out float NdotD)
 	return d;
 }
 
-void initializeRandom(uint seed) {
-	rng_state = seed;// ^ 0xFEFE;
-	[loop]
-	for (int i = 0; i < seed % 10 + 10; i++)
-		random();
-}
-
 void StartRandomSeedForRay(uint2 gridDimensions, int maxBounces, uint2 raysIndex, int bounce, int frame) {
-	int index = 0;
-	int dim = 1;
+	uint index = 0;
+	uint dim = 1;
 	index += raysIndex.x * dim;
 	dim *= gridDimensions.x;
 	index += raysIndex.y * dim;
 	dim *= gridDimensions.y;
 	index += bounce * dim;
 	dim *= maxBounces;
-	index += frame * dim;
-	initializeRandom(index);
+
+	ULONG INDEX = { 0, index };
+	ULONG FRAME = { 0, frame };
+	ULONG DIM = { 0, dim };
+
+	//index += frame * dim;
+	INDEX = ADD(INDEX, MUL(FRAME, DIM));
+
+	initializeRandom(INDEX);
+
+	for (int i = 0; i < 10 + index%13; i++)
+		random();
 }
 
 #endif // RANDOMHLSL_H

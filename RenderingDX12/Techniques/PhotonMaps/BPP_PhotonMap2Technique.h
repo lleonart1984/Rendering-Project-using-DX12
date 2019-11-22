@@ -100,6 +100,7 @@ public:
 			gObj<Buffer> LightTransforms;
 
 			gObj<Texture2D> Output;
+			gObj<Texture2D> Accum;
 
 			struct ObjInfo {
 				int TriangleOffset;
@@ -109,6 +110,7 @@ public:
 
 			void Globals() {
 				UAV(0, Output);
+				UAV(1, Accum);
 
 				ADS(0, Scene);
 
@@ -251,6 +253,7 @@ public:
 		dxrRTPipeline->_Program->LightingCB = dxrPTPipeline->_Program->LightingCB;
 
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
+		dxrRTPipeline->_Program->Accum = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 		// Bind now Photon map as SRVs
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 		dxrRTPipeline->_Program->Radii = constructionPipeline->Radii;
@@ -450,8 +453,10 @@ public:
 		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
 
 		if (CameraIsDirty || LightSourceIsDirty)
+		{
 			manager gClear UAV(rtProgram->Output, 0u);
-
+			manager gClear UAV(rtProgram->Accum, 0u);
+		}
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrRTPipeline);
 		// Activate program with main shaders

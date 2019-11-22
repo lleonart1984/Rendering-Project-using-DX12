@@ -9,6 +9,9 @@ cbuffer AccumulativeInfo : register(ACCUMULATIVE_CB_REG) {
 	int PassCount;
 }
 
+RWTexture2D<float3> Accum : register(ACCUM_IMAGE_REG);
+
 void AccumulateOutput(uint2 coord, float3 value) {
-	Output[coord] = (Output[coord] * PassCount + value) / (PassCount + 1);
+	Accum[coord] += value;
+	Output[coord] = Accum[coord] / (PassCount + 1);// (Output[coord] * PassCount + value) / (PassCount + 1);
 }

@@ -162,7 +162,7 @@ void PTMainRays() {
 	float pdf;
 	RandomScatterRay(L, surfel, material, ratio, direction, pdf);
 
-	if (any(ratio))
+	if (any(ratio > 0))
 	{
 		RayDesc ray;
 		ray.Origin = surfel.P + sign(dot(direction, surfel.N))*surfel.N*0.001;
@@ -217,7 +217,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 	if (NdotV > 0.001 && material.Roulette.x > 0) { // store photon assuming this is the last bounce
 		Photon p = (Photon)0;
 		p.Intensity = payloadAccumulation;
-		p.Position = surfel.P;// +surfel.N * random() * 0.00001;// (float3(random(), random(), random()) * 2 - 1) * 0.0001; // epsilon photon perturbation to prevent Morton patterns
+		p.Position = surfel.P;// (float3(random(), random(), random()) * 2 - 1) * 0.0001; // epsilon photon perturbation to prevent Morton patterns
 		p.Normal = surfel.N;
 		p.Direction = WorldRayDirection();
 		Photons[rayId] = p;
@@ -235,8 +235,8 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 		if (payloadBounce > 0)
 		// Photon can bounce one more time
 		{
-			//RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)) * (1 + d * 3));
-			RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)));
+			RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)) * (1 + d * 3));
+			//RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)));
 
 			float3 ratio;
 			float3 direction;

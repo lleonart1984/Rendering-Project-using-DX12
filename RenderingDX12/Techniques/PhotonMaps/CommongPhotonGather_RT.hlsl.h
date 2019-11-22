@@ -76,6 +76,10 @@ StructuredBuffer<Photon> Photons		: register(t1);
 #define OUTPUT_IMAGE_REG			u0
 #endif
 
+#ifndef	ACCUM_IMAGE_REG
+#define ACCUM_IMAGE_REG				u1
+#endif
+
 #ifndef RT_CUSTOM_PAYLOAD
 struct RTPayload
 {

@@ -194,7 +194,7 @@ float3 ComputeDirectLighting(
 	// Normalize direction to light (L)
 	L /= d;
 	// compute lambert coefficient
-	float NdotL = max(0, dot(fN, L));
+	float NdotL = max(0, dot(surfel.N, L));
 
 	// Outgoing intensity per solid angle
 	// Correct formula would be:
@@ -210,7 +210,7 @@ float3 ComputeDirectLighting(
 	// Lambert Diffuse component (normalized dividing by pi)
 	float3 DiffuseRatio = DiffuseBRDF(V, L, fN, NdotL, material);
 	// Blinn Specular component (normalized multiplying by (2+n)/(2pi)
-	float3 SpecularRatio = 0;// SpecularBRDF(V, L, fN, NdotL, material);
+	float3 SpecularRatio = SpecularBRDF(V, L, fN, NdotL, material);
 
 	// gets the light radius constant
 	float lightRadius = LightSphereRadius();
@@ -265,6 +265,9 @@ void RandomScatterRay(float3 V, float3 fN, float4 R, float4 T, Material material
 ) {
 	float NdotD;
 	float3 D = randomHSDirection(fN, NdotD);
+
+	if (dot(V, fN) <= 0)
+		NdotD = 0;
 
 	float3 Diff = DiffuseBRDFMulTwoPi(V, D, fN, NdotD, material);
 	float3 Spec = SpecularBRDFMulTwoPi(V, D, fN, NdotD, material);

@@ -116,6 +116,9 @@
     <ClInclude Include="Techniques\Raytracing\DXRRaytracerTechnique.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap4Technique.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap5Technique.h" />
+    <ClInclude Include="Techniques\Randoms\MarsagliaRandoms.h" />
+    <ClInclude Include="Techniques\Randoms\MarsagliasXorWow.h" />
+    <ClInclude Include="Techniques\Randoms\XorShiftAster.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

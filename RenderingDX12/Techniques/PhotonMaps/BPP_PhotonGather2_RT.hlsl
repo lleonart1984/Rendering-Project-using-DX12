@@ -70,7 +70,8 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 
 	float photonDistance = distance(surfelPosition, p.Position);
 
-	float NdotL = dot(payload.SurfelNormal, WorldRayDirection());//  -p.Direction);
+	//float NdotL = dot(payload.SurfelNormal, WorldRayDirection());//  -p.Direction);
+	float NdotL = dot(payload.SurfelNormal, -p.Direction);
 	float NdotN = dot(payload.SurfelNormal, p.Normal);
 
 	// Aggregate current Photon contribution if inside radius

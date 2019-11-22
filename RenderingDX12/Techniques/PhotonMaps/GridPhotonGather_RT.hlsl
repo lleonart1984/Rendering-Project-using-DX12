@@ -134,7 +134,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 								NdotN * material.Roulette.x * material.Diffuse / pi;// *DiffuseRatio;
 								//+ material.Roulette.y * SpecularRatio;
 
-							totalLighting += kernel* p.Intensity* BRDF;
+							totalLighting += kernel * p.Intensity * BRDF;
 						}
 
 						currentPhotonPtr = NextBuffer[currentPhotonPtr];

@@ -26,6 +26,24 @@ int morton(int3 pos) {
 	return split3(pos.x) | (split3(pos.y) << 1) | (split3(pos.z) << 2);
 }
 
+void rand_xorshift(inout uint rng_state)
+{
+	// Xorshift algorithm from George Marsaglia's paper
+	rng_state ^= (rng_state << 13);
+	rng_state ^= (rng_state >> 17);
+	rng_state ^= (rng_state << 5);
+}
+
+float random(inout uint state)
+{
+	rand_xorshift(state);
+	rand_xorshift(state);
+	rand_xorshift(state);
+	rand_xorshift(state);
+	rand_xorshift(state);
+	return state * (1.0 / 4294967296.0);
+}
+
 [shader("raygeneration")]
 void Main()
 {
@@ -34,7 +52,11 @@ void Main()
 
 	int index = raysIndex.y * raysDimensions.x + raysIndex.x;
 
-	int3 pos = saturate(Photons[index].Position*0.5 + 0.5) * ((1 << 10) - 1); // map to 1024^3 cells
+	uint rng_state = (Photons[index].Position.x +13* Photons[index].Position.y - Photons[index].Position.z * 23) * 4294967296.0;
+
+	float3 pPos = Photons[index].Position;// +Photons[index].Normal * (random(rng_state) * 2 - 1) * 0.000001;
+
+	int3 pos = saturate(pPos*0.5 + 0.5) * ((1 << 10) - 1); // map to 1024^3 cells
 
 	Indices[index] = any(Photons[index].Intensity) ? morton(pos) : 0x7FFFFFFF;
 }

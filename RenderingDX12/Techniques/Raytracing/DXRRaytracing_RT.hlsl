@@ -15,6 +15,7 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define SHADOW_MAP_SAMPLER_REG		s1
 
 #define OUTPUT_IMAGE_REG			u0
+#define ACCUM_IMAGE_REG				u1
 
 #define VIEWTOWORLD_CB_REG			b0
 #define LIGHTING_CB_REG				b1

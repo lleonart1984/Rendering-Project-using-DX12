@@ -65,6 +65,7 @@ public:
 			gObj<Buffer> PathtracingInfo;
 
 			gObj<Texture2D> Output;
+			gObj<Texture2D> Accum;
 
 
 			struct ObjInfo {
@@ -74,6 +75,7 @@ public:
 
 			void Globals() {
 				UAV(0, Output);
+				UAV(1, Accum);
 
 				ADS(0, Scene);
 				SRV(1, Vertices);
@@ -161,6 +163,7 @@ public:
 		dxrPTPipeline->_Program->PathtracingInfo = _ gCreate ConstantBuffer <int>();
 
 		dxrPTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
+		dxrPTPipeline->_Program->Accum = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 #pragma endregion
 
 	}
@@ -224,7 +227,8 @@ public:
 		if (CameraIsDirty)
 		{
 			FrameIndex = 0;
-			manager gClear UAV(rtProgram->Output, float4(0, 0, 0, 0));
+			manager gClear UAV(rtProgram->Accum, float4(0, 0, 0, 0));
+			manager gClear UAV(rtProgram->Output, 0u);
 		}
 
 		// Update camera

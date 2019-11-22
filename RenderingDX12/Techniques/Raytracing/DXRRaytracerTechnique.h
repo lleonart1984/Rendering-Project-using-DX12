@@ -68,6 +68,7 @@ public:
 			gObj<Buffer> LightTransforms;
 
 			gObj<Texture2D> Output;
+			gObj<Texture2D> Accum;
 
 			struct ObjInfo {
 				int TriangleOffset;
@@ -77,6 +78,7 @@ public:
 
 			void Globals() {
 				UAV(0, Output);
+				UAV(1, Accum);
 
 				ADS(0, Scene);
 
@@ -262,6 +264,7 @@ public:
 		{
 			Frame = 0;
 			manager gClear UAV(rtProgram->Output, 0u);
+			manager gClear UAV(rtProgram->Accum, 0u);
 		}
 		
 		manager gCopy ValueData(dxrRTPipeline->_Program->ProgressiveCB, Frame);
