@@ -235,8 +235,8 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 		if (payloadBounce > 0)
 		// Photon can bounce one more time
 		{
-			RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)) * (1 + d * 3));
-			//RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)));
+			//RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)) * (1 + d * 3));
+			RadiiFactor[rayId] = min(8, RadiiFactor[rayId] * (1 / (1 - stopPdf)));
 
 			float3 ratio;
 			float3 direction;

@@ -21,43 +21,6 @@ public:
 
 #include "DXR_PhotonTracing_Pipeline.h"
 
-	// DXR pipeline for photon map construction stage
-	struct DXR_PM_Pipeline : public RTPipelineManager {
-		gObj<RayGenerationHandle> Main;
-
-		class DXR_PM_IL : public DXIL_Library<DXR_PM_Pipeline> {
-			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\GridPhotonMapConstruction_RT.cso"));
-
-				_ gLoad Shader(Context()->Main, L"Main");
-			}
-		};
-		gObj<DXR_PM_IL> _Library;
-
-		struct DXR_PM_Program : public RTProgram<DXR_PM_Pipeline> {
-			void Setup() {
-				_ gLoad Shader(Context()->Main);
-			}
-
-			gObj<Buffer> Photons;
-			gObj<Buffer> HeadBuffer;
-			gObj<Buffer> NextBuffer;
-			
-			void Globals() {
-				UAV(0, HeadBuffer);
-				UAV(1, NextBuffer);
-				SRV(0, Photons);
-			}
-		};
-		gObj<DXR_PM_Program> _Program;
-
-		void Setup() override
-		{
-			_ gLoad Library(_Library);
-			_ gLoad Program(_Program);
-		}
-	};
-
 	struct PhotonMapConstructionPipeline : public ComputePipelineBindings {
 		void Setup() {
 			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\PhotonMaps\\GridPhotonMapConstruction_CS.cso"));
@@ -127,7 +90,7 @@ public:
 			gObj<Buffer> ProgressivePass;
 
 			gObj<Texture2D> Output;
-
+			gObj<Texture2D> Accum;
 
 			struct ObjInfo {
 				int TriangleOffset;
@@ -136,6 +99,7 @@ public:
 
 			void Globals() {
 				UAV(0, Output);
+				UAV(1, Accum);
 
 				ADS(0, Scene);
 				SRV(1, Photons);
@@ -208,7 +172,6 @@ public:
 		wait_for(signal(flush_all_to_gpu));
 
 		_ gLoad Pipeline(dxrPTPipeline);
-		//_ gLoad Pipeline(dxrPMPipeline);
 		_ gLoad Pipeline(constructingPM);
 		_ gLoad Pipeline(dxrRTPipeline);
 
@@ -281,6 +244,7 @@ public:
 		dxrRTPipeline->_Program->ProgressivePass = dxrPTPipeline->_Program->ProgressivePass = _ gCreate ConstantBuffer<int>();
 
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
+		dxrRTPipeline->_Program->Accum = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 		// Bind now as SRVs
 		dxrRTPipeline->_Program->Photons = dxrPTPipeline->_Program->Photons;
 		//dxrRTPipeline->_Program->HashtableBuffer = dxrPMPipeline->_Program->HeadBuffer;
@@ -367,7 +331,7 @@ public:
 				});
 		}
 
-		if (CameraIsDirty) {
+		if (LightSourceIsDirty) {
 			manager gCopy ValueData(ptRTProgram->CameraCB, lightView.getInverse());
 		}
 
@@ -455,7 +419,10 @@ public:
 		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
 
 		if (CameraIsDirty || LightSourceIsDirty)
+		{
 			manager gClear UAV(rtProgram->Output, 0u);
+			manager gClear UAV(rtProgram->Accum, 0u);
+		}
 
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrRTPipeline);

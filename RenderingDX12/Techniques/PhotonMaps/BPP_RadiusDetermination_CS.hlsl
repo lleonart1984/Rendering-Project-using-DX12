@@ -21,8 +21,8 @@ static const int bufferSize = PHOTON_DIMENSION * PHOTON_DIMENSION;
 
 float MortonEstimator(in Photon currentPhoton, int index, float maximumRadius) {
 
-	int l = index - BOXED_PHOTONS;
-	int r = index - BOXED_PHOTONS;
+	int l = index - 1;
+	int r = index - 1;
 
 	int currentMorton = Morton[Permutation[index]];
 
@@ -32,29 +32,28 @@ float MortonEstimator(in Photon currentPhoton, int index, float maximumRadius) {
 		float mortonBlockRadius = (1 << i) / 1024.0;
 
 		// expand l and r considering all photons inside current block (currentMask)
-		int inc = BOXED_PHOTONS;
+		int inc = 1;
 		do
 		{
 			l -= inc;
 			inc <<= 1;
 		} while (l >= 0 && ((Morton[Permutation[l]] & currentMask) == currentBlock));
-		inc = BOXED_PHOTONS;
+		inc = 1;
 		do
 		{
 			r += inc;
 			inc <<= 1;
 		} while (r < bufferSize && ((Morton[Permutation[r]] & currentMask) == currentBlock));
+		
+		if ((r - l) >= DESIRED_PHOTONS) // if photons inside are sufficient then you get the desired radius
+		{
+			return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l))* 4 / 3.14;
+			//return mortonBlockRadius;
+		}
 
 		// check if morton block is greater already than radius
 		if (mortonBlockRadius >= maximumRadius)
 			return maximumRadius;
-
-		if ((r - l) >= DESIRED_PHOTONS) // if photons inside are sufficient then you get the desired radius
-		{
-
-			return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l) * 4 / 3.14);
-			//return mortonBlockRadius;
-		}
 	}
 	return maximumRadius;
 }
@@ -71,12 +70,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	{
 #if ADAPTIVE_STRATEGY == 1
 		//radius = clamp(MortonEstimator(currentPhoton, photonIdx, clamp(RadiiFactor[Permutation[photonIdx]], 1, 8) * PHOTON_RADIUS), 0.0001, PHOTON_RADIUS * 8);
-		radius = clamp(MortonEstimator(currentPhoton, photonIdx, PHOTON_RADIUS), PHOTON_RADIUS * 0.001, PHOTON_RADIUS);
+		//radius = clamp(MortonEstimator(currentPhoton, photonIdx, PHOTON_RADIUS), PHOTON_RADIUS * 0.001, PHOTON_RADIUS);
+		radius = MortonEstimator(currentPhoton, photonIdx, PHOTON_RADIUS);
 #else
 		radius = PHOTON_RADIUS;
 #endif
 	}
 
-	Radii[photonIdx] = max(0.0001, radius);
+	Radii[photonIdx] = max(0.00001, radius);
 	SortedPhotons[photonIdx] = currentPhoton;
 }

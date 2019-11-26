@@ -29,8 +29,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		int photonIdx = index * BOXED_PHOTONS + i;
 
 		Photon currentPhoton = Photons[photonIdx];
-		float radius = 0;
-
+		
 		if (any(currentPhoton.Intensity))
 		{
 			float radius = Radii[photonIdx];

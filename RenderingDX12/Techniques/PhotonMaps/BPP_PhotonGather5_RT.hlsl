@@ -49,10 +49,13 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 
 		float photonDistance = distance(surfelPosition, p.Position);
 
-		//if (photonDistance < radius) {
-		float radiusRatio = (radius / PHOTON_RADIUS);// min(radius, distance(p.Position, surfelPosition)) / PHOTON_RADIUS;
+		if (photonDistance < radius) 
+		{
+			float radiusRatio = min (1, radius / PHOTON_RADIUS);// min(radius, distance(p.Position, surfelPosition)) / PHOTON_RADIUS;
 
-		payload.Accum += float3(radiusRatio, 1, 1);
+			if (any(p.Intensity))
+				payload.Accum += float3(radiusRatio, 1, 1);
+		}
 	}
 	//}
 
