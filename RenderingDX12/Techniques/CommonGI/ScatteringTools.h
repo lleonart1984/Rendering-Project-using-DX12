@@ -41,7 +41,7 @@ float3 DiffuseBRDF(float3 V, float3 L, float3 fN, float NdotL, Material material
 float3 SpecularBRDFMulTwoPi(float3 V, float3 L, float3 fN, float NdotL, Material material)
 {
 	float3 H = normalize(V + L);
-	float HdotN = max(0, dot(H, fN));
+	float HdotN = max(0.0001, dot(H, fN));
 	return pow(HdotN, material.SpecularSharpness)*material.Specular*(2 + material.SpecularSharpness);
 }
 
@@ -49,7 +49,7 @@ float3 SpecularBRDFMulTwoPi(float3 V, float3 L, float3 fN, float NdotL, Material
 float3 SpecularBRDF(float3 V, float3 L, float3 fN, float NdotL, Material material)
 {
 	float3 H = normalize(V + L);
-	float HdotN = max(0, dot(H, fN));
+	float HdotN = max(0.0001, dot(H, fN));
 	return pow(HdotN, material.SpecularSharpness)*material.Specular*(2 + material.SpecularSharpness) / two_pi;
 }
 
@@ -129,9 +129,9 @@ float3 ComputeDirectLightingNoShadowCast(
 	float3 Ip = I / (pi*d2);
 
 	// Lambert Diffuse component (normalized dividing by pi)
-	float3 DiffuseRatio = DiffuseBRDF(V, L, fN, NdotL, material);
+	float3 DiffuseRatio = DiffuseBRDF(V, L, surfel.N, NdotL, material) ;
 	// Blinn Specular component (normalized multiplying by (2+n)/(2pi)
-	float3 SpecularRatio = SpecularBRDF(V, L, fN, NdotL, material);
+	float3 SpecularRatio = SpecularBRDF(V, L, surfel.N, NdotL, material) ;
 
 	return
 		// Direct diffuse and glossy lighting
@@ -208,9 +208,9 @@ float3 ComputeDirectLighting(
 	float3 Ip = I / (pi*d2);
 
 	// Lambert Diffuse component (normalized dividing by pi)
-	float3 DiffuseRatio = DiffuseBRDF(V, L, fN, NdotL, material);
+	float3 DiffuseRatio = DiffuseBRDF(V, L, surfel.N, NdotL, material) * (!invertNormal);
 	// Blinn Specular component (normalized multiplying by (2+n)/(2pi)
-	float3 SpecularRatio = SpecularBRDF(V, L, fN, NdotL, material);
+	float3 SpecularRatio = SpecularBRDF(V, L, surfel.N, NdotL, material) * (!invertNormal);
 
 	// gets the light radius constant
 	float lightRadius = LightSphereRadius();
@@ -222,8 +222,8 @@ float3 ComputeDirectLighting(
 
 	return shadowFactor * (
 		// Direct diffuse and glossy lighting
-		(material.Roulette.x*DiffuseRatio + material.Roulette.y*SpecularRatio)*NdotL*Ip
-		+ (R.w * DirectReflection + T.w * DirectRefraction)*I / (4 * pi*lightRadius*lightRadius));
+		(material.Roulette.x * DiffuseRatio + material.Roulette.y * SpecularRatio) * NdotL * Ip *(!invertNormal)
+		+ (R.w * DirectReflection + T.w * DirectRefraction) * I / (4 * pi * lightRadius * lightRadius));
 }
 
 
@@ -265,9 +265,6 @@ void RandomScatterRay(float3 V, float3 fN, float4 R, float4 T, Material material
 ) {
 	float NdotD;
 	float3 D = randomHSDirection(fN, NdotD);
-
-	if (dot(V, fN) <= 0)
-		NdotD = 0;
 
 	float3 Diff = DiffuseBRDFMulTwoPi(V, D, fN, NdotD, material);
 	float3 Spec = SpecularBRDFMulTwoPi(V, D, fN, NdotD, material);
@@ -337,13 +334,15 @@ void RandomScatterRay(float3 V, Vertex surfel, Material material,
 }
 
 void ComputeImpulses(float3 V, Vertex surfel, Material material,
+	out float NdotV,
+	out bool invertNormal,
 	out float3 fN,
 	out float4 R,
 	out float4 T) {
 	// compute cosine of angle to viewer respect to the surfel Normal
-	float NdotV = dot(V, surfel.N);
+	NdotV = dot(V, surfel.N);
 	// detect if normal is inverted
-	bool invertNormal = NdotV < 0;
+	invertNormal = NdotV < 0;
 	NdotV = abs(NdotV); // absolute value of the cosine
 	// Ratio between refraction indices depending of exiting or entering to the medium (assuming vaccum medium 1)
 	float eta = invertNormal ? material.RefractionIndex : 1 / material.RefractionIndex;

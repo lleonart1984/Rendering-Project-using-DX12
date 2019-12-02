@@ -1,5 +1,5 @@
 // Override TEXTURES_REG
-#define TEXTURES_REG t11
+#define TEXTURES_REG t12
 
 #define PHOTON_WITH_DIRECTION
 #define PHOTON_WITH_NORMAL
@@ -8,8 +8,8 @@
 #include "CommongPhotonGather_RT.hlsl.h"
 #include "CommonHashing_RT.h"
 
-StructuredBuffer<int> HashTableBuffer	: register(t9);
-StructuredBuffer<int> NextBuffer		: register(t10);
+StructuredBuffer<int> HashTableBuffer	: register(t10);
+StructuredBuffer<int> NextBuffer		: register(t11);
 
 #define T 100
 

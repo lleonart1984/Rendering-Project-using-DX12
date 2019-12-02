@@ -54,8 +54,6 @@
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
 //gObj<GridPhotonMapTechnique> technique;
 //gObj<BPP_PhotonMap2Technique> technique;
-//gObj<BPP_PhotonMap3Technique> technique; // Technique with morton sorting of photons to estimate knn
-//gObj<BPP_PhotonMap4Technique> technique; // Technique with morton sorting of photons to estimate knn
 gObj<BPP_PhotonMap5Technique> technique; // Technique with morton sorting of photons to estimate knn
 
 // APIT

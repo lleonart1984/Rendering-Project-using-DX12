@@ -32,12 +32,12 @@
     <FxCompile Include="Techniques\PhotonMaps\PhotonBitonicSort_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_MortonIndexing_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\PhotonMortonConstruction_CS.hlsl" />
-    <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonGather4_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonGather5_RT.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\PhotonConstruction_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_RadiusDetermination_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_RadiusConvolution_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonPacking_CS.hlsl" />
+    <FxCompile Include="Techniques\CommonRT\DeferredDirectLighting_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -109,14 +109,13 @@
     <ClInclude Include="Techniques\PhotonMaps\PhotonDefinition.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap2Technique.h" />
     <ClInclude Include="Techniques\PhotonMaps\DXR_PhotonTracing_Pipeline.h" />
-    <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap3Technique.h" />
     <ClInclude Include="Techniques\PhotonMaps\CommonHashing_RT.h" />
     <ClInclude Include="Techniques\Raytracing\DXRRaytracerTechnique.h" />
-    <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap4Technique.h" />
     <ClInclude Include="Techniques\PhotonMaps\BPP_PhotonMap5Technique.h" />
     <ClInclude Include="Techniques\Randoms\MarsagliaRandoms.h" />
     <ClInclude Include="Techniques\Randoms\MarsagliasXorWow.h" />
     <ClInclude Include="Techniques\Randoms\XorShiftAster.h" />
+    <ClInclude Include="Techniques\CommonRT\DirectLightingTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

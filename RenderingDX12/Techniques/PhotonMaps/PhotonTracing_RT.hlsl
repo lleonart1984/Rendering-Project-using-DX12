@@ -194,7 +194,7 @@ void PhotonScattering(inout PTPayload payload, in BuiltInTriangleIntersectionAtt
 {
 	Vertex surfel;
 	Material material;
-	GetHitInfo(attr, surfel, material);
+	GetHitInfo(attr, surfel, material, 0, 0);
 
 	float3 payloadAccumulation = DecodePTPayloadAccumulation(payload);
 	int payloadBounce = DecodePTPayloadBounces(payload);

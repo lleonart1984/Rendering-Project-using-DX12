@@ -9,7 +9,8 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define GBUFFER_COORDINATES_REG		t5
 #define GBUFFER_MATERIALS_REG		t6
 #define LIGHTVIEW_POSITIONS_REG		t7
-#define TEXTURES_REG				t8
+#define BACKGROUND_IMG_REG			t8
+#define TEXTURES_REG				t9
 
 #define TEXTURES_SAMPLER_REG		s0
 #define SHADOW_MAP_SAMPLER_REG		s1
@@ -93,13 +94,23 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 	float3 fN;
 	float4 R, T;
 	
-	total += ComputeDirectLighting(
-		V,
-		surfel,
-		material,
-		LightPosition,
-		LightIntensity,
-		/*Out*/ NdotV, invertNormal, fN, R, T);
+	if (bounces == RAY_TRACING_MAX_BOUNCES)
+	{
+		ComputeImpulses(V, surfel, material,
+			NdotV,
+			invertNormal,
+			fN,
+			R,
+			T);
+	}
+	else
+		total += ComputeDirectLighting(
+			V,
+			surfel,
+			material,
+			LightPosition,
+			LightIntensity,
+			/*Out*/ NdotV, invertNormal, fN, R, T);
 
 	if (bounces > 0 && any(material.Specular))
 	{
@@ -167,7 +178,7 @@ void RTScattering(inout RTPayload payload, in BuiltInTriangleIntersectionAttribu
 {
 	Vertex surfel;
 	Material material;
-	GetHitInfo(attr, surfel, material);
+	GetHitInfo(attr, surfel, material, 0, 0);
 
 	float3 V = -normalize(WorldRayDirection());
 

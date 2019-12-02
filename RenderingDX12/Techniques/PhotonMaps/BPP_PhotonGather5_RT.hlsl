@@ -2,14 +2,14 @@
 #define PHOTON_WITH_NORMAL
 #define PHOTON_WITH_POSITION
 
-#define TEXTURES_REG				t11
+#define TEXTURES_REG				t12
 
 #define RAY_CONTRIBUTION_TO_HITGROUPS 1
 
 #include "CommongPhotonGather_RT.hlsl.h"
 
-RaytracingAccelerationStructure PhotonMap : register(t9);
-StructuredBuffer<float> Radii : register(t10);
+RaytracingAccelerationStructure PhotonMap : register(t10);
+StructuredBuffer<float> Radii : register(t11);
 
 struct PhotonHitAttributes {
 	// AABB Index where you can find photons from AABBIdx*BOXED_PHOTONS + 0 to AABBIdx*BOXED_PHOTONS + BOXED_PHOTONS - 1
@@ -66,23 +66,25 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 [shader("anyhit")]
 void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttributes attr) {
 	float3 surfelPosition = WorldRayOrigin();// +WorldRayDirection() * 0.5;
+	float3 V = WorldRayDirection();
 
 	[loop]
 	for (int i = 0; i < BOXED_PHOTONS; i++) {
 		int photonIdx = attr.AABBIdx * BOXED_PHOTONS + i;
 
 		Photon p = Photons[photonIdx];
-		float radius = Radii[photonIdx];
+		float radius = max(0.0001, Radii[photonIdx]);
 		float area = radius * radius;
 
 		float photonDistance = distance(surfelPosition, p.Position);
 
 		float NdotL = dot(payload.SurfelNormal, -p.Direction);
 		float NdotN = dot(payload.SurfelNormal, p.Normal);
+		float NdotV = dot(V, p.Normal);
 
 		// Aggregate current Photon contribution if inside radius
 		//float kernel = (photonDistance < radius && NdotL > 0.001);
-		float kernel = (NdotL > 0.001) * max(0, 1 - (photonDistance / radius));
+		float kernel = (NdotV > 0.0001)*(NdotL > 0.001) * max(0, 1 - (photonDistance / radius));
 		//float kernel = (photonDistance < radius && NdotL > 0.001) * 2 * (1 - pow(photonDistance / radius,2)) / pi;
 		payload.Accum += kernel * p.Intensity * max(0, NdotN) / area;
 	}
@@ -132,7 +134,7 @@ float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V
 	// Count photons
 	return photonGatherPayload.Accum;
 #else
-	if (photonGatherPayload.Accum.y >= DESIRED_PHOTONS / 2)
+	if (photonGatherPayload.Accum.y >= 1)//DESIRED_PHOTONS / 4)
 		return pow(4, (1.001 - min(1, photonGatherPayload.Accum.x / photonGatherPayload.Accum.y)) * 7);
 	return 1;
 

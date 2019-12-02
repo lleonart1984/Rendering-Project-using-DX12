@@ -23,6 +23,7 @@ SamplerState shadowSmp : register(SHADOW_MAP_SAMPLER_REG);
 float ShadowCast(Vertex surfel)
 {
 	float3 pInLightViewSpace = mul(float4(surfel.P, 1), LightView).xyz;
+	float3 nInLightViewSpace = mul(float4(surfel.N, 0), LightView).xyz;
 	float4 pInLightProjSpace = mul(float4(pInLightViewSpace, 1), LightProj);
 	if (pInLightProjSpace.z <= 0.01)
 		return 0.0;

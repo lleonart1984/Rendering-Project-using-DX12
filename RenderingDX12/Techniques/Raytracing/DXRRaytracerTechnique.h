@@ -3,16 +3,10 @@
 #include "../../Techniques/GUI_Traits.h"
 #include "../DeferredShading/GBufferConstruction.h"
 #include "../CommonGI/Parameters.h"
+#include "../CommonRT/DirectLightingTechnique.h"
 
-struct DXRRaytracingTechnique : public Technique, public IHasScene, public IHasLight, public IHasCamera {
+struct DXRRaytracingTechnique : public DirectLightingTechnique {
 public:
-
-	// Scene loading process to retain scene on the GPU
-	gObj<RetainedSceneLoader> sceneLoader;
-	// GBuffer process used to build GBuffer data from light
-	gObj<GBufferConstruction> gBufferFromLight;
-	// GBuffer process used to build GBuffer data from viewer
-	gObj<GBufferConstruction> gBufferFromViewer;
 
 	// DXR pipeline for raytracing
 	struct DXR_RT_Pipeline : public RTPipelineManager {
@@ -67,6 +61,7 @@ public:
 			gObj<Buffer> ProgressiveCB;
 			gObj<Buffer> LightTransforms;
 
+			gObj<Texture2D> DirectLighting;
 			gObj<Texture2D> Output;
 			gObj<Texture2D> Accum;
 
@@ -92,9 +87,11 @@ public:
 
 				SRV(7, LightPositions);
 
-				SRV_Array(8, Textures, TextureCount);
+				SRV(8, DirectLighting);
 
-				Static_SMP(0, Sampler::Linear());
+				SRV_Array(9, Textures, TextureCount);
+
+				Static_SMP(0, Sampler::Anisotropic());
 				Static_SMP(1, Sampler::LinearWithoutMipMaps());
 
 				CBV(0, CameraCB);
@@ -116,7 +113,7 @@ public:
 		}
 	};
 
-	gObj<Buffer> screenVertices;
+	// Raytracing indirect lighting
 	gObj<DXR_RT_Pipeline> dxrRTPipeline;
 
 	// Baked scene geometries used for toplevel instance updates
@@ -124,28 +121,9 @@ public:
 	// Vertex buffer for scene triangles
 	gObj<Buffer> VB;
 
-	void SetScene(gObj<CA4G::Scene> scene) {
-		IHasScene::SetScene(scene);
-		if (sceneLoader != nullptr)
-			sceneLoader->SetScene(scene);
-	}
-
 	void Startup() {
-
-		// Load and setup scene loading process
-		sceneLoader = new RetainedSceneLoader();
-		sceneLoader->SetScene(this->Scene);
-		_ gLoad Subprocess(sceneLoader);
-
-		// Load and setup gbuffer construction process from light
-		gBufferFromLight = new GBufferConstruction(SHADOWMAP_DIMENSION, SHADOWMAP_DIMENSION);
-		gBufferFromLight->sceneLoader = this->sceneLoader;
-		_ gLoad Subprocess(gBufferFromLight);
-
-		// Load and setup gbuffer construction process from viewer
-		gBufferFromViewer = new GBufferConstruction(render_target->Width, render_target->Height);
-		gBufferFromViewer->sceneLoader = this->sceneLoader;
-		_ gLoad Subprocess(gBufferFromViewer);
+		
+		DirectLightingTechnique::Startup(); // startup for every subprocesses
 
 		flush_all_to_gpu;
 
@@ -161,22 +139,27 @@ public:
 
 	void CreatingAssets(gObj<GraphicsManager> manager) {
 
-
 #pragma region DXR Photon gathering Pipeline Objects
 		dxrRTPipeline->_Program->TextureCount = sceneLoader->TextureCount;
 		dxrRTPipeline->_Program->Textures = sceneLoader->Textures;
 		dxrRTPipeline->_Program->Materials = sceneLoader->MaterialBuffer;
 		dxrRTPipeline->_Program->Vertices = sceneLoader->VertexBuffer;
 
-		// CBs will be updated every frame
-		dxrRTPipeline->_Program->CameraCB = _ gCreate ConstantBuffer<float4x4>();
-		dxrRTPipeline->_Program->LightTransforms = _ gCreate ConstantBuffer <Globals>();
+		dxrRTPipeline->_Program->CameraCB = computeDirectLighting->ViewTransform;
+		dxrRTPipeline->_Program->LightTransforms = computeDirectLighting->LightTransforms;
+		dxrRTPipeline->_Program->LightingCB = computeDirectLighting->Lighting;
 
-		// Reused CBs from dxrPTPipeline
 		dxrRTPipeline->_Program->ProgressiveCB = _ gCreate ConstantBuffer<int>();
-		dxrRTPipeline->_Program->LightingCB = _ gCreate ConstantBuffer<Lighting>();
 
+		dxrRTPipeline->_Program->DirectLighting = DirectLighting;
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
+		dxrRTPipeline->_Program->Accum = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
+
+		dxrRTPipeline->_Program->Positions = gBufferFromViewer->pipeline->GBuffer_P;
+		dxrRTPipeline->_Program->Normals = gBufferFromViewer->pipeline->GBuffer_N;
+		dxrRTPipeline->_Program->Coordinates = gBufferFromViewer->pipeline->GBuffer_C;
+		dxrRTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
+		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
 #pragma endregion
 	}
 
@@ -184,7 +167,7 @@ public:
 		/// Loads a static scene for further ray-tracing
 
 		// load full vertex buffer of all scene geometries
-		VB = _ gCreate GenericBuffer<SCENE_VERTEX>(D3D12_RESOURCE_STATE_GENERIC_READ, Scene->VerticesCount(), CPU_WRITE_GPU_READ);
+		VB = _ gCreate GenericBuffer<SCENE_VERTEX>(D3D12_RESOURCE_STATE_GENERIC_READ, this->Scene->VerticesCount(), CPU_WRITE_GPU_READ);
 		manager gCopy PtrData(VB, Scene->Vertices());
 
 		auto sceneGeometriesBuilder = manager gCreate TriangleGeometries();
@@ -205,26 +188,8 @@ public:
 	float4x4 lightView, lightProj;
 
 	void Frame() {
-		if (CameraIsDirty) {
-#pragma region Construct GBuffer from viewer
-			Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
 
-			gBufferFromViewer->ViewMatrix = view;
-			gBufferFromViewer->ProjectionMatrix = proj;
-			ExecuteFrame(gBufferFromViewer);
-#pragma endregion
-		}
-
-		if (LightSourceIsDirty)
-		{
-#pragma region Construct GBuffer from light
-			lightView = LookAtLH(this->Light->Position, this->Light->Position + float3(0, -1, 0), float3(0, 0, 1));
-			lightProj = PerspectiveFovLH(PI / 2, 1, 0.001f, 10);
-			gBufferFromLight->ViewMatrix = lightView;
-			gBufferFromLight->ProjectionMatrix = lightProj;
-			ExecuteFrame(gBufferFromLight);
-#pragma endregion
-		}
+		DirectLightingTechnique::Frame();
 
 		perform(Raytracing);
 	}
@@ -232,31 +197,6 @@ public:
 	void Raytracing(gObj<DXRManager> manager) {
 
 		auto rtProgram = dxrRTPipeline->_Program;
-
-		if (CameraIsDirty) {
-			// Update camera
-			// Required during ray-trace stage
-			manager gCopy ValueData(rtProgram->CameraCB, view.getInverse());
-		}
-
-		if (LightSourceIsDirty) {
-			manager gCopy ValueData(rtProgram->LightTransforms, Globals{
-					lightProj,
-					lightView
-				});
-
-			// Update lighting needed for photon tracing
-			manager gCopy ValueData(rtProgram->LightingCB, Lighting{
-				Light->Position, 0,
-				Light->Intensity, 0
-				});
-		}
-
-		dxrRTPipeline->_Program->Positions = gBufferFromViewer->pipeline->GBuffer_P;
-		dxrRTPipeline->_Program->Normals = gBufferFromViewer->pipeline->GBuffer_N;
-		dxrRTPipeline->_Program->Coordinates = gBufferFromViewer->pipeline->GBuffer_C;
-		dxrRTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
-		dxrRTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
 
 		static int Frame = 0;
 

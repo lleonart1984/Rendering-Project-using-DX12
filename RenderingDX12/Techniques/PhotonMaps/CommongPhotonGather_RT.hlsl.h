@@ -38,8 +38,12 @@ StructuredBuffer<Photon> Photons		: register(t1);
 #define LIGHTVIEW_POSITIONS_REG		t8
 #endif
 
+#ifndef BACKGROUND_IMG_REG
+#define BACKGROUND_IMG_REG			t9
+#endif
+
 #ifndef TEXTURES_REG
-#define TEXTURES_REG				t9
+#define TEXTURES_REG				t10
 #endif
 
 #ifndef TEXTURES_SAMPLER_REG
@@ -138,13 +142,23 @@ float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int boun
 	float3 fN;
 	float4 R, T;
 #ifndef DEBUG_PHOTONS
-	total += ComputeDirectLighting(
-		V,
-		surfel,
-		material,
-		LightPosition,
-		LightIntensity,
-		/*Out*/ NdotV, invertNormal, fN, R, T);
+	if (bounces == RAY_TRACING_MAX_BOUNCES) // not consider direct viewed direct lighting
+	{
+		ComputeImpulses(V, surfel, material,
+			NdotV,
+			invertNormal,
+			fN,
+			R,
+			T);
+	}
+	else
+		total += ComputeDirectLighting(
+			V,
+			surfel,
+			material,
+			LightPosition,
+			LightIntensity,
+			/*Out*/ NdotV, invertNormal, fN, R, T);
 #endif
 
 	float3 gatheredLighting = ComputeDirectLightInWorldSpace(surfel, material, V);// abs(surfel.N);// float3(triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f, triangleIndex % 10000 / 10000.0f);
@@ -219,7 +233,7 @@ void RTScattering(inout RTPayload payload, in BuiltInTriangleIntersectionAttribu
 {
 	Vertex surfel;
 	Material material;
-	GetHitInfo(attr, surfel, material);
+	GetHitInfo(attr, surfel, material, 0, 0);
 
 	float3 V = -normalize(WorldRayDirection());
 

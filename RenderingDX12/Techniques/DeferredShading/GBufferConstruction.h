@@ -76,6 +76,10 @@ public:
 	float4x4 ViewMatrix;
 	float4x4 ProjectionMatrix;
 
+	inline gObj<Buffer> getGlobalTransforms() {
+		return pipeline->globals;
+	}
+
 protected:
 	void SetScene(gObj<CA4G::Scene> scene)
 	{

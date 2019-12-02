@@ -14,7 +14,8 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define GBUFFER_COORDINATES_REG		t5
 #define GBUFFER_MATERIALS_REG		t6
 #define LIGHTVIEW_POSITIONS_REG		t7
-#define TEXTURES_REG				t8
+#define BACKGROUND_IMG_REG			t8
+#define TEXTURES_REG				t9
 
 #define TEXTURES_SAMPLER_REG		s0
 #define SHADOW_MAP_SAMPLER_REG		s1
@@ -69,7 +70,7 @@ void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPaylo
 	float3 ratio;
 	float3 direction;
 	float pdf;
-	RandomScatterRay(V, fN, R, T, material, ratio, direction, pdf);
+	RandomScatterRay(V, surfel.N, R, T, material, ratio, direction, pdf);
 
 	// Update gathered Importance to the viewer
 	payload.Importance *= max(0, ratio);// / (1 - russianRoulette);
@@ -78,13 +79,43 @@ void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPaylo
 	payload.ScatteredRay.Position = surfel.P + sign(dot(direction, fN))*0.001*fN;
 }
 
+// Represents a single bounce of path tracing
+// Will accumulate emissive and direct lighting modulated by the carrying importance
+// Will update importance with scattered ratio divided by pdf
+// Will output scattered ray to continue with
+void SurfelScatteringWithoutAccumulation(float3 V, Vertex surfel, Material material, inout RayPayload payload)
+{
+	// Adding emissive and direct lighting
+	float NdotV;
+	bool invertNormal;
+	float3 fN;
+	float4 R, T;
+	ComputeImpulses(V, surfel, material,
+		NdotV,
+		invertNormal,
+		fN,
+		R,
+		T);
+
+	float3 ratio;
+	float3 direction;
+	float pdf;
+	RandomScatterRay(V, surfel.N, R, T, material, ratio, direction, pdf);
+
+	// Update gathered Importance to the viewer
+	payload.Importance *= max(0, ratio);// / (1 - russianRoulette);
+	// Update scattered ray
+	payload.ScatteredRay.Direction = direction;
+	payload.ScatteredRay.Position = surfel.P + sign(dot(direction, fN)) * 0.001 * fN;
+}
+
 float3 ComputePath(float3 V, Vertex surfel, Material material, int bounces)
 {
 	RayPayload payload = (RayPayload)0;
 	payload.Importance = 1;
 
 	// initial scatter (primary rays)
-	SurfelScattering(V, surfel, material, payload);
+	SurfelScatteringWithoutAccumulation(V, surfel, material, payload);
 
 	[loop]
 	for (int bounce = 1; bounce < bounces; bounce++)
@@ -130,7 +161,6 @@ void PTMainRays()
 	}
 
 	float3 color = ComputePath(V, surfel, material, PATH_TRACING_MAX_BOUNCES);
-
 	AccumulateOutput(raysIndex, color);
 }
 
@@ -139,7 +169,7 @@ void PTScattering(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 {
 	Vertex surfel;
 	Material material;
-	GetHitInfo(attr, surfel, material);
+	GetHitInfo(attr, surfel, material, 0, 0);
 
 	// Start static seed here... for some reason, in RTX static fields are not shared
 	// between different shader types...

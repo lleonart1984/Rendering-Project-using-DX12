@@ -14,7 +14,8 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define GBUFFER_COORDINATES_REG		t5
 #define GBUFFER_MATERIALS_REG		t6
 #define LIGHTVIEW_POSITIONS_REG		t7
-#define TEXTURES_REG				t8
+#define BACKGROUND_IMG_REG			t8
+#define TEXTURES_REG				t9
 
 #define TEXTURES_SAMPLER_REG		s0
 #define SHADOW_MAP_SAMPLER_REG		s1
@@ -81,6 +82,45 @@ void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPaylo
 	}
 }
 
+// Represents a single bounce of path tracing
+// Will accumulate emissive and direct lighting modulated by the carrying importance
+// Will update importance with scattered ratio divided by pdf
+// Will output scattered ray to continue with
+void SurfelScatteringWithoutAccumulation(float3 V, Vertex surfel, Material material, inout RayPayload payload)
+{
+	// Adding emissive and direct lighting
+	float NdotV;
+	bool invertNormal;
+	float3 fN;
+	float4 R, T;
+	ComputeImpulses(V, surfel, material,
+		NdotV,
+		invertNormal,
+		fN,
+		R,
+		T);
+
+	float3 ratio;
+	float3 direction;
+	float pdf;
+	RandomScatterRay(V, fN, R, T, material, ratio, direction, pdf);
+
+	// Update gathered Importance to the viewer
+	payload.Importance *= ratio;
+	payload.bounce--;
+
+	if (payload.bounce > 0)
+	{
+		// Trace new ray
+		RayDesc newRay;
+		newRay.Origin = surfel.P + sign(dot(direction, fN)) * 0.001 * fN;
+		newRay.Direction = direction;
+		newRay.TMin = 0.001;
+		newRay.TMax = 10.0;
+		TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, payload);
+	}
+}
+
 float3 ComputePath(float3 V, Vertex surfel, Material material, int bounces)
 {
 	RayPayload payload = (RayPayload)0;
@@ -88,7 +128,7 @@ float3 ComputePath(float3 V, Vertex surfel, Material material, int bounces)
 	payload.bounce = bounces;
 
 	// initial scatter (primary rays)
-	SurfelScattering(V, surfel, material, payload);
+	SurfelScatteringWithoutAccumulation(V, surfel, material, payload);
 
 	return payload.AccRadiance;
 }
@@ -127,7 +167,7 @@ void PTScattering(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 {
 	Vertex surfel;
 	Material material;
-	GetHitInfo(attr, surfel, material);
+	GetHitInfo(attr, surfel, material, 0, 0);
 
 	// Start static seed here... for some reason, in RTX static fields are not shared
 	// between different shader types...

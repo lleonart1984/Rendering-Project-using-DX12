@@ -20,12 +20,12 @@ void main( uint3 DTid : SV_DispatchThreadID )
 	{
 		float3 N = Photons[index].Normal;
 
-		float total = In_Radii[index];
-		float kernelInt = 1;
+		float total = In_Radii[index] * 2;
+		float kernelInt = 2;
 
-		int CHECK = 128;
+		int CHECK = 113 + index % 123;
 
-		for (int i = 1; i <= CHECK; i += 1)
+		for (float i = 1; i <= CHECK; i += 1)
 		{
 			float kernel = 2 * (1 - i / (float)CHECK);
 			float hasR = any(Photons[index + i].Intensity) * max(0, dot(N, Photons[index + i].Normal));

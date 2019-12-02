@@ -66,11 +66,11 @@ ZipNormal Float3ToZipNormal(float3 v) {
 // Given a surfel will modify the normal with texture maps, using
 // Bump mapping and masking textures.
 // Material info is updated as well.
-void AugmentHitInfoWithTextureMapping(inout Vertex surfel, inout Material material) {
-	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0, 0) : float4(1, 1, 1, 1);
-	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0, 0) : material.Specular;
-	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, 0, 0) : float3(0.5, 0.5, 1);
-	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, 0, 0) : 1;
+void AugmentHitInfoWithTextureMapping(inout Vertex surfel, inout Material material, float ddx, float ddy) {
+	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, ddx, ddy) : float4(1, 1, 1, 1);
+	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, ddx, ddy) : material.Specular;
+	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, ddx, ddy) : float3(0.5, 0.5, 1);
+	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, ddx, ddy) : 1;
 
 	float3x3 TangentToWorld = { surfel.T, surfel.B, surfel.N };
 	// Change normal according to bump map
@@ -81,17 +81,17 @@ void AugmentHitInfoWithTextureMapping(inout Vertex surfel, inout Material materi
 }
 
 // Given a surfel will modify the material using texture mapping.
-void AugmentMaterialWithTextureMapping(inout Vertex surfel, inout Material material) {
-	float4 DiffTex = material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, 0.01 * length(surfel.P), 0.01 * length(surfel.P)) : float4(1, 1, 1, 1);
-	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, 0, 0).xyz : material.Specular;
-	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, 0, 0).xyz : float3(0.5, 0.5, 1);
-	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, 0, 0).xyz : 1;
+void AugmentMaterialWithTextureMapping(inout Vertex surfel, inout Material material, float ddx, float ddy) {
+	float4 DiffTex = 1;// material.Texture_Index.x >= 0 ? Textures[material.Texture_Index.x].SampleGrad(gSmp, surfel.C, ddx, ddy) : float4(1, 1, 1, 1);
+	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, ddx, ddy).xyz : material.Specular;
+	float3 BumpTex = material.Texture_Index.z >= 0 ? Textures[material.Texture_Index.z].SampleGrad(gSmp, surfel.C, ddx, ddy).xyz : float3(0.5, 0.5, 1);
+	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, ddx, ddy).xyz : 1;
 
 	material.Diffuse *= DiffTex * MaskTex.x; // set transparent if necessary.
 	material.Specular.xyz = max(material.Specular.xyz, SpecularTex);
 }
 
-void GetHitInfo(in BuiltInTriangleIntersectionAttributes attr, out Vertex surfel, out Material material)
+void GetHitInfo(in BuiltInTriangleIntersectionAttributes attr, out Vertex surfel, out Material material, float ddx, float ddy)
 {
 	float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
@@ -113,5 +113,5 @@ void GetHitInfo(in BuiltInTriangleIntersectionAttributes attr, out Vertex surfel
 
 	material = materials[materialIndex];
 
-	AugmentHitInfoWithTextureMapping(surfel, material);
+	AugmentHitInfoWithTextureMapping(surfel, material, ddx, ddy);
 }

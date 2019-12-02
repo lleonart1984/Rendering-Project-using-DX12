@@ -36,22 +36,21 @@ float MortonEstimator(in Photon currentPhoton, int index, float maximumRadius) {
 		do
 		{
 			l -= inc;
-			inc <<= 1;
+			//inc <<= 1;
 		} while (l >= 0 && ((Morton[Permutation[l]] & currentMask) == currentBlock));
 		inc = 1;
 		do
 		{
 			r += inc;
-			inc <<= 1;
+			//inc <<= 1;
 		} while (r < bufferSize && ((Morton[Permutation[r]] & currentMask) == currentBlock));
 		
-		if ((r - l) >= DESIRED_PHOTONS) // if photons inside are sufficient then you get the desired radius
+		if ((r - l) >= DESIRED_PHOTONS * 3.14/ 4 ) // if photons inside are sufficient then you get the desired radius
 		{
-			return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l))* 4 / 3.14;
-			//return mortonBlockRadius;
+			//return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l))* 4 / 3.14;
+			return min(maximumRadius, mortonBlockRadius);
 		}
 
-		// check if morton block is greater already than radius
 		if (mortonBlockRadius >= maximumRadius)
 			return maximumRadius;
 	}

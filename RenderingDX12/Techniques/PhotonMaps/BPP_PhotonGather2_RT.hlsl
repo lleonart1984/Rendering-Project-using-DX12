@@ -2,14 +2,14 @@
 #define PHOTON_WITH_NORMAL
 #define PHOTON_WITH_POSITION
 
-#define TEXTURES_REG				t11
+#define TEXTURES_REG				t12
 
 #define RAY_CONTRIBUTION_TO_HITGROUPS 1
 
 #include "CommongPhotonGather_RT.hlsl.h"
 
-RaytracingAccelerationStructure PhotonMap : register(t9);
-StructuredBuffer<float> Radii : register(t10);
+RaytracingAccelerationStructure PhotonMap : register(t10);
+StructuredBuffer<float> Radii : register(t11);
 
 struct PhotonHitAttributes {
 	// AABB Index where you can find photons from AABBIdx*BOXED_PHOTONS + 0 to AABBIdx*BOXED_PHOTONS + BOXED_PHOTONS - 1
@@ -65,7 +65,7 @@ void PhotonGatheringAnyHit(inout PhotonRayPayload payload, in PhotonHitAttribute
 	int photonIdx = attr.AABBIdx;
 
 	Photon p = Photons[photonIdx];
-	float radius = Radii[photonIdx];
+	float radius = max(0.0001, Radii[photonIdx]);
 	float area = radius * radius;
 
 	float photonDistance = distance(surfelPosition, p.Position);

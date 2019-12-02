@@ -42,5 +42,5 @@ void main(PSInput input, out float4 position : SV_TARGET0, out float4 normal : S
 
 	normal = float4(normalize(mul(BumpTex * 2 - 1, tangentToWorld)), 1);
 	position = float4(input.position,0);
-	coordinates = float4(input.uv, 0, 0);
+	coordinates = float4(input.uv, length(ddx_fine(input.uv)), length(ddy_fine(input.uv)));
 }
