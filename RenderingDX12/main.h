@@ -13,7 +13,7 @@
 #define MOVE_LIGHT false
 
 // Change this to force every frame camera dirty
-#define PERMANENT_CAMERA_DIRTY false
+#define PERMANENT_CAMERA_DIRTY true
 
 // Uncomment this to use warp device for unsupported DX12 functionalities in your device
 //#define WARP

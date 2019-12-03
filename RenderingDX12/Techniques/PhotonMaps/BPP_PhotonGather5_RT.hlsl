@@ -100,6 +100,7 @@ void PhotonGatheringIntersection() {
 	att.AABBIdx = index;
 	ReportHit(0.0001, 0, att);
 }
+
 [shader("miss")]
 void PhotonGatheringMiss(inout PhotonRayPayload payload)
 {
