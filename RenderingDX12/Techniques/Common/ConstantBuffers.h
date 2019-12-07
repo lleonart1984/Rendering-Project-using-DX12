@@ -35,11 +35,8 @@ struct ScreenInfo {
     int Width;
     int Height;
 
-    int pWidth;
-    int pHeight;
-
     int Levels;
-    float3 res0;
+    float res0;
 };
 
 struct Fragment {
@@ -74,4 +71,9 @@ struct RayInfo
 struct RayIntersection {
     int TriangleIndex;
     float3 Coordinates;
+};
+
+struct Reticulation {
+    int K;
+    int D;
 };

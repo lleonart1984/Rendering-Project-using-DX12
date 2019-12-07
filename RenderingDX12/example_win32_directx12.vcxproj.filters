@@ -69,6 +69,12 @@
     <FxCompile Include="Techniques\WSAPIT\Shaders\WSPIT_Build_CS.hlsl" />
     <FxCompile Include="Techniques\WSAPIT\Shaders\WSPIT_Link_CS.hlsl" />
     <FxCompile Include="Techniques\WSAPIT\Shaders\WSPIT_Traversal_CS.hlsl" />
+    <FxCompile Include="Techniques\WS_MRAPIT\Shaders\WSMRPIT_Fill_GS.hlsl" />
+    <FxCompile Include="Techniques\WS_MRAPIT\Shaders\WSMRPIT_Fill_PS.hlsl" />
+    <FxCompile Include="Techniques\WS_MRAPIT\Shaders\WSMRPIT_Fill_VS.hlsl" />
+    <FxCompile Include="Techniques\WS_MRAPIT\Shaders\WorldSpaceTransform_CS.hlsl" />
+    <FxCompile Include="Techniques\WS_MRAPIT\Shaders\DebugWSMRAPIT_VS.hlsl" />
+    <FxCompile Include="Techniques\WS_MRAPIT\Shaders\DebugWSMRAPIT_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -180,6 +186,8 @@
     <ClInclude Include="Techniques\WSAPIT\WorldSpaceAPIT.h" />
     <ClInclude Include="Techniques\WSAPIT\DebugWSAPIT.h" />
     <ClInclude Include="Techniques\RaymarchRT\RaymarchRT_Constants.h" />
+    <ClInclude Include="Techniques\WS_MRAPIT\WorldSpaceMRAPIT.h" />
+    <ClInclude Include="Techniques\WS_MRAPIT\DebugWSMRAPIT.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

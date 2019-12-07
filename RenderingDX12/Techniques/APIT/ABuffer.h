@@ -143,7 +143,7 @@ protected:
 
         manager gClear  UAV(Malloc, 0U);
         manager gClear  UAV(FirstBuffer, (unsigned int)-1);
-        manager gCopy   ValueData(screenInfo, ScreenInfo{ Width, Height, 0, 0, Levels });
+        manager gCopy   ValueData(screenInfo, ScreenInfo{ Width, Height, Levels });
 
         manager gSet Viewport(Width, Height);
         manager gSet Pipeline(pipeline);

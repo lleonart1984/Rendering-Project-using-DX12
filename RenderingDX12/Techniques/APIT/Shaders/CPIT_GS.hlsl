@@ -2,9 +2,6 @@ cbuffer ScreenInfo : register (b0) {
     int Width;
     int Height;
 
-    int pWidth;
-    int pHeight;
-
     int Levels;
 }
 

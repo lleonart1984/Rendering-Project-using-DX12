@@ -50,4 +50,6 @@ using namespace CA4G;
 
 #include "Techniques/WSAPIT/DebugWSAPIT.h"
 
+#include "Techniques/WS_MRAPIT/DebugWSMRAPIT.h"
+
 #include "main.h"
