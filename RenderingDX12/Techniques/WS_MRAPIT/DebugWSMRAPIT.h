@@ -46,12 +46,12 @@ public:
     gObj<RetainedSceneLoader> sceneLoader;
     gObj<WorldSpaceMRAPIT> worldSpaceMRAPIT;
     gObj<DebugWSMRAPIT_Pipeline> pipeline;
-    APITDescription aPITDescription;
+    MRAPITDescription description;
 
     gObj<Buffer> debugVertices;
 
-    DebugWSMRAPIT(APITDescription description) {
-        this->aPITDescription = description;
+    DebugWSMRAPIT(MRAPITDescription description) {
+        this->description = description;
     }
 
 protected:
@@ -68,7 +68,7 @@ protected:
             _ gLoad Subprocess(sceneLoader);
         }
 
-        worldSpaceMRAPIT = new WorldSpaceMRAPIT(aPITDescription);
+        worldSpaceMRAPIT = new WorldSpaceMRAPIT(description);
         worldSpaceMRAPIT->sceneLoader = sceneLoader;
         _ gLoad Subprocess(worldSpaceMRAPIT);
 

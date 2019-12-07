@@ -68,4 +68,5 @@
 //gObj<DebugAPIT> technique;
 //gObj<RaymarchRT<APITConstruction, APITDescription>> technique;
 //gObj<DebugWSAPIT> technique;
-gObj<RaymarchRT<WorldSpaceAPIT, APITDescription>> technique;
+//gObj<RaymarchRT<WorldSpaceAPIT, APITDescription>> technique;
+gObj<DebugWSMRAPIT> technique;

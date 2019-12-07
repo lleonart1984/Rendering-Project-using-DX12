@@ -30,6 +30,7 @@ protected:
 class WSMRAPIT_ABufferPipeline : public GraphicsPipelineBindings {
 public:
     gObj<Buffer> screenInfo;
+    gObj<Buffer> reticulation;
 
     gObj<Buffer> wsVertices;
     gObj<Buffer> sceneBoundaries;
@@ -42,9 +43,9 @@ public:
 protected:
     void Setup() {
         _ gSet InputLayout({});
-        _ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSPIT_Fill_VS.cso"));
-        _ gSet GeometryShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSPIT_Fill_GS.cso"));
-        _ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSPIT_Fill_PS.cso"));
+        _ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSMRPIT_Fill_VS.cso"));
+        _ gSet GeometryShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSMRPIT_Fill_GS.cso"));
+        _ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSMRPIT_Fill_PS.cso"));
     }
 
     void Globals() {
@@ -52,6 +53,7 @@ protected:
         SRV(1, sceneBoundaries, ShaderType_Vertex);
 
         CBV(0, screenInfo, ShaderType_Geometry);
+        CBV(1, reticulation, ShaderType_Geometry);
 
         CBV(0, screenInfo, ShaderType_Pixel);
         UAV(0, fragments, ShaderType_Pixel);
@@ -75,7 +77,7 @@ public:
     gObj<Buffer> malloc;
 protected:
     void Setup() {
-        _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSPIT_Build_CS.cso"));
+        _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSMRPIT_Build_CS.cso"));
     }
 
     void Globals() {
@@ -102,7 +104,7 @@ public:
     gObj<Buffer> skipBuffer;
 protected:
     void Setup() {
-        _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSPIT_Link_CS.cso"));
+        _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSMRPIT_Link_CS.cso"));
     }
 
     void Globals() {
@@ -141,7 +143,7 @@ public:
     gObj<Buffer> raymarchingInfo;
 protected:
     void Setup() {
-        _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSPIT_Traversal_CS.cso"));
+        _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSMRPIT_Traversal_CS.cso"));
     }
 
     void Globals() {
@@ -166,6 +168,19 @@ protected:
     }
 };
 
+struct MRAPITDescription {
+    int Delta;
+    int K;
+    int Power;
+
+    MRAPITDescription() : MRAPITDescription(4, 2, 8) {}
+    MRAPITDescription(int k, int delta, int power) : K(k), Delta(delta), Power(power) {}
+    
+    int getResolution() {
+        return 1 << Power;
+    }
+};
+
 class WorldSpaceMRAPIT : public Technique, public IHasScene, public DebugRaymarchRT {
 public:
     // Scene loading process to retain scene on the GPU
@@ -182,6 +197,7 @@ public:
     gObj<Buffer> BoundaryNodeBuffer;
     gObj<Buffer> PreorderBuffer;
     gObj<Buffer> SkipBuffer;
+    gObj<Buffer> reticulation;
 
     gObj<WSMRAPIT_TransformerPipeline> wsTransformPipeline;
     gObj<WSMRAPIT_ABufferPipeline> aBufferPipeline;
@@ -189,9 +205,9 @@ public:
     gObj<WSMRAPIT_LinkPipeline> linkPipeline;
     gObj<WSMRAPIT_TraversalPipeline> traversalPipeline;
 
-    APITDescription description;
+    MRAPITDescription description;
 
-    WorldSpaceMRAPIT(APITDescription description) {
+    WorldSpaceMRAPIT(MRAPITDescription description) {
         this->description = description;
     }
 
@@ -236,12 +252,11 @@ protected:
             _ gLoad Subprocess(sceneLoader);
         }
 
-        int levels = description.Power;
-        int resolution = description.getResolution();
+        int totalEntries = ((1 << ((description.Power + 1) * 2)) - 1) / 3;
         Vertices = _ gCreate RWStructuredBuffer<SCENE_VERTEX>(sceneLoader->VertexBuffer->ElementCount);
         SceneBoundaries = _ gCreate RWStructuredBuffer<int3>(2);
         Fragments = _ gCreate RWStructuredBuffer<Fragment>(MAX_NUMBER_OF_FRAGMENTS);
-        RootBuffer = _ gCreate RWStructuredBuffer<int>((1 << ((levels + 1) * 2) - 1) / 3);
+        RootBuffer = _ gCreate RWStructuredBuffer<int>(totalEntries);
         FirstBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         NextBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         Malloc = _ gCreate RWStructuredBuffer<int>(1);
@@ -250,6 +265,7 @@ protected:
         BoundaryNodeBuffer = _ gCreate RWStructuredBuffer<float4>(MAX_NUMBER_OF_FRAGMENTS);
         PreorderBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         SkipBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
+        reticulation = _ gCreate ConstantBuffer<Reticulation>();
 
         // Load and setup pipeline resources
         _ gLoad Pipeline(wsTransformPipeline);
@@ -267,8 +283,9 @@ protected:
         aBufferPipeline->nextBuffer = NextBuffer;
         aBufferPipeline->malloc = Malloc;
         aBufferPipeline->screenInfo = screenInfo;
+        aBufferPipeline->reticulation = reticulation;
 
-        _ gLoad Pipeline(buildPipeline);
+       /* _ gLoad Pipeline(buildPipeline);
         buildPipeline->fragments = Fragments;
         buildPipeline->rootBuffer = RootBuffer;
         buildPipeline->nodeBuffer = NodeBuffer;
@@ -295,7 +312,7 @@ protected:
         traversalPipeline->preorderBuffer = PreorderBuffer;
         traversalPipeline->skipBuffer = SkipBuffer;
         traversalPipeline->screenInfo = screenInfo;
-        traversalPipeline->raymarchingInfo = _ gCreate ConstantBuffer<RaymarchingDebug>();
+        traversalPipeline->raymarchingInfo = _ gCreate ConstantBuffer<RaymarchingDebug>();*/
     }
 
     void TransformVertices(gObj<GraphicsManager> manager) {
@@ -308,6 +325,7 @@ protected:
         manager gClear UAV(Malloc, 0U);
         manager gClear UAV(RootBuffer, (unsigned int)-1);
         manager gCopy ValueData(screenInfo, ScreenInfo{ resolution, resolution, description.Power });
+        manager gCopy ValueData(reticulation, Reticulation{ description.K, description.Delta }); 
 
         manager gSet Viewport(resolution, resolution);
         manager gSet Pipeline(aBufferPipeline);

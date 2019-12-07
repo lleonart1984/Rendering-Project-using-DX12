@@ -113,7 +113,8 @@ int main(int, char**)
 	static Presenter* presenter = new ImGUIPresenter(hWnd);
 #endif
 
-    presenter->Load(technique, APITDescription{ 8 });
+    presenter->Load(technique, MRAPITDescription{ 4, 2, 9 });
+    //presenter->Load(technique, APITDescription{  9 });
 	gObj<IHasBackcolor> asBackcolorRenderer = technique.Dynamic_Cast<IHasBackcolor>();
 	gObj<IHasScene> asSceneRenderer = technique.Dynamic_Cast<IHasScene>();
 	gObj<IHasCamera> asCameraRenderer = technique.Dynamic_Cast<IHasCamera>();

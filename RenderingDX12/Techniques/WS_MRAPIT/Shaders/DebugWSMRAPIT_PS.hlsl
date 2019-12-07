@@ -143,12 +143,12 @@ float4 GetFragmentCount(int2 px, int level) {
 
 float4 main(PS_IN input) : SV_TARGET
 {
-    int2 dimensions = int2(Width, Height);
-    int2 pxy = input.C.xy * dimensions;
     int level = 0;
+    int2 dimensions = int2(Width, Height) >> level;
+    int2 pxy = input.C.xy * dimensions;
 
-    return GetDensityPerNode(pxy, 0);
-    //return GetFragmentCount(pxy);
+    //return GetDensityPerNode(pxy, level);
+    return GetFragmentCount(pxy, level);
     //return float4(GetColor(pxy[0] + pxy.y), 1);
 
     /*float maxDepth = boundaryBuffer[currentNode].w;
