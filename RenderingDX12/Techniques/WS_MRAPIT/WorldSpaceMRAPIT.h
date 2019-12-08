@@ -285,7 +285,7 @@ protected:
         aBufferPipeline->screenInfo = screenInfo;
         aBufferPipeline->reticulation = reticulation;
 
-       /* _ gLoad Pipeline(buildPipeline);
+        _ gLoad Pipeline(buildPipeline);
         buildPipeline->fragments = Fragments;
         buildPipeline->rootBuffer = RootBuffer;
         buildPipeline->nodeBuffer = NodeBuffer;
@@ -312,7 +312,7 @@ protected:
         traversalPipeline->preorderBuffer = PreorderBuffer;
         traversalPipeline->skipBuffer = SkipBuffer;
         traversalPipeline->screenInfo = screenInfo;
-        traversalPipeline->raymarchingInfo = _ gCreate ConstantBuffer<RaymarchingDebug>();*/
+        traversalPipeline->raymarchingInfo = _ gCreate ConstantBuffer<RaymarchingDebug>();
     }
 
     void TransformVertices(gObj<GraphicsManager> manager) {
@@ -347,6 +347,6 @@ protected:
     void Frame() {
         perform(TransformVertices);
         perform(BuildABuffer);
-        /*perform(BuildPIT);*/
+        perform(BuildPIT);
     }
 };
