@@ -77,3 +77,8 @@ struct Reticulation {
     int K;
     int D;
 };
+
+struct ComputeShaderInfo {
+    uint3 InputSize;
+    float res;
+};

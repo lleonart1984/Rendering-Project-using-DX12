@@ -4,6 +4,8 @@
 
 class WorldSpaceTransformerPipeline : public ComputePipelineBindings {
 public:
+    gObj<Buffer> computeShaderInfo;
+
     // SRV
     gObj<Buffer> vertices;
     gObj<Buffer> objectIds;
@@ -18,6 +20,8 @@ protected:
     }
 
     void Globals() {
+        CBV(0, computeShaderInfo, ShaderType_Any);
+        
         SRV(0, vertices, ShaderType_Any);
         SRV(1, objectIds, ShaderType_Any);
         SRV(2, transforms, ShaderType_Any);
@@ -182,6 +186,7 @@ public:
     gObj<Buffer> BoundaryNodeBuffer;
     gObj<Buffer> PreorderBuffer;
     gObj<Buffer> SkipBuffer;
+    gObj<Buffer> computeShaderInfo;
 
     gObj<WorldSpaceTransformerPipeline> wsTransformPipeline;
     gObj<WorldSpaceABufferPipeline> aBufferPipeline;
@@ -249,6 +254,7 @@ protected:
         BoundaryNodeBuffer = _ gCreate RWStructuredBuffer<float4>(MAX_NUMBER_OF_FRAGMENTS);
         PreorderBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         SkipBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
+        computeShaderInfo = _ gCreate ConstantBuffer<ComputeShaderInfo>();
 
         // Load and setup pipeline resources
         _ gLoad Pipeline(wsTransformPipeline);
@@ -257,6 +263,7 @@ protected:
         wsTransformPipeline->vertices = sceneLoader->VertexBuffer;
         wsTransformPipeline->objectIds = sceneLoader->ObjectBuffer;
         wsTransformPipeline->transforms = sceneLoader->TransformBuffer;
+        wsTransformPipeline->computeShaderInfo = computeShaderInfo;
 
         _ gLoad Pipeline(aBufferPipeline);
         aBufferPipeline->wsVertices = Vertices;
@@ -299,6 +306,7 @@ protected:
 
     void TransformVertices(gObj<GraphicsManager> manager) {
         manager gSet Pipeline(wsTransformPipeline);
+        manager gCopy ValueData(computeShaderInfo, ComputeShaderInfo{ uint3(wsTransformPipeline->vertices->ElementCount, 0, 0) });
         manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_LINEARGROUP(wsTransformPipeline->vertices->ElementCount));
     }
 

@@ -1,6 +1,5 @@
 #include "../../Common/CS_Constants.h"
 #define PRECISION 1e7
-#define EPSILON 0.0001
 
 // Data for each fragment
 struct VertexData {

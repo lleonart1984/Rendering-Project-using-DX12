@@ -4,6 +4,9 @@
 
 class WSMRAPIT_TransformerPipeline : public ComputePipelineBindings {
 public:
+    // CBV
+    gObj<Buffer> computeShaderInfo;
+
     // SRV
     gObj<Buffer> vertices;
     gObj<Buffer> objectIds;
@@ -18,6 +21,8 @@ protected:
     }
 
     void Globals() {
+        CBV(0, computeShaderInfo, ShaderType_Any);
+
         SRV(0, vertices, ShaderType_Any);
         SRV(1, objectIds, ShaderType_Any);
         SRV(2, transforms, ShaderType_Any);
@@ -65,6 +70,9 @@ protected:
 
 class WSMRAPIT_BuildPipeline : public ComputePipelineBindings {
 public:
+    // CBV
+    gObj<Buffer> computeShaderInfo;
+
     // SRV
     gObj<Buffer> fragments;
 
@@ -81,6 +89,8 @@ protected:
     }
 
     void Globals() {
+        CBV(0, computeShaderInfo, ShaderType_Any);
+
         SRV(0, fragments, ShaderType_Any);
 
         UAV(0, rootBuffer, ShaderType_Any);
@@ -94,6 +104,9 @@ protected:
 
 class WSMRAPIT_LinkPipeline : public ComputePipelineBindings {
 public:
+    // CBV
+    gObj<Buffer> computeShaderInfo;
+
     // SRV
     gObj<Buffer> rootBuffer;
 
@@ -108,6 +121,8 @@ protected:
     }
 
     void Globals() {
+        CBV(0, computeShaderInfo, ShaderType_Any);
+
         SRV(0, rootBuffer, ShaderType_Any);
 
         UAV(0, nodeBuffer, ShaderType_Any);
@@ -141,6 +156,7 @@ public:
     // Constant buffers
     gObj<Buffer> screenInfo;
     gObj<Buffer> raymarchingInfo;
+    gObj<Buffer> computeShaderInfo;
 protected:
     void Setup() {
         _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WSMRPIT_Traversal_CS.cso"));
@@ -165,6 +181,7 @@ protected:
 
         CBV(0, screenInfo, ShaderType_Any);
         CBV(1, raymarchingInfo, ShaderType_Any);
+        CBV(2, computeShaderInfo, ShaderType_Any);
     }
 };
 
@@ -175,9 +192,13 @@ struct MRAPITDescription {
 
     MRAPITDescription() : MRAPITDescription(4, 2, 8) {}
     MRAPITDescription(int k, int delta, int power) : K(k), Delta(delta), Power(power) {}
-    
+
     int getResolution() {
         return 1 << Power;
+    }
+
+    int countEntries() {
+        return ((1 << ((Power + 1) * 2)) - 1) / 3;
     }
 };
 
@@ -198,6 +219,7 @@ public:
     gObj<Buffer> PreorderBuffer;
     gObj<Buffer> SkipBuffer;
     gObj<Buffer> reticulation;
+    gObj<Buffer> apitComputeShaderInfo;
 
     gObj<WSMRAPIT_TransformerPipeline> wsTransformPipeline;
     gObj<WSMRAPIT_ABufferPipeline> aBufferPipeline;
@@ -220,7 +242,8 @@ public:
 
         int width = traversalPipeline->rayHeadBuffer->Width;
         int height = traversalPipeline->rayHeadBuffer->Height;
-
+        
+        manager gCopy ValueData(traversalPipeline->computeShaderInfo, ComputeShaderInfo{ uint3(width, height, 0) });
         manager gSet Pipeline(traversalPipeline);
         manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_SQUAREGROUP(width, height));
     }
@@ -252,7 +275,7 @@ protected:
             _ gLoad Subprocess(sceneLoader);
         }
 
-        int totalEntries = ((1 << ((description.Power + 1) * 2)) - 1) / 3;
+        int totalEntries = description.countEntries();
         Vertices = _ gCreate RWStructuredBuffer<SCENE_VERTEX>(sceneLoader->VertexBuffer->ElementCount);
         SceneBoundaries = _ gCreate RWStructuredBuffer<int3>(2);
         Fragments = _ gCreate RWStructuredBuffer<Fragment>(MAX_NUMBER_OF_FRAGMENTS);
@@ -266,6 +289,7 @@ protected:
         PreorderBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         SkipBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         reticulation = _ gCreate ConstantBuffer<Reticulation>();
+        apitComputeShaderInfo = _ gCreate ConstantBuffer<ComputeShaderInfo>();
 
         // Load and setup pipeline resources
         _ gLoad Pipeline(wsTransformPipeline);
@@ -274,6 +298,7 @@ protected:
         wsTransformPipeline->vertices = sceneLoader->VertexBuffer;
         wsTransformPipeline->objectIds = sceneLoader->ObjectBuffer;
         wsTransformPipeline->transforms = sceneLoader->TransformBuffer;
+        wsTransformPipeline->computeShaderInfo = _ gCreate ConstantBuffer<ComputeShaderInfo>();
 
         _ gLoad Pipeline(aBufferPipeline);
         aBufferPipeline->wsVertices = Vertices;
@@ -293,6 +318,7 @@ protected:
         buildPipeline->firstBuffer = FirstBuffer;
         buildPipeline->nextBuffer = NextBuffer;
         buildPipeline->malloc = Malloc;
+        buildPipeline->computeShaderInfo = apitComputeShaderInfo;
 
         _ gLoad Pipeline(linkPipeline);
         linkPipeline->rootBuffer = RootBuffer;
@@ -300,6 +326,7 @@ protected:
         linkPipeline->boundaryNodeBuffer = BoundaryNodeBuffer;
         linkPipeline->preorderBuffer = PreorderBuffer;
         linkPipeline->skipBuffer = SkipBuffer;
+        linkPipeline->computeShaderInfo = apitComputeShaderInfo;
 
         _ gLoad Pipeline(traversalPipeline);
         traversalPipeline->wsVertices = Vertices;
@@ -313,10 +340,12 @@ protected:
         traversalPipeline->skipBuffer = SkipBuffer;
         traversalPipeline->screenInfo = screenInfo;
         traversalPipeline->raymarchingInfo = _ gCreate ConstantBuffer<RaymarchingDebug>();
+        traversalPipeline->computeShaderInfo = _ gCreate ConstantBuffer<ComputeShaderInfo>();
     }
 
     void TransformVertices(gObj<GraphicsManager> manager) {
         manager gSet Pipeline(wsTransformPipeline);
+        manager gCopy ValueData(wsTransformPipeline->computeShaderInfo, ComputeShaderInfo{ uint3(wsTransformPipeline->vertices->ElementCount, 0, 0) });
         manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_LINEARGROUP(wsTransformPipeline->vertices->ElementCount));
     }
 
@@ -325,23 +354,24 @@ protected:
         manager gClear UAV(Malloc, 0U);
         manager gClear UAV(RootBuffer, (unsigned int)-1);
         manager gCopy ValueData(screenInfo, ScreenInfo{ resolution, resolution, description.Power });
-        manager gCopy ValueData(reticulation, Reticulation{ description.K, description.Delta }); 
+        manager gCopy ValueData(reticulation, Reticulation{ description.K, description.Delta });
 
         manager gSet Viewport(resolution, resolution);
         manager gSet Pipeline(aBufferPipeline);
-        
+
         manager gDispatch Triangles(aBufferPipeline->wsVertices->ElementCount);
     }
 
     void BuildPIT(gObj<GraphicsManager> manager) {
-        int resolution = description.getResolution();
+        int entries = description.countEntries();
 
+        manager gCopy ValueData(apitComputeShaderInfo, ComputeShaderInfo{ uint3(entries, 0, 0) });
         manager gClear UAV(Malloc, 0U);
         manager gSet Pipeline(buildPipeline);
-        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_SQUAREGROUP(resolution, resolution));
+        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_LINEARGROUP(entries));
 
         manager gSet Pipeline(linkPipeline);
-        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_SQUAREGROUP(resolution, resolution));
+        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_LINEARGROUP(entries));
     }
 
     void Frame() {

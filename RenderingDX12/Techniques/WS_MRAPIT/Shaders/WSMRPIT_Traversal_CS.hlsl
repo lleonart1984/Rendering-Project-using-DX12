@@ -38,7 +38,7 @@ StructuredBuffer<RayInfo> rays                  : register (t0);
 Texture2D<int> rayHeadBuffer                    : register (t1);
 StructuredBuffer<int> rayNextBuffer             : register (t2);
 // Scene Geometry
-StructuredBuffer<VertexData> wsVertices          : register (t3);
+StructuredBuffer<VertexData> wsVertices         : register (t3);
 StructuredBuffer<int3> sceneBoundaries          : register (t4);
 // APIT
 StructuredBuffer<Fragment> fragments            : register (t5);
@@ -63,6 +63,25 @@ cbuffer RaymarchingInfo : register (b1)
 {
     int CountSteps;
     int CountHits;
+}
+
+cbuffer ComputeShaderInfo : register(b2)
+{
+    uint3 InputSize;
+}
+
+int GetMRIndex(uint2 pxy, int level)
+{
+    /*
+     * Let G(q, n) the Geometric Progression of N terms with ratio q
+     * G(q, n) = (q^(n + 1) - 1) / (q - 1)
+     * Sum from i = a to b: 2^i x 2^i = G(4, b) - G(4, a - 1)
+     */
+    int eMaxLevel = (Levels + 1) << 1;
+    int eCurrentLevel = (Levels - level + 1) << 1;
+    int skippedEntries = ((1 << eMaxLevel) - 1) / 3 - ((1 << eCurrentLevel) - 1) / 3; // G(4, Levels + 1) - G(4, Levels - level + 1)
+
+    return skippedEntries + pxy.x + pxy.y * (1 << (Levels - level));
 }
 
 bool HitTest(float3 O, float3 D, float3 V1, float3 V2, float3 V3,
@@ -128,10 +147,11 @@ void AnalizeNode(int node, inout float minDepth, inout float maxDepth, float3 ra
 }
 
 
-void QueryRange(uint2 px, float minDepth, float maxDepth,
+void QueryRange(uint2 px, int level, float minDepth, float maxDepth,
     float3 rayOrigin, float3 rayDirection, inout float t, inout float3 coords, inout int rayHit, inout int counter)
 {
-    int currentNode = rootBuffer[px];
+    int rootBufferIndex = GetMRIndex(px, level);
+    int currentNode = rootBuffer[rootBufferIndex];
 
     while (currentNode != -1)
     {
@@ -179,37 +199,39 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
     float3 a = (wsRayOrigin - bMin) / (bMax - bMin);
     float3 b = (wsRayOrigin + wsRayDirection - bMin) / (bMax - bMin);
 
-    // Screen positions of the ray
-    float2 dimensions = float2(Width, Height);
-
-    float2 screenIn  = float2(a.x, 1 - a.y) * dimensions;
-    float2 screenOut = float2(b.x, 1 - b.y) * dimensions;
-    float2 screenDirection = screenOut - screenIn;
-
-    int2 pixelBorder = (screenOut > screenIn) + int2(screenIn);
-    float2 step = screenDirection == 0 ? 100 : 1 / abs(screenDirection);
-
-    float2 alpha = screenDirection == 0 ? 1000 : (pixelBorder - screenIn) / screenDirection;
-    int2 pixelInc = screenDirection > 0 ? 1 : -1;
-    
-    float currentAlpha = 0;
-    float currentZ = a.z;
-    int2 currentPixel = int2(screenIn);
     float t = 1.0;
-    while (currentAlpha < t)
-    {
-        int2 selection = int2(alpha.x <= alpha.y, alpha.x > alpha.y);
-        float nextAlpha = min(t, dot(selection, alpha));
-        float nextZ = a.z + (b.z - a.z) * nextAlpha;
+    for (int level = 0; level <= Levels; level++) {
+        // Screen positions of the ray
+        int2 dimensions = int2(Width, Height) >> level;
 
-        QueryRange(currentPixel, min(currentZ, nextZ), max(currentZ, nextZ), wsRayOrigin, wsRayDirection, t,
-            intersection.Coordinates, intersection.TriangleIndex, counter);
-        
-        alpha += selection * step;
-        currentPixel += selection * pixelInc;
+        float2 screenIn = float2(a.x, 1 - a.y) * dimensions;
+        float2 screenOut = float2(b.x, 1 - b.y) * dimensions;
+        float2 screenDirection = screenOut - screenIn;
 
-        currentAlpha = nextAlpha;
-        currentZ = nextZ;
+        int2 pixelBorder = (screenOut > screenIn) + int2(screenIn);
+        float2 step = screenDirection == 0 ? 100 : 1 / abs(screenDirection);
+
+        float2 alpha = screenDirection == 0 ? 1000 : (pixelBorder - screenIn) / screenDirection;
+        int2 pixelInc = screenDirection > 0 ? 1 : -1;
+
+        float currentAlpha = 0;
+        float currentZ = a.z;
+        int2 currentPixel = int2(screenIn);
+        while (currentAlpha < t)
+        {
+            int2 selection = int2(alpha.x <= alpha.y, alpha.x > alpha.y);
+            float nextAlpha = min(t, dot(selection, alpha));
+            float nextZ = a.z + (b.z - a.z) * nextAlpha;
+
+            QueryRange(currentPixel, level, min(currentZ, nextZ), max(currentZ, nextZ), wsRayOrigin, wsRayDirection, t,
+                intersection.Coordinates, intersection.TriangleIndex, counter);
+
+            alpha += selection * step;
+            currentPixel += selection * pixelInc;
+
+            currentAlpha = nextAlpha;
+            currentZ = nextZ;
+        }
     }
 
     hits[rayIndex] = intersection;

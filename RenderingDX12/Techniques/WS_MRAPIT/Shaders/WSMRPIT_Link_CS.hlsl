@@ -7,6 +7,11 @@ struct PITNode {
     float Discriminant;
 };
 
+cbuffer ComputeShaderInfo : register(b0)
+{
+    uint3 InputSize;
+}
+
 StructuredBuffer<int> rootBuffer                : register(t0); // Allocated arrays starts
 
 RWStructuredBuffer<PITNode> nodeBuffer          : register(u0); // Interval Tree (will be updated the Global info)
@@ -109,9 +114,11 @@ void ResolveReferencesToNextNonChildrenInPreorder(int root)
 [numthreads(CS_GROUPSIZE_1D, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-    uint2 crd = uint2(DTid.xy);
+    if (DTid.x >= InputSize.x) {
+        return;
+    }
 
-    int root = rootBuffer[crd.x];
+    int root = rootBuffer[DTid.x];
     if (root != -1) {
         ResolveReferencesToNextNonChildrenInPreorder(root);
     }

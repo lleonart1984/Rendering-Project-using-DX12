@@ -11,6 +11,11 @@ struct Vertex
     float3 B;
 };
 
+cbuffer ComputeShaderInfo : register(b0)
+{
+    uint3 InputSize;
+}
+
 StructuredBuffer<Vertex> vertices       : register(t0);
 StructuredBuffer<int> objects           : register(t1);
 StructuredBuffer<float4x4> transforms   : register(t2);
@@ -21,6 +26,10 @@ RWStructuredBuffer<int3> sceneBoundaries        : register(u1);
 [numthreads(CS_GROUPSIZE_1D, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
+    if (DTid.x >= InputSize.x) {
+        return;
+    }
+
     int vertexIndex = DTid.x;
     Vertex v = vertices[vertexIndex];
     int objectId = objects[vertexIndex];

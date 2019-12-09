@@ -17,6 +17,7 @@ cbuffer ScreenInfo : register (b0)
 {
     int Width;
     int Height;
+    int Levels;
 }
 
 cbuffer Reticulation : register (b1)

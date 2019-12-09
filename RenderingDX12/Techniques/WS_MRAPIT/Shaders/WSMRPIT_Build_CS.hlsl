@@ -12,9 +12,14 @@ struct PITNode {
     float Discriminant;
 };
 
+cbuffer ComputeShaderInfo : register(b0)
+{
+    uint3 InputSize;
+}
+
 StructuredBuffer<Fragment> fragments            : register(t0);
 
-StructuredBuffer<int> rootBuffer                : register(u0);
+RWStructuredBuffer<int> rootBuffer              : register(u0);
 RWStructuredBuffer<PITNode> nodeBuffer          : register(u1);
 RWStructuredBuffer<float4> boundaryNodeBuffer   : register(u2);
 RWStructuredBuffer<int> firstBuffer             : register(u3);
@@ -50,6 +55,10 @@ int AllocateNode(int parent, int idxFragment, float2 interval)
 [numthreads(CS_GROUPSIZE_1D, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
+    if (DTid.x >= InputSize.x) {
+        return;
+    }
+
     int currentFragmentIdx = rootBuffer[DTid.x]; // rootBuffer is the first in the linked list at the beginning
     int ROOT = NONE; // start with empty tree
 
