@@ -11,6 +11,11 @@ struct Vertex
     float3 B;
 };
 
+struct MinMax {
+    int3 min;
+    int3 max;
+};
+
 cbuffer ComputeShaderInfo : register(b0)
 {
     uint3 InputSize;
@@ -22,6 +27,7 @@ StructuredBuffer<float4x4> transforms   : register(t2);
 
 RWStructuredBuffer<Vertex> transformedVertices  : register(u0);
 RWStructuredBuffer<int3> sceneBoundaries        : register(u1);
+RWStructuredBuffer<MinMax> boundaries           : register(u2);
 
 [numthreads(CS_GROUPSIZE_1D, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
@@ -46,11 +52,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     int3 lowerBound = int3((output.P - EPSILON) * PRECISION);
     int3 upperBound = int3((output.P + EPSILON) * PRECISION);
+    boundaries[DTid.x].min = lowerBound;
+    boundaries[DTid.x].max = upperBound;
 
-    InterlockedMin(sceneBoundaries[0].x, lowerBound.x);
+    /*InterlockedMin(sceneBoundaries[0].x, lowerBound.x);
     InterlockedMin(sceneBoundaries[0].y, lowerBound.y);
     InterlockedMin(sceneBoundaries[0].z, lowerBound.z);
     InterlockedMax(sceneBoundaries[1].x, upperBound.x);
     InterlockedMax(sceneBoundaries[1].y, upperBound.y);
-    InterlockedMax(sceneBoundaries[1].z, upperBound.z);
+    InterlockedMax(sceneBoundaries[1].z, upperBound.z);*/
 }

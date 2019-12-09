@@ -82,3 +82,8 @@ struct ComputeShaderInfo {
     uint3 InputSize;
     float res;
 };
+
+struct MinMax {
+    int3 min;
+    int3 max;
+};

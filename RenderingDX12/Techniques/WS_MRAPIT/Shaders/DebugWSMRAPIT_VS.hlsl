@@ -1,10 +1,10 @@
 
 struct Vertex {
-    float3 Position     : POSITION;
-    float3 Normal       : NORMAL;
-    float2 Coordinates  : TEXCOORD;
-    float3 Tangent      : TANGENT;
-    float3 Binormal     : BINORMAL;
+    float3 P;
+    float3 N;
+    float2 C;
+    float3 T;
+    float3 B;
 };
 
 struct VS_IN {
@@ -12,8 +12,8 @@ struct VS_IN {
 };
 
 struct PS_IN {
-    float4 Projected    : SV_POSITION;
-    float3 Position     : POSITION;
+    float4 Projected: SV_POSITION;
+    float3 Position: POSITION;
 };
 
 cbuffer CameraTransforms : register(b0) {
@@ -31,8 +31,8 @@ PS_IN main(VS_IN input)
     float4x4 viewProjection = mul(View, Projection);
 
     PS_IN output = (PS_IN)0;
-    output.Projected = mul(float4(v.Position, 1), viewProjection);
-    output.Position = v.Position;
+    output.Projected = mul(float4(v.P, 1), viewProjection);
+    output.Position = float4(v.P, 1);
 
     return output;
 }

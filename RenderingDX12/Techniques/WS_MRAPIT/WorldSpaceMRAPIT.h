@@ -15,6 +15,7 @@ public:
     // UAV
     gObj<Buffer> worldSpaceVertices;
     gObj<Buffer> sceneBoundaries;
+    gObj<Buffer> boundaries;
 protected:
     void Setup() {
         _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\WorldSpaceTransform_CS.cso"));
@@ -29,6 +30,28 @@ protected:
 
         UAV(0, worldSpaceVertices, ShaderType_Any);
         UAV(1, sceneBoundaries, ShaderType_Any);
+        UAV(2, boundaries, ShaderType_Any);
+    }
+};
+
+class WSMRAPIT_SceneBoundariesPipeline : public ComputePipelineBindings {
+public:
+    // CBV
+    gObj<Buffer> computeShaderInfo;
+
+    // UAV
+    gObj<Buffer> boundaries;
+    gObj<Buffer> sceneBoundaries;
+protected:
+    void Setup() {
+        _ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\ComputeSceneBoundaries_CS.cso"));
+    }
+
+    void Globals() {
+        CBV(0, computeShaderInfo, ShaderType_Any);
+
+        UAV(0, boundaries, ShaderType_Any);
+        //UAV(1, sceneBoundaries, ShaderType_Any);
     }
 };
 
@@ -39,6 +62,7 @@ public:
 
     gObj<Buffer> wsVertices;
     gObj<Buffer> sceneBoundaries;
+    gObj<Buffer> boundaries;
 
     gObj<Buffer> fragments;
     gObj<Buffer> firstBuffer;
@@ -56,6 +80,7 @@ protected:
     void Globals() {
         SRV(0, wsVertices, ShaderType_Vertex);
         SRV(1, sceneBoundaries, ShaderType_Vertex);
+        SRV(2, boundaries, ShaderType_Vertex);
 
         CBV(0, screenInfo, ShaderType_Geometry);
         CBV(1, reticulation, ShaderType_Geometry);
@@ -150,6 +175,8 @@ public:
     gObj<Buffer> preorderBuffer; // next node in preorder
     gObj<Buffer> skipBuffer; // next node in preorder skipping current subtree
 
+    gObj<Buffer> boundaries;
+
     gObj<Buffer> hits;
     gObj<Texture2D> complexity; // Complexity buffer for debugging
 
@@ -175,6 +202,7 @@ protected:
         SRV(9, nextBuffer, ShaderType_Any);
         SRV(10, preorderBuffer, ShaderType_Any);
         SRV(11, skipBuffer, ShaderType_Any);
+        SRV(12, boundaries, ShaderType_Any);
 
         UAV(0, hits, ShaderType_Any);
         UAV(1, complexity, ShaderType_Any);
@@ -221,7 +249,11 @@ public:
     gObj<Buffer> reticulation;
     gObj<Buffer> apitComputeShaderInfo;
 
+    gObj<Buffer> boundaries;
+
     gObj<WSMRAPIT_TransformerPipeline> wsTransformPipeline;
+    gObj<WSMRAPIT_SceneBoundariesPipeline> sceneBoundariesPipeline;
+
     gObj<WSMRAPIT_ABufferPipeline> aBufferPipeline;
     gObj<WSMRAPIT_BuildPipeline> buildPipeline;
     gObj<WSMRAPIT_LinkPipeline> linkPipeline;
@@ -290,6 +322,7 @@ protected:
         SkipBuffer = _ gCreate RWStructuredBuffer<int>(MAX_NUMBER_OF_FRAGMENTS);
         reticulation = _ gCreate ConstantBuffer<Reticulation>();
         apitComputeShaderInfo = _ gCreate ConstantBuffer<ComputeShaderInfo>();
+        boundaries = _ gCreate RWStructuredBuffer<MinMax>(sceneLoader->VertexBuffer->ElementCount);
 
         // Load and setup pipeline resources
         _ gLoad Pipeline(wsTransformPipeline);
@@ -299,6 +332,12 @@ protected:
         wsTransformPipeline->objectIds = sceneLoader->ObjectBuffer;
         wsTransformPipeline->transforms = sceneLoader->TransformBuffer;
         wsTransformPipeline->computeShaderInfo = _ gCreate ConstantBuffer<ComputeShaderInfo>();
+        wsTransformPipeline->boundaries = boundaries;
+
+        _ gLoad Pipeline(sceneBoundariesPipeline);
+        sceneBoundariesPipeline->computeShaderInfo = wsTransformPipeline->computeShaderInfo;
+        sceneBoundariesPipeline->boundaries = boundaries;
+        sceneBoundariesPipeline->sceneBoundaries = SceneBoundaries;
 
         _ gLoad Pipeline(aBufferPipeline);
         aBufferPipeline->wsVertices = Vertices;
@@ -309,6 +348,7 @@ protected:
         aBufferPipeline->malloc = Malloc;
         aBufferPipeline->screenInfo = screenInfo;
         aBufferPipeline->reticulation = reticulation;
+        aBufferPipeline->boundaries = boundaries;
 
         _ gLoad Pipeline(buildPipeline);
         buildPipeline->fragments = Fragments;
@@ -341,12 +381,24 @@ protected:
         traversalPipeline->screenInfo = screenInfo;
         traversalPipeline->raymarchingInfo = _ gCreate ConstantBuffer<RaymarchingDebug>();
         traversalPipeline->computeShaderInfo = _ gCreate ConstantBuffer<ComputeShaderInfo>();
+        traversalPipeline->boundaries = boundaries;
     }
 
     void TransformVertices(gObj<GraphicsManager> manager) {
         manager gSet Pipeline(wsTransformPipeline);
         manager gCopy ValueData(wsTransformPipeline->computeShaderInfo, ComputeShaderInfo{ uint3(wsTransformPipeline->vertices->ElementCount, 0, 0) });
         manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(CS_LINEARGROUP(wsTransformPipeline->vertices->ElementCount));
+
+        int k = (int)(ceil(wsTransformPipeline->vertices->ElementCount * 1.0 / CS_GROUPSIZE_1D));
+        while (k > 0) {
+            manager gSet Pipeline(sceneBoundariesPipeline);
+            manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(k);
+
+            k >>= 1;
+        }
+
+        /*manager gSet Pipeline(sceneBoundariesPipeline);
+        manager.Dynamic_Cast<ComputeManager>() gDispatch Threads(k);*/
     }
 
     void BuildABuffer(gObj<GraphicsManager> manager) {

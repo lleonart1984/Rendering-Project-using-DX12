@@ -2,14 +2,16 @@
 
 #include "WorldSpaceMRAPIT.h"
 
-class DebugWSMRAPIT_Pipeline : public ShowTexturePipeline {
+class DebugWSMRAPIT_Pipeline : public GraphicsPipelineBindings {
 public:
     gObj<Texture2D> renderTarget;
 
     // CBVs
+    gObj<Buffer> cameraCB;
     gObj<Buffer> screenInfo;
 
     // SRVs
+    gObj<Buffer> wsVertices;
     gObj<Buffer> sceneBoundaries;
     gObj<Buffer> fragments;
     gObj<Buffer> rootBuffer;
@@ -19,14 +21,21 @@ public:
     gObj<Buffer> nextBuffer;
     gObj<Buffer> preorderBuffer;
     gObj<Buffer> skipBuffer;
+
+    gObj<Buffer> boundaries;
 protected:
     void Setup() {
-        ShowTexturePipeline::Setup();
+        //ShowTexturePipeline::Setup();
+        _ gSet InputLayout({});
+        _ gSet VertexShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\DebugWSMRAPIT_VS.cso"));
         _ gSet PixelShader(ShaderLoader::FromFile(".\\Techniques\\WS_MRAPIT\\Shaders\\DebugWSMRAPIT_PS.cso"));
     }
 
     void Globals() {
         RTV(0, renderTarget);
+
+        CBV(0, cameraCB, ShaderType_Vertex);
+        SRV(0, wsVertices, ShaderType_Vertex);
 
         CBV(0, screenInfo, ShaderType_Pixel);
         SRV(0, sceneBoundaries, ShaderType_Pixel);
@@ -38,6 +47,8 @@ protected:
         SRV(6, nextBuffer, ShaderType_Pixel);
         SRV(7, preorderBuffer, ShaderType_Pixel);
         SRV(8, skipBuffer, ShaderType_Pixel);
+
+        SRV(9, boundaries, ShaderType_Pixel);
     }
 };
 
@@ -84,6 +95,10 @@ protected:
         pipeline->nextBuffer = worldSpaceMRAPIT->NextBuffer;
         pipeline->preorderBuffer = worldSpaceMRAPIT->PreorderBuffer;
         pipeline->skipBuffer = worldSpaceMRAPIT->SkipBuffer;
+        pipeline->boundaries = worldSpaceMRAPIT->boundaries;
+        
+        pipeline->cameraCB = _ gCreate ConstantBuffer<Globals>();
+        pipeline->wsVertices = worldSpaceMRAPIT->Vertices;
 
         perform(CreatingAssets);
     }
@@ -106,14 +121,20 @@ protected:
 
     void Graphics(gObj<GraphicsManager> manager) {
         ExecuteFrame(worldSpaceMRAPIT);
+
+        float4x4 view, proj;
+        Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
+        manager gCopy ValueData(pipeline->cameraCB, Globals{ proj, view });
         
         pipeline->renderTarget = render_target;
         manager gClear RT(render_target, float4(Backcolor, 1));
         manager gSet Viewport(render_target->Width, render_target->Height);
         manager gSet Pipeline(pipeline);
-        manager gSet VertexBuffer(debugVertices);
+        /*manager gSet VertexBuffer(debugVertices);
 
-        manager gDispatch Triangles(6);
+        manager gDispatch Triangles(6);*/
+
+        manager gDispatch Triangles(sceneLoader->VertexBuffer->ElementCount);
     }
 
     void Frame() {

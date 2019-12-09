@@ -13,10 +13,20 @@ struct PITNode {
     float Discriminant;
 };
 
-struct PS_IN {
-    float4 P: SV_POSITION;
-    float2 C: TEXCOORD;
+struct MinMax {
+    int3 min;
+    int3 max;
 };
+
+struct PS_IN {
+    float4 Projected: SV_POSITION;
+    float3 Position: POSITION;
+};
+
+//struct PS_IN {
+//    float4 P: SV_POSITION;
+//    float2 C: TEXCOORD;
+//};
 
 cbuffer ScreenInfo : register (b0) {
     int Width;
@@ -33,6 +43,8 @@ StructuredBuffer<int> firstBuffer       : register(t5);
 StructuredBuffer<int> nextBuffer        : register(t6);
 StructuredBuffer<int> preorderBuffer    : register(t7);
 StructuredBuffer<int> skipBuffer        : register(t8);
+
+StructuredBuffer<MinMax> boundaries : register(t9);
 
 float3 GetColor(int complexity) {
     if (complexity == 0) {
@@ -145,10 +157,12 @@ float4 main(PS_IN input) : SV_TARGET
 {
     int level = 0;
     int2 dimensions = int2(Width, Height) >> level;
-    int2 pxy = input.C.xy * dimensions;
+    //int2 pxy = input.C.xy * dimensions;
+
+    return float4(0.8, 0.1, 0.2, 1);
 
     //return GetDensityPerNode(pxy, level);
-    return GetFragmentCount(pxy, level);
+    //return GetFragmentCount(pxy, level);
     //return float4(GetColor(pxy[0] + pxy.y), 1);
 
     /*float maxDepth = boundaryBuffer[currentNode].w;
@@ -157,9 +171,10 @@ float4 main(PS_IN input) : SV_TARGET
     return float4((maxDepth - minDepth) * float3(0.00, 0.27, 0.29), 1);*/
 
     
-
     /*float3 lowerCorner = sceneBoundaries[0] / 1e7;
-    float3 upperCorner = sceneBoundaries[1] / 1e7;
+    float3 upperCorner = sceneBoundaries[1] / 1e7;*/
+    /*float3 lowerCorner = boundaries[0].min / 1e7;
+    float3 upperCorner = boundaries[0].max / 1e7;
     float3 unit = upperCorner - lowerCorner;
 
     float3 d = input.Position - lowerCorner;

@@ -10,6 +10,11 @@ struct Vertex
     float3 B;
 };
 
+struct MinMax {
+    int3 min;
+    int3 max;
+};
+
 struct GS_IN {
     float3 P : POSITION;
     uint VertexIndex : VERTEXINDEX;
@@ -21,12 +26,15 @@ struct VS_IN {
 
 StructuredBuffer<Vertex> wsVertices     : register(t0);
 StructuredBuffer<int3> sceneBoundaries  : register(t1);
+StructuredBuffer<MinMax> boundaries     : register(t2);
 
 GS_IN main(VS_IN input)
 {
     // Normalize Position (x, y) in [-1, 1], z in [0, 1]
-    float3 lowerCorner = sceneBoundaries[0] / PRECISION;
-    float3 upperCorner = sceneBoundaries[1] / PRECISION;
+    /*float3 lowerCorner = sceneBoundaries[0] / PRECISION;
+    float3 upperCorner = sceneBoundaries[1] / PRECISION;*/
+    float3 lowerCorner = boundaries[0].min / PRECISION;
+    float3 upperCorner = boundaries[0].max / PRECISION;
 
     int index = input.Index;
     float3 position = (wsVertices[index].P - lowerCorner) / (upperCorner - lowerCorner);

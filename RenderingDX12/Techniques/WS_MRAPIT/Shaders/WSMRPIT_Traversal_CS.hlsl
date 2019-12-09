@@ -33,6 +33,11 @@ struct RayIntersection {
     float3 Coordinates;
 };
 
+struct MinMax {
+    int3 min;
+    int3 max;
+};
+
 // Ray information input
 StructuredBuffer<RayInfo> rays                  : register (t0);
 Texture2D<int> rayHeadBuffer                    : register (t1);
@@ -48,6 +53,7 @@ StructuredBuffer<int> rootBuffer                : register (t8); // first buffer
 StructuredBuffer<int> nextBuffer                : register (t9); // next buffer updated to be links of each per-node lists
 StructuredBuffer<int> preorderBuffer            : register (t10);
 StructuredBuffer<int> skipBuffer                : register (t11);
+StructuredBuffer<MinMax> boundaries             : register (t12);
 
 RWStructuredBuffer<RayIntersection> hits        : register (u0);
 RWTexture2D<int> complexity                     : register (u1);
@@ -240,8 +246,11 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
 [numthreads(CS_GROUPSIZE_2D, CS_GROUPSIZE_2D, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-    float3 bMin = sceneBoundaries[0] / PRECISION;
-    float3 bMax = sceneBoundaries[1] / PRECISION;
+    /*float3 bMin = sceneBoundaries[0] / PRECISION;
+    float3 bMax = sceneBoundaries[1] / PRECISION;*/
+
+    float3 bMin = boundaries[0].min / PRECISION;
+    float3 bMax = boundaries[0].max / PRECISION;
 
     int2 px = DTid.xy;
     int rayIndex = rayHeadBuffer[px];

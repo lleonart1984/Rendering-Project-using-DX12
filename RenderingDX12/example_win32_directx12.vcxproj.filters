@@ -78,6 +78,7 @@
     <FxCompile Include="Techniques\WS_MRAPIT\Shaders\WSMRPIT_Build_CS.hlsl" />
     <FxCompile Include="Techniques\WS_MRAPIT\Shaders\WSMRPIT_Link_CS.hlsl" />
     <FxCompile Include="Techniques\WS_MRAPIT\Shaders\WSMRPIT_Traversal_CS.hlsl" />
+    <FxCompile Include="Techniques\WS_MRAPIT\Shaders\ComputeSceneBoundaries_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
