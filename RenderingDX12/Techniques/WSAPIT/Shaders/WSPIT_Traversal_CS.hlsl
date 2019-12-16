@@ -143,7 +143,7 @@ void QueryRange(uint2 px, float minDepth, float maxDepth,
     }
 }
 
-void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
+void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax, inout int counter)
 {
     RayInfo ray = rays[rayIndex];
     RayIntersection intersection = (RayIntersection)0;
@@ -158,7 +158,6 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
 
     bool cont;
     bool hit;
-    int counter = 0;
 
     float2x3 C = float2x3(bMin - P, bMax - P);
     float2x3 D2 = float2x3(D, D);
@@ -209,6 +208,8 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
 
         currentAlpha = nextAlpha;
         currentZ = nextZ;
+
+		counter += CountSteps;
     }
 
     hits[rayIndex] = intersection;
@@ -222,9 +223,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     int2 px = DTid.xy;
     int rayIndex = rayHeadBuffer[px];
+	int comp = 0;
     while (rayIndex != -1)
     {
-        Raymarch(px, rayIndex, bMin, bMax);
+        Raymarch(px, rayIndex, bMin, bMax, comp);
         rayIndex = rayNextBuffer[rayIndex];
     }
+
+	complexity[DTid.xy] = comp;
 }

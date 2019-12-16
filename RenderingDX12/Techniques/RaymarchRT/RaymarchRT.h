@@ -154,6 +154,9 @@ public:
     gObj<InitializeRayDirectionsPipeline> initialRayDirectionsPipeline;
     gObj<BounceRaysPipeline> bounceRaysPipeline;
 
+	gObj<ShowComplexityPipeline> showComplexity;
+
+
     gObj<Buffer> depthBuffer;
 
     RaymarchRT(D description) {
@@ -169,6 +172,10 @@ protected:
     }
 
     void Startup() {
+
+		// Load pipeline to draw complexity
+		_ gLoad Pipeline(showComplexity);
+
         // Load scene in retained mode
         if (sceneLoader == nullptr) {
             sceneLoader = new RetainedSceneLoader();
@@ -247,7 +254,14 @@ protected:
         constructing->ViewMatrix = view;
 #endif
 
-        ExecuteFrame(constructing);
+		static bool firstTime = true;
+		if (firstTime) {
+			ExecuteFrame(constructing);
+#ifndef CONSTRUCT_ADS_EVERYFRAME
+			firstTime = false;
+#endif
+		}
+
         manager gClear RT(render_target, float4(Backcolor, 1));
 
         manager gClear Depth(depthBuffer);
@@ -324,8 +338,15 @@ protected:
             }
         }
 
-        /*if (CountHits || CountSteps)
-            DebugComplexity(Complexity);*/
+		if (CountHits || CountSteps)
+		{
+			showComplexity->RenderTarget = render_target;
+			showComplexity->complexity = Complexity;
+			manager gClear RT(render_target, Backcolor);
+			manager gSet Pipeline(showComplexity);
+			manager gSet VertexBuffer(screenVertices);
+			manager gDispatch Triangles(6);
+		}
     }
 
     void Frame() {

@@ -152,7 +152,6 @@ void AnalizeNode(int node, inout float minDepth, inout float maxDepth, float3 ra
     //counter += CountHits; // count current node
 }
 
-
 void QueryRange(uint2 px, int level, float minDepth, float maxDepth,
     float3 rayOrigin, float3 rayDirection, inout float t, inout float3 coords, inout int rayHit, inout int counter)
 {
@@ -170,7 +169,7 @@ void QueryRange(uint2 px, int level, float minDepth, float maxDepth,
     }
 }
 
-void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
+void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax, inout int counter)
 {
     RayInfo ray = rays[rayIndex];
     RayIntersection intersection = (RayIntersection)0;
@@ -185,7 +184,6 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
 
     bool cont;
     bool hit;
-    int counter = 0;
 
     float2x3 C = float2x3(bMin - P, bMax - P);
     float2x3 D2 = float2x3(D, D);
@@ -206,7 +204,8 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
     float3 b = (wsRayOrigin + wsRayDirection - bMin) / (bMax - bMin);
 
     float t = 1.0;
-    for (int level = 0; level <= Levels; level++) {
+	//for (int level = Levels; level >= 0; level--) {
+	for (int level = 0; level <= Levels; level++) {
         // Screen positions of the ray
         int2 dimensions = int2(Width, Height) >> level;
 
@@ -237,6 +236,8 @@ void Raymarch(int2 px, int rayIndex, float3 bMin, float3 bMax)
 
             currentAlpha = nextAlpha;
             currentZ = nextZ;
+
+			counter += CountSteps;
         }
     }
 
@@ -252,11 +253,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float3 bMin = boundaries[0].min / PRECISION;
     float3 bMax = boundaries[0].max / PRECISION;
 
+	int comp = 0;
+
     int2 px = DTid.xy;
     int rayIndex = rayHeadBuffer[px];
     while (rayIndex != -1)
     {
-        Raymarch(px, rayIndex, bMin, bMax);
+        Raymarch(px, rayIndex, bMin, bMax, comp);
         rayIndex = rayNextBuffer[rayIndex];
     }
+
+	complexity[DTid.xy] = comp;
 }
