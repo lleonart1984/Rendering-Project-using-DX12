@@ -30,7 +30,9 @@
 #define USE_VOLUME_GRID true
 
 #ifndef DEBUG_PHOTONS
-//#define SHOW_DIRECT
+#define SHOW_DIRECT
 #endif
 
 #define SHOW_INDIRECT
+
+//#define REBUILT_ADS_EVERY_FRAME

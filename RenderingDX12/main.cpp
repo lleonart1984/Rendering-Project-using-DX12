@@ -41,6 +41,10 @@ void GuiFor(gObj<IHasBackcolor> t) {
 void GuiFor(gObj<IHasTriangleNumberParameter> t) {
 	ImGui::SliderInt("Number of tris", &t->NumberOfTriangles, t->MinimumOfTriangles, t->MaximumOfTriangles);
 }
+void GuiFor(gObj<IHasRaymarchDebugInfo> t) {
+	ImGui::Checkbox("Show Count Steps", &t->CountSteps);
+	ImGui::Checkbox("Show Count Hits", &t->CountHits);
+}
 void GuiFor(gObj<IHasParalellism> t) {
 #ifdef MAX_NUMBER_OF_ASYNC_PROCESSES
 	ImGui::SliderInt("Number of workers", &t->NumberOfWorkers, 1, MAX_NUMBER_OF_ASYNC_PROCESSES);
@@ -131,8 +135,16 @@ int main(int, char**)
 	static Presenter* presenter = new ImGUIPresenter(hWnd);
 #endif
 
-    //presenter->Load(technique, APITDescription{ 8 });
+#ifdef TEST_WSAPIT
+    presenter->Load(technique, APITDescription{ 8 });
+#else
+#ifdef TEST_WSMRAPIT
+	presenter->Load(technique, MRAPITDescription{ 8, 1, 8 });
+#else
     presenter->Load(technique);
+#endif
+#endif
+
 	gObj<IHasBackcolor> asBackcolorRenderer = technique.Dynamic_Cast<IHasBackcolor>();
 	gObj<IHasScene> asSceneRenderer = technique.Dynamic_Cast<IHasScene>();
 	gObj<IHasCamera> asCameraRenderer = technique.Dynamic_Cast<IHasCamera>();
@@ -185,7 +197,7 @@ int main(int, char**)
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			//MixMirrorMaterial(&scene->Materials()[9], 0.3); // floor
+			MixMirrorMaterial(&scene->Materials()[9], 1); // floor
 			camera->Position = float3(0.3f, 0.05f, -0.028);
 			camera->Target = float3(0, 0.07f, 0);
 			lightSource->Position = float3(0, 0.45, 0);
@@ -284,6 +296,7 @@ int main(int, char**)
 			RenderGUI<IHasTriangleNumberParameter>(technique);
 			RenderGUI<IHasParalellism>(technique);
 			RenderGUI<IHasLight>(technique);
+			RenderGUI<IHasRaymarchDebugInfo>(technique);
             
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();

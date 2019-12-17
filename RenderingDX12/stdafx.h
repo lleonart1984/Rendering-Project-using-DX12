@@ -40,4 +40,8 @@ using namespace CA4G;
 #include "Techniques/PhotonMaps/BPP_PhotonMap2Technique.h"
 #include "Techniques/PhotonMaps/BPP_PhotonMap5Technique.h"
 
+#include "Techniques/Raymarching/RaymarchRT/RaymarchRT.h"
+#include "Techniques/Raymarching/WSAPIT/WorldSpaceAPIT.h"
+#include "Techniques/Raymarching/WS_MRAPIT/WorldSpaceMRAPIT.h"
+
 #include "main.h"

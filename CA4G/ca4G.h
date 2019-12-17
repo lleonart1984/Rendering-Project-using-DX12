@@ -11346,6 +11346,7 @@ namespace CA4G {
 			d.DestBlendAlpha = dstAlpha;
 			d.LogicOpEnable = enableLogicOperation;
 			d.LogicOp = logicOperation;
+			d.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 			_Description.RenderTarget[renderTarget] = d;
 		}
 		void BlendForAllRenderTargets(
@@ -11369,6 +11370,8 @@ namespace CA4G {
 			d.DestBlendAlpha = dstAlpha;
 			d.LogicOpEnable = enableLogicOperation;
 			d.LogicOp = logicOperation;
+			d.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
 			for (int i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; i++)
 				_Description.RenderTarget[i] = d;
 		}
@@ -11675,7 +11678,7 @@ namespace CA4G {
 			const D3D12_PIPELINE_STATE_STREAM_DESC streamDesc = { sizeof(*setting), setting };
 			auto hr = manager->device->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&pso));
 			if (FAILED(hr)) {
-				//auto hr = manager->device->GetDeviceRemovedReason();
+				auto _hr = manager->device->GetDeviceRemovedReason();
 				throw CA4GException::FromError(CA4G_Errors_BadPSOConstruction, nullptr, hr);
 			}
 		}

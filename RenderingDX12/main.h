@@ -19,7 +19,7 @@
 //#define WARP
 
 // Uncomment this to Force fallback device
-//#define FORCE_FALLBACK
+#define FORCE_FALLBACK
 
 //class NoTechnique : public Technique {}; gObj<NoTechnique> technique;
 
@@ -54,11 +54,23 @@
 //----- Photon Mapping approaches for PhotonMap techniques on the GPU using RT cores ------
 //gObj<GridPhotonMapTechnique> technique;
 //gObj<BPP_PhotonMap2Technique> technique;
-gObj<BPP_PhotonMap5Technique> technique; // Technique with morton sorting of photons to estimate knn
+//gObj<BPP_PhotonMap5Technique> technique; // Technique with morton sorting of photons to estimate knn
+
+// Raytracing
+gObj<DXRRaytracingTechnique> technique;
+
+//#define TEST_WSAPIT
+//#define TEST_WSMRAPIT
 
 // APIT
 //gObj<DebugAPIT> technique;
 //gObj<RaymarchRT<APITConstruction, APITDescription>> technique;
+#ifdef TEST_WSAPIT
+//gObj<DebugWSAPIT> technique;
+gObj<RaymarchRT<WorldSpaceAPIT, APITDescription>> technique;
+#endif
 
-// Raytracing
-//gObj<DXRRaytracingTechnique> technique;
+#ifdef TEST_WSMRAPIT
+//gObj<DebugWSMRAPIT> technique;
+gObj<RaymarchRT<WorldSpaceMRAPIT, MRAPITDescription>> technique;
+#endif

@@ -177,11 +177,26 @@ public:
 			auto sceneObj = Scene->Objects()[i];
 			sceneGeometriesBuilder gLoad Geometry(sceneObj.startVertex, sceneObj.vertexesCount);
 		}
-		sceneGeometriesOnGPU = sceneGeometriesBuilder gCreate BakedGeometry();
+		sceneGeometriesOnGPU = sceneGeometriesBuilder gCreate BakedGeometry(true, true);
 
 		auto sceneInstances = manager gCreate Instances();
 		sceneInstances gLoad Instance(sceneGeometriesOnGPU);
-		dxrRTPipeline->_Program->Scene = sceneInstances gCreate BakedScene();
+		dxrRTPipeline->_Program->Scene = sceneInstances gCreate BakedScene(true, true);
+	}
+
+	void UpdateSceneOnGPU(gObj<DXRManager> manager) {
+		auto sceneGeometriesBuilder = manager gCreate TriangleGeometries(sceneGeometriesOnGPU);
+		sceneGeometriesBuilder gSet VertexBuffer(VB, SCENE_VERTEX::Layout());
+		for (int i = 0; i < Scene->ObjectsCount(); i++)
+		{ // Create a geometry for each obj loaded group
+			auto sceneObj = Scene->Objects()[i];
+			sceneGeometriesBuilder gLoad Geometry(sceneObj.startVertex, sceneObj.vertexesCount);
+		}
+		sceneGeometriesOnGPU = sceneGeometriesBuilder gCreate RebuiltGeometry(true, true);
+
+		auto sceneInstances = manager gCreate Instances(dxrRTPipeline->_Program->Scene);
+		sceneInstances gLoad Instance(sceneGeometriesOnGPU);
+		dxrRTPipeline->_Program->Scene = sceneInstances gCreate UpdatedScene();
 	}
 
 	float4x4 view, proj;
@@ -190,6 +205,10 @@ public:
 	void Frame() {
 
 		DirectLightingTechnique::Frame();
+
+#ifdef REBUILT_ADS_EVERY_FRAME
+		perform(UpdateSceneOnGPU);
+#endif
 
 		perform(Raytracing);
 	}

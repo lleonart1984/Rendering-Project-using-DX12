@@ -38,6 +38,29 @@
     <FxCompile Include="Techniques\PhotonMaps\BPP_RadiusConvolution_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\BPP_PhotonPacking_CS.hlsl" />
     <FxCompile Include="Techniques\CommonRT\DeferredDirectLighting_CS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\RaymarchRT\Shaders\RT_InitialRayDirections_PS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\RaymarchRT\Shaders\RT_InitialRays_PS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\RaymarchRT\Shaders\RT_InitialRays_VS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\RaymarchRT\Shaders\RT_Bounce_PS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WS_MRAPIT\Shaders\ComputeSceneBoundaries_CS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WS_MRAPIT\Shaders\DebugWSMRAPIT_PS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WS_MRAPIT\Shaders\DebugWSMRAPIT_VS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WS_MRAPIT\Shaders\WorldSpaceTransform_CS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WS_MRAPIT\Shaders\WSMRPIT_Build_CS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WS_MRAPIT\Shaders\WSMRPIT_Fill_GS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WS_MRAPIT\Shaders\WSMRPIT_Fill_PS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WS_MRAPIT\Shaders\WSMRPIT_Fill_VS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WS_MRAPIT\Shaders\WSMRPIT_Link_CS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WS_MRAPIT\Shaders\WSMRPIT_Traversal_CS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WSAPIT\Shaders\DebugWSAPIT_PS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WSAPIT\Shaders\DebugWSAPIT_VS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WSAPIT\Shaders\WorldSpaceTransform_CS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WSAPIT\Shaders\WSPIT_Build_CS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WSAPIT\Shaders\WSPIT_Fill_GS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WSAPIT\Shaders\WSPIT_Fill_PS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WSAPIT\Shaders\WSPIT_Fill_VS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WSAPIT\Shaders\WSPIT_Link_CS.hlsl" />
+    <FxCompile Include="Techniques\Raymarching\WSAPIT\Shaders\WSPIT_Traversal_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -116,6 +139,14 @@
     <ClInclude Include="Techniques\Randoms\MarsagliasXorWow.h" />
     <ClInclude Include="Techniques\Randoms\XorShiftAster.h" />
     <ClInclude Include="Techniques\CommonRT\DirectLightingTechnique.h" />
+    <ClInclude Include="Techniques\Raymarching\RaymarchRT\Common_RaymarchRT.h" />
+    <ClInclude Include="Techniques\Raymarching\RaymarchRT\RaymarchRT.h" />
+    <ClInclude Include="Techniques\Raymarching\RaymarchRT\RaymarchRT_Constants.h" />
+    <ClInclude Include="Techniques\Raymarching\WS_MRAPIT\WorldSpaceMRAPIT.h" />
+    <ClInclude Include="Techniques\Raymarching\WS_MRAPIT\DebugWSMRAPIT.h" />
+    <ClInclude Include="Techniques\Raymarching\WSAPIT\DebugWSAPIT.h" />
+    <ClInclude Include="Techniques\Raymarching\WSAPIT\WorldSpaceAPIT.h" />
+    <ClInclude Include="Techniques\Common\CS_Constants.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

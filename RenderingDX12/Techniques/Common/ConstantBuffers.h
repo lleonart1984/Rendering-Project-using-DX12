@@ -25,3 +25,66 @@ struct Materialing {
 	float3 Emissive; float res2;
 	float4 Roulette;
 };
+
+/*
+ * APIT Constants
+ */
+
+#define MAX_NUMBER_OF_FRAGMENTS 20000000 // up to 20 million of fragments supported
+
+struct ScreenInfo {
+	int Width;
+	int Height;
+
+	int Levels;
+	float res0;
+};
+
+struct Fragment {
+	int Index;
+	float MinDepth;
+	float MaxDepth;
+};
+
+struct PITNode {
+	int Parent;
+	int LeftChild;
+	int RightChild;
+
+	float Discriminant;
+};
+
+struct LevelInfo {
+	int Length;
+
+	int Level;
+
+	float2 res;
+};
+
+struct RayInfo
+{
+	float3 Position;
+	float3 Direction;
+	float3 AccumulationFactor;
+};
+
+struct RayIntersection {
+	int TriangleIndex;
+	float3 Coordinates;
+};
+
+struct Reticulation {
+	int K;
+	int D;
+};
+
+struct ComputeShaderInfo {
+	uint3 InputSize;
+	float res;
+};
+
+struct MinMax {
+	int3 min;
+	int3 max;
+};
