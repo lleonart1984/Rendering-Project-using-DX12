@@ -19,7 +19,7 @@
 //#define WARP
 
 // Uncomment this to Force fallback device
-#define FORCE_FALLBACK
+//#define FORCE_FALLBACK
 
 //class NoTechnique : public Technique {}; gObj<NoTechnique> technique;
 

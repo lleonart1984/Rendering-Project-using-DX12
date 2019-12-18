@@ -263,5 +263,5 @@ void main(uint3 DTid : SV_DispatchThreadID)
         rayIndex = rayNextBuffer[rayIndex];
     }
 
-	complexity[DTid.xy] = comp;
+	complexity[DTid.xy] += comp;
 }

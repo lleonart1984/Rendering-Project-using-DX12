@@ -163,6 +163,7 @@ public:
 #pragma endregion
 	}
 
+#ifdef REBUILT_ADS_EVERY_FRAME
 	void CreateSceneOnGPU(gObj<DXRManager> manager) {
 		/// Loads a static scene for further ray-tracing
 
@@ -198,7 +199,28 @@ public:
 		sceneInstances gLoad Instance(sceneGeometriesOnGPU);
 		dxrRTPipeline->_Program->Scene = sceneInstances gCreate UpdatedScene();
 	}
+#else
+	void CreateSceneOnGPU(gObj<DXRManager> manager) {
+		/// Loads a static scene for further ray-tracing
 
+		// load full vertex buffer of all scene geometries
+		VB = _ gCreate GenericBuffer<SCENE_VERTEX>(D3D12_RESOURCE_STATE_GENERIC_READ, this->Scene->VerticesCount(), CPU_WRITE_GPU_READ);
+		manager gCopy PtrData(VB, Scene->Vertices());
+
+		auto sceneGeometriesBuilder = manager gCreate TriangleGeometries();
+		sceneGeometriesBuilder gSet VertexBuffer(VB, SCENE_VERTEX::Layout());
+		for (int i = 0; i < Scene->ObjectsCount(); i++)
+		{ // Create a geometry for each obj loaded group
+			auto sceneObj = Scene->Objects()[i];
+			sceneGeometriesBuilder gLoad Geometry(sceneObj.startVertex, sceneObj.vertexesCount);
+		}
+		sceneGeometriesOnGPU = sceneGeometriesBuilder gCreate BakedGeometry();
+
+		auto sceneInstances = manager gCreate Instances();
+		sceneInstances gLoad Instance(sceneGeometriesOnGPU);
+		dxrRTPipeline->_Program->Scene = sceneInstances gCreate BakedScene();
+	}
+#endif
 	float4x4 view, proj;
 	float4x4 lightView, lightProj;
 

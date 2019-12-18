@@ -169,7 +169,7 @@ int main(int, char**)
 			camera->Target = float3(0, 0, 0);
 			lightSource->Position = float3(0.0, 0.4, 0.1);
 			lightSource->Intensity = float3(400, 400, 400);
-			//MixGlassMaterial(&scene->Materials()[5], 1);
+			MixGlassMaterial(&scene->Materials()[5], 1);
 			break;
 		case CORNELL_OBJ:
 			filePath = desktop_directory();

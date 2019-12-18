@@ -27,7 +27,6 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #include "../CommonRT/CommonDeferred.h"
 #include "../CommonRT/CommonShadowMaping.h"
 #include "../CommonRT/CommonProgressive.h"
-#include "../CommonRT/CommonOutput.h"
 #include "../CommonGI/ScatteringTools.h"
 #include "../CommonGI/Parameters.h"
 
