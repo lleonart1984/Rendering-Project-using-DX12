@@ -57,10 +57,10 @@
 //gObj<BPP_PhotonMap5Technique> technique; // Technique with morton sorting of photons to estimate knn
 
 // Raytracing
-gObj<DXRRaytracingTechnique> technique;
+//gObj<DXRRaytracingTechnique> technique;
 
 //#define TEST_WSAPIT
-//#define TEST_WSMRAPIT
+#define TEST_WSMRAPIT
 
 // APIT
 //gObj<DebugAPIT> technique;

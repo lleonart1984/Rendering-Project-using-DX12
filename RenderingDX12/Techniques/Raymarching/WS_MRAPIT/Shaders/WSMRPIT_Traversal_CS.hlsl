@@ -256,6 +256,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	int comp = 0;
 
     int2 px = DTid.xy;
+
+	int2 dim;
+	rayHeadBuffer.GetDimensions(dim.x, dim.y);
+	if (any(px >= dim))
+		return;
+
     int rayIndex = rayHeadBuffer[px];
     while (rayIndex != -1)
     {

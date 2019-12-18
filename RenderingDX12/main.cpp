@@ -190,8 +190,8 @@ int main(int, char**)
 			camera->Target = float3(0, 0.1f, 0);
 			lightSource->Position = float3(0.1, 0.4, -0.2);
 			lightSource->Intensity = float3(240, 240, 240);
-			MixMirrorMaterial(&scene->Materials()[0], 1);
-			//MixGlassMaterial(&scene->Materials()[0], 1);
+			//MixMirrorMaterial(&scene->Materials()[0], 1);
+			MixGlassMaterial(&scene->Materials()[0], 1);
 			break;
 		case SPONZA_OBJ:
 			filePath = desktop_directory();
@@ -208,7 +208,7 @@ int main(int, char**)
 			strcat(filePath, "\\Models\\sibenik\\sibenik.obj");
 			scene = new Scene(filePath);
 			//MixGlassMaterial(&scene->Materials()[1], 0.9f); // window
-			//MixMirrorMaterial(&scene->Materials()[4], 1); // floor
+			MixMirrorMaterial(&scene->Materials()[5], 1); // floor
 			camera->Position = float3(-0.4, -0.3, 0.0);
 			camera->Target = float3(0, -0.25, 0);
 			lightSource->Position = float3(-0, -0.05, 0);
