@@ -81,7 +81,7 @@ public:
 			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
 			gObj<Buffer> LightTransforms;
-			gObj<Buffer> ProgressivePass;
+			int ProgressivePass;
 
 			gObj<Texture2D> Output;
 			gObj<Texture2D> Accum;
@@ -210,8 +210,6 @@ public:
 		// Reused CBs from dxrPTPipeline
 		dxrRTPipeline->_Program->LightingCB = dxrPTPipeline->_Program->LightingCB;
 
-		dxrRTPipeline->_Program->ProgressivePass = dxrPTPipeline->_Program->ProgressivePass = _ gCreate ConstantBuffer<int>();
-
 		dxrRTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		dxrRTPipeline->_Program->Accum = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 		dxrRTPipeline->_Program->DirectLighting = DirectLighting;
@@ -268,7 +266,7 @@ public:
 		if (CameraIsDirty || LightSourceIsDirty)
 			FrameIndex = 0;
 
-		manager gCopy ValueData(dxrPTPipeline->_Program->ProgressivePass, FrameIndex);
+		dxrPTPipeline->_Program->ProgressivePass = FrameIndex;
 
 		FrameIndex++;
 
@@ -335,6 +333,8 @@ public:
 			manager gClear UAV(rtProgram->Output, 0u);
 			manager gClear UAV(rtProgram->Accum, 0u);
 		}
+
+		rtProgram->ProgressivePass = dxrPTPipeline->_Program->ProgressivePass;
 
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrRTPipeline);

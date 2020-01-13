@@ -56,11 +56,14 @@
 //gObj<BPP_PhotonMap2Technique> technique;
 //gObj<BPP_PhotonMap5Technique> technique; // Technique with morton sorting of photons to estimate knn
 
+//----- Progressive Photon Mapping approaches
+gObj<PPMTechnique> technique;
+
 // Raytracing
 //gObj<DXRRaytracingTechnique> technique;
 
 //#define TEST_WSAPIT
-#define TEST_WSMRAPIT
+//#define TEST_WSMRAPIT
 
 // APIT
 //gObj<DebugAPIT> technique;

@@ -190,14 +190,14 @@ int main(int, char**)
 			camera->Target = float3(0, 0.1f, 0);
 			lightSource->Position = float3(0.1, 0.4, -0.2);
 			lightSource->Intensity = float3(240, 240, 240);
-			//MixMirrorMaterial(&scene->Materials()[0], 1);
-			MixGlassMaterial(&scene->Materials()[0], 1);
+			MixMirrorMaterial(&scene->Materials()[0], 1);
+			//MixGlassMaterial(&scene->Materials()[0], 1);
 			break;
 		case SPONZA_OBJ:
 			filePath = desktop_directory();
 			strcat(filePath, "\\Models\\sponza\\SponzaMoreMeshes.obj");
 			scene = new Scene(filePath);
-			MixMirrorMaterial(&scene->Materials()[9], 1); // floor
+			//MixMirrorMaterial(&scene->Materials()[9], 1); // floor
 			camera->Position = float3(0.3f, 0.05f, -0.028);
 			camera->Target = float3(0, 0.07f, 0);
 			lightSource->Position = float3(0, 0.45, 0);

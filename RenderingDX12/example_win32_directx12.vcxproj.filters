@@ -63,6 +63,10 @@
     <FxCompile Include="Techniques\Raymarching\WSAPIT\Shaders\WSPIT_Traversal_CS.hlsl" />
     <FxCompile Include="Techniques\Raymarching\RaymarchRT\Shaders\GenerateInitialRays_CS.hlsl" />
     <FxCompile Include="Techniques\Raymarching\RaymarchRT\Shaders\RaytracingScattering_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PPMRaytracingStage_RT.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PPMScheduler_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PPMMergeMaps_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\PPMAccumulateRadiance_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -150,6 +154,7 @@
     <ClInclude Include="Techniques\Raymarching\WSAPIT\WorldSpaceAPIT.h" />
     <ClInclude Include="Techniques\Common\CS_Constants.h" />
     <ClInclude Include="Techniques\Raymarching\RaymarchRT\Shaders\RayQueue.hlsl.h" />
+    <ClInclude Include="Techniques\PhotonMaps\PPMTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
