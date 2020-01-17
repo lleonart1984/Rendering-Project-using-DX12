@@ -67,6 +67,9 @@
     <FxCompile Include="Techniques\PhotonMaps\PPMScheduler_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\PPMMergeMaps_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\PPMAccumulateRadiance_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\BuildOctree_CS.hlsl" />
+    <FxCompile Include="Techniques\PhotonMaps\GatherOctree_RT.hlsl" />
+    <FxCompile Include="Techniques\Pathtracing\Filter_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -155,6 +158,7 @@
     <ClInclude Include="Techniques\Common\CS_Constants.h" />
     <ClInclude Include="Techniques\Raymarching\RaymarchRT\Shaders\RayQueue.hlsl.h" />
     <ClInclude Include="Techniques\PhotonMaps\PPMTechnique.h" />
+    <ClInclude Include="Techniques\PhotonMaps\OctreePhotonMapTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

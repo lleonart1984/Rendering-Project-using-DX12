@@ -59,6 +59,9 @@
 //----- Progressive Photon Mapping approaches
 gObj<PPMTechnique> technique;
 
+//gObj<OctreePhotonMapTechnique> technique;
+
+
 // Raytracing
 //gObj<DXRRaytracingTechnique> technique;
 

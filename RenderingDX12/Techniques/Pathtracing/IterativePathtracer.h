@@ -109,7 +109,46 @@ public:
 		}
 	};
 
+
+	struct Filter : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\Pathtracing\\Filter_CS.cso"));
+		}
+
+		gObj<Texture2D> Accumulation;
+		gObj<Texture2D> Background;
+		gObj<Texture2D> Positions;
+		gObj<Texture2D> Normals;
+		gObj<Texture2D> Coordinates;
+		gObj<Texture2D> MaterialIndices;
+		gObj<Buffer> Materials;
+		gObj<Texture2D>* Textures;
+		int TextureCount;
+
+		gObj<Texture2D> Final;
+
+		int PassCount;
+
+		void Globals() {
+			SRV(0, Accumulation, ShaderType_Any);
+			SRV(1, Background, ShaderType_Any);
+			SRV(2, Positions, ShaderType_Any);
+			SRV(3, Normals, ShaderType_Any);
+			SRV(4, Coordinates, ShaderType_Any);
+			SRV(5, MaterialIndices, ShaderType_Any);
+			SRV(6, Materials, ShaderType_Any);
+			SRV_Array(7, Textures, TextureCount, ShaderType_Any);
+
+			Static_SMP(0, Sampler::Linear(), ShaderType_Any);
+
+			UAV(0, Final, ShaderType_Any);
+
+			CBV(0, PassCount, ShaderType_Any);
+		}
+	};
+
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
+	gObj<Filter> filterPipeline;
 
 	void Startup() {
 
@@ -118,6 +157,7 @@ public:
 		wait_for(signal(flush_all_to_gpu));
 
 		_ gLoad Pipeline(dxrPTPipeline);
+		_ gLoad Pipeline(filterPipeline);
 
 		// Load assets to render the deferred lighting image
 		perform(CreatingAssets);
@@ -143,10 +183,21 @@ public:
 		dxrPTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
 
 		dxrPTPipeline->_Program->DirectLighting = DirectLighting;
+		//dxrPTPipeline->_Program->Output = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 		dxrPTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		dxrPTPipeline->_Program->Accum = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 #pragma endregion
 
+		filterPipeline->Accumulation = dxrPTPipeline->_Program->Accum;
+		filterPipeline->Background = DirectLighting;
+		filterPipeline->Positions = computeDirectLighting->Positions;
+		filterPipeline->Normals = computeDirectLighting->Normals;
+		filterPipeline->Coordinates = computeDirectLighting->Coordinates;
+		filterPipeline->MaterialIndices = computeDirectLighting->MaterialIndices;
+		filterPipeline->Materials = computeDirectLighting->Materials;
+		filterPipeline->TextureCount = computeDirectLighting->TextureCount;
+		filterPipeline->Textures = computeDirectLighting->Textures;
+		filterPipeline->Final = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 	}
 
 	gObj<Buffer> VB;
@@ -241,8 +292,18 @@ public:
 		// Dispatch primary rays
 		manager gDispatch Rays(render_target->Width, render_target->Height);
 		
-		// Copy DXR output texture to the render target
 		manager gCopy All(render_target, rtProgram->Output);
+		
+		//auto compute = manager.Dynamic_Cast<ComputeManager>();
+		//
+		//filterPipeline->PassCount = FrameIndex;
+		//compute gSet Pipeline(filterPipeline);
+		//compute gDispatch Threads(
+		//	(int)ceil(render_target->Width / CS_2D_GROUPSIZE),
+		//	(int)ceil(render_target->Height / CS_2D_GROUPSIZE));
+
+		////// Copy DXR output texture to the render target
+		//manager gCopy All(render_target, filterPipeline->Final);
 
 		FrameIndex++;
 #pragma endregion

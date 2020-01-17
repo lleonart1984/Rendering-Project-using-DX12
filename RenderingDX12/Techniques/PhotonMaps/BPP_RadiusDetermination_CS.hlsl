@@ -47,8 +47,8 @@ float MortonEstimator(in Photon currentPhoton, int index, float maximumRadius) {
 		
 		if ((r - l) >= DESIRED_PHOTONS * 3.14/ 4 ) // if photons inside are sufficient then you get the desired radius
 		{
-			//return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l))* 4 / 3.14;
-			return min(maximumRadius, mortonBlockRadius);
+			return sqrt(mortonBlockRadius * mortonBlockRadius * DESIRED_PHOTONS / (r - l))* 4 / 3.14;
+			//return min(maximumRadius, mortonBlockRadius);
 		}
 
 		if (mortonBlockRadius >= maximumRadius)

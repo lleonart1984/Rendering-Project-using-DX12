@@ -30,15 +30,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
 			float N = TPM[currentNode].N;
 			float M = WPM[currentNode].N;
 
-			float alpha = 0.7;// min(1, pow(0.9, (double)M / DESIRED_PHOTONS));
+			float alpha = 0.75;// min(16, pow(0.5, (double)M / DESIRED_PHOTONS));
 
 			if (N == 0.0) // initial wave 
 			{
 				float ratio = clamp(sqrt(DESIRED_PHOTONS / M), 0.0125, 1);
-				TPM[currentNode].N = WPM[currentNode].N * ratio;
-				TPM[currentNode].Accum = WPM[currentNode].Accum * ratio;
+				TPM[currentNode].N = WPM[currentNode].N;// *ratio;
+				TPM[currentNode].Accum = WPM[currentNode].Accum;// *ratio;
 
-				Radii[currentNode] *= sqrt(ratio);
+				//Radii[currentNode] *= sqrt(ratio);
 			}
 			else {
 				float nN = N + alpha * M;
