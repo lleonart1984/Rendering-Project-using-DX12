@@ -67,7 +67,7 @@ void RayTraversal(float3 beg, float3 end, float3 bMin, float3 bMax, out float3 t
 
 	total = 0;
 
-	float3 importance = 1;
+	float intSigmaT = 0;
 
 	float t = 1;
 	while (currentAlpha < t)
@@ -75,13 +75,19 @@ void RayTraversal(float3 beg, float3 end, float3 bMin, float3 bMax, out float3 t
 		// Decide next step
 		int3 selection = alpha.x <= min(alpha.y, alpha.z) ? int3(1, 0, 0) : int3(0, alpha.y <= alpha.z, alpha.y > alpha.z);
 		float nextAlpha = min(t, dot(selection, alpha));
-		float distance = (nextAlpha - currentAlpha) * alphaToDistance;
+		float stepdistance = (nextAlpha - currentAlpha) * alphaToDistance;
+		float distance = nextAlpha * alphaToDistance;
 
 		// Do something with the Voxel
 		int index = currentVoxel.x * Height * Slices + currentVoxel.y * Slices + currentVoxel.z;
-		float density = saturate(Data[index] * 100 * Absortion * distance);
-		total += density * importance;
-		importance *= (1 - density);
+		float density = Data[index] * 10;
+
+		float sigmaS = density * Absortion; // scattering
+		float sigmaT = density * Absortion;
+
+		total += exp(-intSigmaT) * (sigmaS) * stepdistance;
+
+		intSigmaT += stepdistance * sigmaT;
 
 		// Move to next voxel
 		alpha += selection * step;
