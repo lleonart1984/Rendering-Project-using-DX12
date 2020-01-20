@@ -35,6 +35,16 @@ struct IHasScene {
 	}
 };
 
+struct IHasVolume {
+	gObj<Volume> Volume;
+
+	float globalAbsortion = 0.2;
+
+	virtual void SetVolume(gObj<CA4G::Volume> volume) {
+		this->Volume = volume;
+	}
+};
+
 #define MAX_NUMBER_OF_TRIANGLES 10000
 
 struct IHasTriangleNumberParameter {

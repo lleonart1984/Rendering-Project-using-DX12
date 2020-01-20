@@ -10,6 +10,8 @@
 
 #define USE_SCENE SPONZA_OBJ
 
+#define USE_VOLUME 0
+
 #define MOVE_LIGHT false
 
 // Change this to force every frame camera dirty
@@ -57,13 +59,17 @@
 //gObj<BPP_PhotonMap5Technique> technique; // Technique with morton sorting of photons to estimate knn
 
 //----- Progressive Photon Mapping approaches
-gObj<PPMTechnique> technique;
+//gObj<PPMTechnique> technique;
 
 //gObj<OctreePhotonMapTechnique> technique;
 
-
 // Raytracing
 //gObj<DXRRaytracingTechnique> technique;
+
+
+// Volume Rendering
+gObj<BasicVolumeTechnique> technique;
+
 
 //#define TEST_WSAPIT
 //#define TEST_WSMRAPIT

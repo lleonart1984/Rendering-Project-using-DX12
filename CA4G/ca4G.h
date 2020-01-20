@@ -15558,6 +15558,28 @@ namespace CA4G {
 	private:
 		BaseLoader* loader = nullptr;
 	};
+
+	class Volume {
+	public:
+		Volume(const char* xyzFilePath) {
+			FILE* f;
+			if (fopen_s(&f, xyzFilePath, "r"))
+				return;
+
+			double vx, vy, vz;
+			fread_s(&width, 4, 4, 1, f);
+			fread_s(&height, 4, 4, 1, f);
+			fread_s(&slices, 4, 4, 1, f);
+			fread_s(&vx, 8, 8, 1, f);
+			fread_s(&vy, 8, 8, 1, f);
+			fread_s(&vz, 8, 8, 1, f);
+			data = new float[width * height * slices];
+			fread_s(data, width * height * slices * 4, 4, width * height * slices, f);
+			fclose(f);
+		}
+		int width, height, slices;
+		float* data;
+	};
 }
 
 #pragma endregion

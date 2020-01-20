@@ -70,6 +70,11 @@ void GuiFor(gObj<IHasLight> t) {
 	}
 }
 
+void GuiFor(gObj<IHasVolume> t) {
+	ImGui::SliderFloat("Absortion", &t->globalAbsortion, 0, 1);
+}
+
+
 LPSTR desktop_directory()
 {
 	static char path[MAX_PATH + 1];
@@ -149,8 +154,11 @@ int main(int, char**)
 	gObj<IHasScene> asSceneRenderer = technique.Dynamic_Cast<IHasScene>();
 	gObj<IHasCamera> asCameraRenderer = technique.Dynamic_Cast<IHasCamera>();
 	gObj<IHasLight> asLightRenderer = technique.Dynamic_Cast<IHasLight>();
+	gObj<IHasVolume> asVolumeRenderer = technique.Dynamic_Cast<IHasVolume>();
+
 
 	static Scene* scene = nullptr;
+	static Volume* volume = nullptr;
 	static Camera* camera = new Camera { float3(1,1.5f,2.0f), float3(0,0,0), float3(0,1,0), PI / 4, 0.001f, 1000.0f };
 	static LightSource *lightSource = new LightSource{ float3(0,1,0), float3(0,0,0), 0, float3(10, 10, 10) };
 
@@ -228,6 +236,20 @@ int main(int, char**)
 		asSceneRenderer->Scene = scene;
 	}
 
+	if (asVolumeRenderer) {
+		char* volumePath;
+		switch (USE_VOLUME) {
+		case 0:
+			volumePath = desktop_directory();
+			//strcat(volumePath, "\\clouds\\cloud-190.xyz");
+			strcat(volumePath, "\\clouds\\cloud-1196.xyz");
+			volume = new Volume(volumePath);
+			break;
+		}
+
+		asVolumeRenderer->SetVolume(volume);
+	}
+
 	if (asCameraRenderer) {
 		asCameraRenderer->Camera = camera;
 	}
@@ -297,6 +319,7 @@ int main(int, char**)
 			RenderGUI<IHasParalellism>(technique);
 			RenderGUI<IHasLight>(technique);
 			RenderGUI<IHasRaymarchDebugInfo>(technique);
+			RenderGUI<IHasVolume>(technique);
             
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();
@@ -333,25 +356,25 @@ int main(int, char**)
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveForward(deltaTime);
+					camera->MoveForward(deltaTime*10);
 					cameraChanged = true;
 				}
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveBackward(deltaTime);
+					camera->MoveBackward(deltaTime * 10);
 					cameraChanged = true;
 				}
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_LeftArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveLeft(deltaTime);
+					camera->MoveLeft(deltaTime * 10);
 					cameraChanged = true;
 				}
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_RightArrow)))
 				{
 					movingCamera = -1;
-					camera->MoveRight(deltaTime);
+					camera->MoveRight(deltaTime * 10);
 					cameraChanged = true;
 				}
 
@@ -372,7 +395,8 @@ int main(int, char**)
 
 		firstFrame = false;
 
-		asLightRenderer->LightSourceIsDirty = false;
+		if (asLightRenderer)
+			asLightRenderer->LightSourceIsDirty = false;
     }
 
 	presenter->Close();

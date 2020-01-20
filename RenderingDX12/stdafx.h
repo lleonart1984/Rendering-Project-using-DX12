@@ -7,6 +7,7 @@ using namespace CA4G;
 
 #include "Techniques/Common/ConstantBuffers.h"
 #include "Techniques/Common/RetainedSceneLoader.h"
+#include "Techniques/VolumeRendering/VolumeLoader.h"
 #include "Techniques/Sample/Sample.h"
 #include "Techniques/RetainedBasic/RetainedBasicRenderer.h"
 #include "Techniques/Tutorials/Tutorial1.h"
@@ -47,5 +48,7 @@ using namespace CA4G;
 #include "Techniques/Raymarching/RaymarchRT/RaymarchRT.h"
 #include "Techniques/Raymarching/WSAPIT/WorldSpaceAPIT.h"
 #include "Techniques/Raymarching/WS_MRAPIT/WorldSpaceMRAPIT.h"
+
+#include "Techniques/VolumeRendering/BasicVolumeTechnique.h"
 
 #include "main.h"

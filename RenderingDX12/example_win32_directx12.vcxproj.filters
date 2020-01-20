@@ -70,6 +70,7 @@
     <FxCompile Include="Techniques\PhotonMaps\BuildOctree_CS.hlsl" />
     <FxCompile Include="Techniques\PhotonMaps\GatherOctree_RT.hlsl" />
     <FxCompile Include="Techniques\Pathtracing\Filter_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\BasicRayMarch_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -159,6 +160,8 @@
     <ClInclude Include="Techniques\Raymarching\RaymarchRT\Shaders\RayQueue.hlsl.h" />
     <ClInclude Include="Techniques\PhotonMaps\PPMTechnique.h" />
     <ClInclude Include="Techniques\PhotonMaps\OctreePhotonMapTechnique.h" />
+    <ClInclude Include="Techniques\VolumeRendering\VolumeLoader.h" />
+    <ClInclude Include="Techniques\VolumeRendering\BasicVolumeTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
