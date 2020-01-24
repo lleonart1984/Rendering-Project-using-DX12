@@ -9,9 +9,10 @@ class BasicVolumeTechnique : public VolumeLoader, public IHasCamera
 	struct BasicRayMarch : public ComputePipelineBindings {
 		void Setup() {
 			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\BasicRayMarch_CS.cso"));
+			//_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\SingleScattering_CS.cso"));
 		}
 
-		gObj<Buffer> VolumeData;
+		gObj<Texture3D> VolumeData;
 		gObj<Texture2D> Output;
 		gObj<Buffer> Camera;
 		gObj<Buffer> VolumeInfo;
@@ -20,6 +21,8 @@ class BasicVolumeTechnique : public VolumeLoader, public IHasCamera
 			UAV(0, Output, ShaderType_Any);
 
 			SRV(0, VolumeData, ShaderType_Any);
+
+			Static_SMP(0, Sampler::LinearWithoutMipMaps(), ShaderType_Any);
 
 			CBV(0, Camera, ShaderType_Any);
 			CBV(1, VolumeInfo, ShaderType_Any);
@@ -55,12 +58,13 @@ protected:
 			VolumeWidth,
 			VolumeHeight,
 			VolumeSlices,
+			densityScale,
 			globalAbsortion 
 			});
 
 		compute gSet Pipeline(basicViewing);
 
-		compute gDispatch Threads((int)ceil(render_target->Width / CS_2D_GROUPSIZE), (int)ceil(render_target->Height / CS_2D_GROUPSIZE));
+		compute gDispatch Threads((int)ceil(render_target->Width / (float)CS_2D_GROUPSIZE), (int)ceil(render_target->Height / (float)CS_2D_GROUPSIZE));
 
 		compute gCopy All(render_target, basicViewing->Output);
 	}

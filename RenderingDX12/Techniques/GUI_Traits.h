@@ -38,7 +38,8 @@ struct IHasScene {
 struct IHasVolume {
 	gObj<Volume> Volume;
 
-	float globalAbsortion = 0.2;
+	float densityScale = 50;
+	float globalAbsortion = 0.1;
 
 	virtual void SetVolume(gObj<CA4G::Volume> volume) {
 		this->Volume = volume;

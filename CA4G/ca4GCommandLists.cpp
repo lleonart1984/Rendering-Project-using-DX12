@@ -20,7 +20,7 @@ namespace CA4G {
 				// Buffer from upload to any resource on the gpu
 				auto device = getInternalDevice();
 
-				int numberOfSubresources = dst->desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1 :
+				int numberOfSubresources = dst->desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? dst->desc.MipLevels :
 					dst->desc.MipLevels * dst->desc.DepthOrArraySize;
 
 				D3D12_PLACED_SUBRESOURCE_FOOTPRINT* Layouts = new D3D12_PLACED_SUBRESOURCE_FOOTPRINT[numberOfSubresources];

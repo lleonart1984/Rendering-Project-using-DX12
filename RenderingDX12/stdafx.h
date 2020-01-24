@@ -50,5 +50,7 @@ using namespace CA4G;
 #include "Techniques/Raymarching/WS_MRAPIT/WorldSpaceMRAPIT.h"
 
 #include "Techniques/VolumeRendering/BasicVolumeTechnique.h"
+#include "Techniques/VolumeRendering/SingleScatteringVolumeTechnique.h"
+#include "Techniques/VolumeRendering/VolumePathtracingTechnique.h"
 
 #include "main.h"

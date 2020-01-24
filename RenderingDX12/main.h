@@ -68,7 +68,9 @@
 
 
 // Volume Rendering
-gObj<BasicVolumeTechnique> technique;
+//gObj<BasicVolumeTechnique> technique;
+//gObj<SingleScatteringVolumeTechnique> technique;
+gObj<VolumePathtracingTechnique> technique;
 
 
 //#define TEST_WSAPIT

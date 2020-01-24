@@ -10394,7 +10394,14 @@ namespace CA4G {
 	inline UINT64 GetRequiredIntermediateSize(DX_Device device, const D3D12_RESOURCE_DESC &desc)
 	{
 		UINT64 RequiredSize = 0;
-		device->GetCopyableFootprints(&desc, 0, desc.DepthOrArraySize*desc.MipLevels, 0, nullptr, nullptr, nullptr, &RequiredSize);
+		switch (desc.Dimension) {
+		case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+			device->GetCopyableFootprints(&desc, 0, desc.MipLevels, 0, nullptr, nullptr, nullptr, &RequiredSize);
+			break;
+		default:
+			device->GetCopyableFootprints(&desc, 0, desc.DepthOrArraySize * desc.MipLevels, 0, nullptr, nullptr, nullptr, &RequiredSize);
+			break;
+		}
 		return RequiredSize;
 	}
 
@@ -10930,8 +10937,8 @@ namespace CA4G {
 		{
 		}
 
-		Texture2D(gObj<DeviceManager> manager) : ResourceView(manager), Width(1), Height(1) {
-		}
+		/*Texture2D(gObj<DeviceManager> manager) : ResourceView(manager), Width(1), Height(1) {
+		}*/
 	public:
 		// Width of this Texture2D
 		int const Width;
@@ -10955,6 +10962,77 @@ namespace CA4G {
 		}
 		gObj<Texture2D> CreateMipSlice(int slice) {
 			return CreateSlice(arraySliceStart, arraySliceCount, slice, 1);
+		}
+	};
+
+	// Represents a 3D view of a resource. This view includes mipmaps.
+	class Texture3D : public ResourceView {
+		friend Creating;
+		friend Presenter;
+		friend ResourceView;
+		friend CommandListManager;
+
+	protected:
+		// Inherited via Resource
+		void CreateUAVDesc(D3D12_UNORDERED_ACCESS_VIEW_DESC& d)
+		{
+			d.Texture3D.WSize = arraySliceCount;
+			d.Texture3D.FirstWSlice = arraySliceStart;
+			d.Texture3D.MipSlice = mipSliceStart;
+			d.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+			d.Format = !resource ? DXGI_FORMAT_UNKNOWN : resource->desc.Format;
+		}
+
+		void CreateSRVDesc(D3D12_SHADER_RESOURCE_VIEW_DESC& d)
+		{
+			d.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			d.Texture3D.MipLevels = mipSliceCount;
+			d.Texture3D.MostDetailedMip = mipSliceStart;
+			d.Texture3D.ResourceMinLODClamp = 0;
+			d.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+			d.Format = !resource ? DXGI_FORMAT_R8G8B8A8_UNORM : resource->desc.Format;
+		}
+
+		void CreateCBVDesc(D3D12_CONSTANT_BUFFER_VIEW_DESC& d)
+		{
+			throw "Not supported convert a texture 3D into a constant buffer";
+		}
+
+		void CreateRTVDesc(D3D12_RENDER_TARGET_VIEW_DESC& d)
+		{
+			throw "Not supported a 3D volume as render target";
+		}
+
+		void CreateDSVDesc(D3D12_DEPTH_STENCIL_VIEW_DESC& d)
+		{
+			throw "Not supported a 3D volume as depth stencil";
+		}
+
+		Texture3D(gObj<ResourceWrapper> resource, int mipStart = 0, int mipsCount = INT_MAX)
+			: ResourceView(resource, 0, resource->desc.DepthOrArraySize >> mipStart, mipStart, mipsCount)
+			, Width(max(1, resource->desc.Width >> mipStart)), Height(max(1, resource->desc.Height >> mipStart))
+		{
+		}
+	public:
+		// Width of this Texture3D
+		int const Width;
+		// Height of this Texture3D
+		int const Height;
+
+		inline int getMipsCount() {
+			return mipSliceCount;
+		}
+		inline int getSlicesCount() {
+			return arraySliceCount;
+		}
+		gObj<Texture3D> CreateSlice(int mipStart = 0, int mipCount = INT_MAX) {
+			return new Texture3D(this->resource, this->mipSliceStart + mipStart, mipCount);
+		}
+		gObj<Texture3D> CreateSubresource(int mipStart = 0) {
+			return CreateSlice(mipStart, 1);
+		}
+		gObj<Texture3D> CreateMipSlice(int slice) {
+			return CreateSlice(slice, 1);
 		}
 	};
 
@@ -11826,6 +11904,29 @@ namespace CA4G {
 		}
 
 		// Binds a shader resource view
+		void SRV(int slot, gObj<Texture3D>& resource, ShaderType type, int space = 0) {
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			p.DescriptorTable.NumDescriptorRanges = 1;
+			p.ShaderVisibility = (D3D12_SHADER_VISIBILITY)type;
+			D3D12_DESCRIPTOR_RANGE range = { };
+			range.BaseShaderRegister = slot;
+			range.NumDescriptors = 1;
+			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+			range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+			range.RegisterSpace = space;
+
+			ranges.add(range);
+			p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+			SlotBinding b{  };
+			b.Root_Parameter = p;
+			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+			b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+			__CurrentLoadingCSU->add(b);
+		}
+
+		// Binds a shader resource view
 		void SRV_Array(int startSlot, gObj<Texture2D>*& resources, int &count, ShaderType type, int space = 0) {
 			D3D12_ROOT_PARAMETER p = { };
 			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -11917,6 +12018,30 @@ namespace CA4G {
 			SlotBinding b{  };
 			b.Root_Parameter = p;
 			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+			__CurrentLoadingCSU->add(b);
+		}
+
+		// Binds an unordered access view
+		void UAV(int slot, gObj<Texture3D>& resource, ShaderType type, int space = 0) {
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			p.DescriptorTable.NumDescriptorRanges = 1;
+			p.ShaderVisibility = (D3D12_SHADER_VISIBILITY)type;
+
+			D3D12_DESCRIPTOR_RANGE range = { };
+			range.BaseShaderRegister = slot;
+			range.NumDescriptors = 1;
+			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+			range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+			range.RegisterSpace = space;
+
+			ranges.add(range);
+			p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+			SlotBinding b{  };
+			b.Root_Parameter = p;
+			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
 			b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
 			__CurrentLoadingCSU->add(b);
 		}
@@ -13379,7 +13504,8 @@ namespace CA4G {
 
 			DX_Resource resource;
 			auto hr = manager->device->CreateCommittedResource(
-				cpuAccess == CPU_ACCESS_NONE ? &defaultProp : cpuAccess == CPU_WRITE_GPU_READ ? &uploadProp : &downloadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, state, clearDefault,
+				cpuAccess == CPU_ACCESS_NONE ? &defaultProp : cpuAccess == CPU_WRITE_GPU_READ ? &uploadProp : &downloadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, state, 
+				finalDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ? clearDefault : nullptr,
 				IID_PPV_ARGS(&resource));
 			if (FAILED(hr))
 			{
@@ -13468,8 +13594,52 @@ namespace CA4G {
 			d.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 			d.Format = Formats<T>::Value;
 			D3D12_CLEAR_VALUE clearing = { };
+
 			clearing.Format = d.Format;
 			return new Texture2D(CreateResourceAndWrap(d, state, CPU_ACCESS_NONE, &clearing));
+		}
+
+		// Creates a drawable 3D texture of specific element type.
+		// Use int, float, unsigned int, float[2,3,4], int[2,3,4]
+		template <class T>
+		gObj<Texture3D> DrawableTexture3D(int width, int height, int slices, int mips = 1, D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON) {
+			D3D12_RESOURCE_DESC d;
+			ZeroMemory(&d, sizeof(D3D12_RESOURCE_DESC));
+			d.Width = width;
+			d.Height = height;
+			d.DepthOrArraySize = slices;
+			d.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+			d.MipLevels = min(mips, MaxMipsFor(min(width, height)));
+			d.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+			d.SampleDesc.Count = 1;
+			d.SampleDesc.Quality = 0;
+			d.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+			d.Format = Formats<T>::Value;
+			D3D12_CLEAR_VALUE clearing = { };
+			clearing.Format = d.Format;
+			return new Texture3D(CreateResourceAndWrap(d, state, CPU_ACCESS_NONE, &clearing));
+		}
+
+		// Creates a readonly 3D texture of specific element type.
+		// Use int, float, unsigned int, float[2,3,4], int[2,3,4]
+		template <class T>
+		gObj<Texture3D> ReadonlyTexture3D(int width, int height, int slices, int mips = 1, D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON) {
+			D3D12_RESOURCE_DESC d = {};
+			ZeroMemory(&d, sizeof(D3D12_RESOURCE_DESC));
+			d.Alignment = 0;// 64 * 1024;
+			d.Width = width;
+			d.Height = height;
+			d.DepthOrArraySize = slices;
+			d.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+			d.MipLevels = min(mips, MaxMipsFor(min(min(width, height), slices)));
+			d.Flags = D3D12_RESOURCE_FLAG_NONE;
+			d.SampleDesc.Count = 1;
+			d.SampleDesc.Quality = 0;
+			d.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+			d.Format = Formats<T>::Value;
+			D3D12_CLEAR_VALUE clearing = { };
+			clearing.Format = d.Format;
+			return new Texture3D(CreateResourceAndWrap(d, state, CPU_ACCESS_NONE, &clearing));
 		}
 
 		// Creates a 2D texture for depth buffer purpose (32-bit float format).
@@ -13755,7 +13925,7 @@ namespace CA4G {
 			// Data is given by a reference using a pointer
 			template<typename T>
 			void GenericCopy(gObj<ResourceView> dst, T* data, const D3D12_BOX *box = nullptr) {
-				if (dst->arraySliceCount > 1 || dst->mipSliceCount > 1)
+				if (dst->mipSliceCount > 1)
 					throw CA4GException::FromError(CA4G_Errors_Invalid_Operation, "Can not update a region of a resource of multiple subresources");
 
 				int subresource = dst->mipSliceStart + dst->resource->desc.DepthOrArraySize * dst->arraySliceStart;
@@ -15506,7 +15676,6 @@ namespace CA4G {
 		float3 Intensity;
 	};
 
-
 #pragma endregion
 
 	class Scene {
@@ -15574,8 +15743,20 @@ namespace CA4G {
 			fread_s(&vy, 8, 8, 1, f);
 			fread_s(&vz, 8, 8, 1, f);
 			data = new float[width * height * slices];
-			fread_s(data, width * height * slices * 4, 4, width * height * slices, f);
+			float* xorderData = new float[width * height * slices];
+			fread_s(xorderData, width * height * slices * 4, 4, width * height * slices, f);
 			fclose(f);
+
+			int p = 0;
+			for (int z = 0; z < slices; z++)
+				for (int y = 0; y < height; y++)
+					for (int x = 0; x < width; x++)
+					{
+						float d = xorderData[x * height * slices + y * slices + z];
+						data[p++] = max(0, d);
+					}
+
+			delete xorderData;
 		}
 		int width, height, slices;
 		float* data;

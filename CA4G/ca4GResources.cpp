@@ -16,7 +16,7 @@ namespace CA4G {
 			else
 				cpu_access = CPU_READ_GPU_WRITE;
 
-		subresources = desc.MipLevels * desc.DepthOrArraySize;
+		subresources = description.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? desc.MipLevels : desc.MipLevels * desc.DepthOrArraySize;
 
 		pLayouts = new D3D12_PLACED_SUBRESOURCE_FOOTPRINT[subresources];
 		pNumRows = new unsigned int[subresources];

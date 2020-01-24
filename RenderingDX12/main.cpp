@@ -68,9 +68,19 @@ void GuiFor(gObj<IHasLight> t) {
 		t->Light->Position.y = lightY;
 		t->LightSourceIsDirty = true;
 	}
+
+	float alpha = atan2f(t->Light->Direction.z, t->Light->Direction.x);
+	float beta = asinf(t->Light->Direction.y);
+	bool changeDirection = ImGui::SliderFloat("Light Direction Alpha", &alpha, 0, 3.141596 * 2);
+	changeDirection |= ImGui::SliderFloat("Light Direction Beta", &beta, -3.141596 / 2, 3.141596 / 2);
+	if (changeDirection) {
+		t->Light->Direction = float3(cos(alpha) * cos(beta), sin(beta), sin(alpha) * cos(beta));
+		t->LightSourceIsDirty = true;
+	}
 }
 
 void GuiFor(gObj<IHasVolume> t) {
+	ImGui::SliderFloat("Density", &t->densityScale, 0, 100);
 	ImGui::SliderFloat("Absortion", &t->globalAbsortion, 0, 1);
 }
 
@@ -160,7 +170,7 @@ int main(int, char**)
 	static Scene* scene = nullptr;
 	static Volume* volume = nullptr;
 	static Camera* camera = new Camera { float3(1,1.5f,2.0f), float3(0,0,0), float3(0,1,0), PI / 4, 0.001f, 1000.0f };
-	static LightSource *lightSource = new LightSource{ float3(0,1,0), float3(0,0,0), 0, float3(10, 10, 10) };
+	static LightSource *lightSource = new LightSource{ float3(0,1,0), float3(0,-1,0), 0, float3(10, 10, 10) };
 
 	if (asSceneRenderer)
 	{
@@ -241,9 +251,17 @@ int main(int, char**)
 		switch (USE_VOLUME) {
 		case 0:
 			volumePath = desktop_directory();
+			strcat(volumePath, "\\clouds\\cloud-1191.xyz");
+			//strcat(volumePath, "\\clouds\\cloud-1940.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-190.xyz");
-			strcat(volumePath, "\\clouds\\cloud-1196.xyz");
+			//strcat(volumePath, "\\clouds\\cloud-1196.xyz");
 			volume = new Volume(volumePath);
+			lightSource->Position = float3(0.4, 0.5, 0.3);
+			lightSource->Direction = normalize(-1*float3(1, 1, 1));
+			lightSource->Intensity = float3(12);
+			camera->Position = float3(0, -1, 1);
+			camera->Target = float3(0, 0, 0);
+
 			break;
 		}
 

@@ -5,27 +5,21 @@ cbuffer Camera : register(b0) {
 };
 
 cbuffer Volume : register(b1) {
-	int Width;
-	int Height;
-	int Slices;
+	int3 Dimensions;
+	float Density;
 	float Absortion;
 }
 
-StructuredBuffer<float> Data : register(t0);
+Texture3D<float> Data : register(t0);
+
+sampler VolumeSampler : register(s0);
 
 RWTexture2D<float3> Output : register(u0);
 
 void GetVolumeBox(out float3 minim, out float3 maxim) {
-	int3 sizes = int3(Width, Height, Slices);
-	float maxC = max(Width, max(Height, Slices));
-	minim = -sizes * 0.5 / maxC;
+	float maxC = max(Dimensions.x, max(Dimensions.y, Dimensions.z));
+	minim = -Dimensions * 0.5 / maxC;
 	maxim = -minim;
-}
-
-bool FromPositionToVolume(float3 P, float3 minCoord, float3 maxCoord, out int3 cell) {
-	int3 sizes = int3(Width, Height, Slices);
-	cell = (P - minCoord) * sizes / (maxCoord - minCoord);
-	return all(cell >= 0) && all(cell < sizes);
 }
 
 bool BoxIntersect(float3 bMin, float3 bMax, float3 P, float3 D, inout float tMin, inout float tMax)
@@ -43,12 +37,14 @@ bool BoxIntersect(float3 bMin, float3 bMax, float3 P, float3 D, inout float tMin
 	return true;
 }
 
+float SampleVolume(float3 cell) {
+	return Data.SampleGrad(VolumeSampler, cell / Dimensions, 0, 0);
+}
+
 void RayTraversal(float3 beg, float3 end, float3 bMin, float3 bMax, out float3 total)
 {
-	int3 sizes = int3(Width, Height, Slices);
-	
-	float3 P = (beg - bMin) * sizes / (bMax - bMin);
-	float3 H = (end - bMin) * sizes / (bMax - bMin);
+	float3 P = (beg - bMin) * Dimensions / (bMax - bMin);
+	float3 H = (end - bMin) * Dimensions / (bMax - bMin);
 
 	float3 D = H - P;
 
@@ -79,21 +75,62 @@ void RayTraversal(float3 beg, float3 end, float3 bMin, float3 bMax, out float3 t
 		float distance = nextAlpha * alphaToDistance;
 
 		// Do something with the Voxel
-		int index = currentVoxel.x * Height * Slices + currentVoxel.y * Slices + currentVoxel.z;
-		float density = Data[index] * 10;
+		float density = SampleVolume(lerp(P, H, lerp(currentAlpha, nextAlpha, 0.5))) * 10;
 
 		float sigmaS = density * Absortion; // scattering
 		float sigmaT = density * Absortion;
 
+		intSigmaT += stepdistance * sigmaT;
 		total += exp(-intSigmaT) * (sigmaS) * stepdistance;
 
-		intSigmaT += stepdistance * sigmaT;
 
 		// Move to next voxel
 		alpha += selection * step;
 		currentVoxel += selection * voxelInc;
 		currentAlpha = nextAlpha;
 	}
+}
+
+void RayTraversal2(float3 beg, float3 end, float3 bMin, float3 bMax, out float3 total)
+{
+	float3 P = (beg - bMin) * Dimensions / (bMax - bMin);
+	float3 H = (end - bMin) * Dimensions / (bMax - bMin);
+
+	float3 D = H - P;
+
+	float step = 0.5 / max(Dimensions.x, max(Dimensions.y, Dimensions.z)); // half of a voxel size
+
+	float currentAlpha = 0;
+	float alphaToDistance = length(end - beg);
+
+	float alphaStep = step / alphaToDistance;
+
+	total = 0;
+
+	float intSigmaT = 0;
+
+	float t = 1;
+	while (currentAlpha < t)
+	{
+		float nextAlpha = currentAlpha + alphaStep;
+		float stepdistance = alphaStep * alphaToDistance;
+		float distance = nextAlpha * alphaToDistance;
+
+		// Do something with the Voxel
+		float density = SampleVolume(lerp(P, H, currentAlpha)) * Density;
+
+		float sigmaA = density * Absortion;
+		float sigmaS = density * (1 - Absortion); // scattering
+		float sigmaT = sigmaA + sigmaS;
+
+		intSigmaT += stepdistance * sigmaT;
+		total += exp(-intSigmaT) * (sigmaS)*stepdistance;
+
+		// Move to next step
+		currentAlpha = nextAlpha;
+	}
+
+	total += exp(-intSigmaT) * float3(0.5, 0.6, 1);
 }
 
 [numthreads(CS_2D_GROUPSIZE, CS_2D_GROUPSIZE, 1)]
@@ -117,64 +154,14 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	float3 bMin, bMax;
 	GetVolumeBox(bMin, bMax);
 
-	float total = 0;
+	float3 total = 0;
 	float importance = 1;
 	int Samples = 1000;
 	float tMin = 0;
 	float tMax = 1000;
 	if (BoxIntersect(bMin, bMax, O, D, tMin, tMax)) {
-		RayTraversal(O + D * tMin, O + D * tMax, bMin, bMax, total);
+		RayTraversal2(O + D * tMin, O + D * tMax, bMin, bMax, total);
 	}
 	Output[DTid.xy] = total;
 }
 
-/*
-
-[numthreads(CS_2D_GROUPSIZE, CS_2D_GROUPSIZE, 1)]
-void main( uint3 DTid : SV_DispatchThreadID )
-{
-	uint2 dim;
-	Output.GetDimensions(dim.x, dim.y);
-
-	float4 ndcP = float4(2 * (DTid.xy + 0.5) / dim - 1, 0, 1);
-	ndcP.y *= -1;
-	float4 ndcT = ndcP + float4(0, 0, 1, 0);
-
-	float4 viewP = mul(ndcP, FromProjectionToWorld);
-	viewP.xyz /= viewP.w;
-	float4 viewT = mul(ndcT, FromProjectionToWorld);
-	viewT.xyz /= viewT.w;
-
-	float3 O = viewP.xyz;
-	float3 D = normalize(viewT - viewP);
-
-	float3 bMin, bMax;
-	GetVolumeBox(bMin, bMax);
-
-	float total = 0;
-	float importance = 1;
-	int Samples = 1000;
-	float tMin = 0;
-	float tMax = 1000;
-	BoxIntersect(bMin, bMax, O, D, tMin, tMax);
-
-	for (int i = 0; i < Samples; i++)
-	{
-		float alpha = tMin + (tMax - tMin) * i / Samples;
-		float3 P = O + D * alpha;
-
-		int3 cell;
-		if (FromPositionToVolume(P, bMin, bMax, cell))
-		{
-			int index = cell.x * Height * Slices + cell.y * Slices + cell.z;
-
-			float density = saturate(Data[index] * Absortion);
-
-			total += density * importance;
-			importance *= (1 - density);
-		}
-	}
-	Output[DTid.xy] = total;
-}
-
-*/

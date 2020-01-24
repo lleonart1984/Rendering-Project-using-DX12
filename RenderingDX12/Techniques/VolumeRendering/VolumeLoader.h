@@ -6,7 +6,7 @@
 class VolumeLoader : public Technique, public IHasVolume {
 public:
 	int VolumeWidth, VolumeHeight, VolumeSlices;
-	gObj<Buffer> VolumeData;
+	gObj<Texture3D> VolumeData;
 
 protected:
 	void Startup() {
@@ -20,7 +20,7 @@ protected:
 		VolumeSlices = this->Volume->slices;
 
 		// load full vertex buffer of all scene geometries
-		VolumeData = _ gCreate StructuredBuffer<float>(VolumeWidth * VolumeHeight * VolumeSlices);
+		VolumeData = _ gCreate ReadonlyTexture3D<float>(VolumeWidth, VolumeHeight, VolumeSlices);
 		VolumeData->SetDebugName(L"Volume Data Buffer");
 		manager gCopy PtrData(VolumeData, Volume->data);
 	}
@@ -30,5 +30,6 @@ struct VolumeInfo {
 	int Width;
 	int Height;
 	int Slices;
+	float Density;
 	float Absortion;
 };
