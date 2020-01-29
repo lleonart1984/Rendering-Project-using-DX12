@@ -4,6 +4,7 @@
 using namespace CA4G;
 
 #include "Techniques/GUI_Traits.h"
+#include "Techniques/Common/ScreenShotTechnique.h"
 
 #include "Techniques/Common/ConstantBuffers.h"
 #include "Techniques/Common/RetainedSceneLoader.h"
@@ -52,5 +53,6 @@ using namespace CA4G;
 #include "Techniques/VolumeRendering/BasicVolumeTechnique.h"
 #include "Techniques/VolumeRendering/SingleScatteringVolumeTechnique.h"
 #include "Techniques/VolumeRendering/VolumePathtracingTechnique.h"
+#include "Techniques/VolumeRendering/PureVPathtracingTechnique.h"
 
 #include "main.h"

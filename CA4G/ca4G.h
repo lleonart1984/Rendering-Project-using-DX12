@@ -8633,6 +8633,8 @@ namespace CA4G {
 
 		static gObj<TextureData> LoadFromFile(const char * filename);
 
+		static void SaveToFile(gObj<TextureData> data, const char* filename);
+
 	private:
 		int pixelStride;
 
@@ -10463,6 +10465,8 @@ namespace CA4G {
 
 		// Prepares this resource wrapper to have an uploading version
 		void CreateForUploading();
+		// Prepares this resource wrapper to have a downloading version
+		void CreateForDownloading();
 
 		//---Copied from d3d12x.hs----------------------------------------------------------------------------
 		// Row-by-row memcpy
@@ -10491,6 +10495,7 @@ namespace CA4G {
 		// Uploads a full data mapped of this resource.
 		// All data (for all subresources if any) appears sequentially in ptr buffer.
 		void UploadFullData(byte* data, long long dataSize, bool flipRows = false);
+		void DownloadFullData(byte* data, long long dataSize, bool flipRows = false);
 
 		// Uploads the data of a region of a single subresource.
 		template<typename T>
@@ -13771,6 +13776,7 @@ namespace CA4G {
 		friend Presenter;
 		friend Creating;
 		friend Copying;
+		friend Loading;
 		friend GPUScheduler;
 		friend TriangleGeometryCollection;
 		friend ProceduralGeometryCollection;
@@ -13988,6 +13994,14 @@ namespace CA4G {
 			// Supported formats, dds, any wic image and tga.
 			void FromFile(gObj<Texture2D> &texture, const char* filePath) {
 				FromData(texture, TextureData::LoadFromFile(filePath));
+			}
+
+			void ToData(gObj<Texture2D> texture, gObj<TextureData>& data);
+
+			void ToFile(gObj<Texture2D> texture, const char* filePath) {
+				gObj<TextureData> data;
+				ToData(texture, data);
+				TextureData::SaveToFile(data, filePath);
 			}
 
 		}*const loading;
@@ -15748,13 +15762,18 @@ namespace CA4G {
 			fclose(f);
 
 			int p = 0;
+			float maxValue = 0;
 			for (int z = 0; z < slices; z++)
 				for (int y = 0; y < height; y++)
 					for (int x = 0; x < width; x++)
 					{
 						float d = xorderData[x * height * slices + y * slices + z];
 						data[p++] = max(0, d);
+						maxValue = max(maxValue, d);
 					}
+
+			for (int i = 0; i < p; i++)
+				data[i] /= maxValue; // normalize densities 0..1
 
 			delete xorderData;
 		}

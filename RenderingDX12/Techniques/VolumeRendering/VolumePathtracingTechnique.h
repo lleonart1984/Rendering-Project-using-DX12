@@ -101,32 +101,41 @@ protected:
 
 		if (LightSourceIsDirty)
 		{
-			float3 lightDirection = normalize(Light->Direction);
+			float3 lightDirection = -1*normalize(Light->Direction);
 			float3 corner = float3(VolumeWidth, VolumeHeight, VolumeSlices) / max(VolumeWidth, max(VolumeHeight, VolumeSlices));
 			float size = length(corner);
 			float3 accY = normalize(cross(
 				dot(corner, lightDirection) < size ? corner : float3(corner.y, corner.z, corner.x),
 				lightDirection)) * size;
 			float3 accZ = lightDirection * size;
-			float3 accX = normalize(cross(accY, accZ)) * size;
+			float3 accX = normalize(cross(accZ, accY)) * size;
+
+			float4x4 centering = float4x4(
+				2, 0, 0, 0,
+				0, 2, 0, 0,
+				0, 0, 2, 0,
+				-1, -1, -1, 1
+			);
+			float4x4 volumeScaling = float4x4(
+				corner.x, 0, 0, 0,
+				0, corner.y, 0, 0,
+				0, 0, corner.z, 0,
+				0, 0, 0, 1
+			);
 
 			// from accumulation to volume
-			float4x4 transform = float4x4(
+			float4x4 lightRotation = float4x4(
 				accX.x, accX.y, accX.z, 0,
 				accY.x, accY.y, accY.z, 0,
 				accZ.x, accZ.y, accZ.z, 0,
 				0, 0, 0, 1
 			);
-			transform = mul(
-				mul(
-					float4x4(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, -1, -1, -1, 1),
-					transform),
-				float4x4(corner.x, 0, 0, 0, 0, corner.y, 0, 0, 0, 0, corner.z, 0, 0.5, 0.5, 0.5, 1));
+			float4x4 fromVolToLight = mul(centering, mul(volumeScaling, mul(lightRotation.getInverse(), centering.getInverse())));
 
-			compute gCopy ValueData(accumulation->Transforms, transform);
+			compute gCopy ValueData(accumulation->Transforms, fromVolToLight.getInverse());
 			compute gSet Pipeline(accumulation);
 			compute gDispatch Threads(accSize / CS_2D_GROUPSIZE, accSize / CS_2D_GROUPSIZE);
-			compute gCopy ValueData(raymarch->Transforms, transform.getInverse());
+			compute gCopy ValueData(raymarch->Transforms, fromVolToLight);
 		}
 #pragma endregion
 

@@ -11,22 +11,17 @@ cbuffer Volume : register(b1) {
 	float Absortion;
 }
 
-cbuffer Transforms : register(b2) {
-	row_major matrix FromVolToAcc;
-}
-
-cbuffer Lighting : register(b3) {
+cbuffer Lighting : register(b2) {
 	float3 LightPosition;
 	float3 LightIntensity;
 	float3 LightDirection;
 }
 
-cbuffer PathtracingInfo : register(b4) {
+cbuffer PathtracingInfo : register(b3) {
 	int PassCount;
 };
 
 Texture3D<float> Data : register(t0);
-Texture3D<float> Light : register(t1);
 
 sampler VolumeSampler : register(s0);
 
@@ -61,48 +56,155 @@ bool BoxIntersect(float3 bMin, float3 bMax, float3 P, float3 D, inout float tMin
 	return true;
 }
 
-void ComputeIntegrals(float stepscale, float3 beg, float3 end, float sampleT, float3 bMin, float3 bMax, out float T1, out float T2, out float3 total)
+//float GetTransmitancePower (float stepscale, float3 beg, float3 end, float sampleT, float3 bMin, float3 bMax)
+
+float2 GetTransmitancePower(float stepscale, float3 beg, float3 end, float sampleT, float3 bMin, float3 bMax)
 {
 	float3 D = end - beg;
 	float totalDistance = length(D);
-	total = 0;
-	T1 = 0;
-	T2 = 0;
-
-	if (totalDistance < 0.001)
-		return;
+	float2 total = 0;
 
 	D /= totalDistance;
 
-	float3 L = normalize(LightDirection);
-
 	float step = stepscale / max(Dimensions.x, max(Dimensions.y, Dimensions.z)); // half of a voxel size
 
-	float t = 0.5 * step;
+	float t = 0;
 	while (t < totalDistance)
 	{
-		float3 samplePosition = (beg + D * t - bMin) / (bMax - bMin);
+		float3 samplePosition = saturate((beg + D * t - bMin) / (bMax - bMin));
 
 		// Do something with the Voxel
 		float density = Data.SampleGrad(VolumeSampler, samplePosition, 0, 0) * Density;
 
-		float3 lightPosition = mul(float4(samplePosition, 1), FromVolToAcc).xyz;
-		float3 toLightDensity = Light.SampleGrad(VolumeSampler, lightPosition, 0, 0) * Density;
+		total += density * step * int2(t < sampleT, 1);
 
-		float sigmaA = density * Absortion;
-		float sigmaS = density * (1 - Absortion); // scattering
-		float sigmaT = sigmaA + sigmaS;
-		
-		T1 += step * sigmaT * (t <= sampleT);
-		T2 += step * sigmaT;
-		total += LightIntensity * step * exp(-T2) * sigmaS * exp(-toLightDensity) * EvalPhase(D, L);
-		
 		// Move to next step
 		t += step;
 	}
+
+	return total;
 }
 
-float3 Pathtrace2(float3 P, float3 D) {
+float3 Pathtrace(float3 P, float3 D) {
+
+	float3 bMin, bMax;
+	GetVolumeBox(bMin, bMax);
+
+	float tMin = 0;
+	float tMax = 1000;
+	BoxIntersect(bMin, bMax, P, D, tMin, tMax);
+	
+	P += D * tMin; // Put P inside the volume
+
+	int N = 1000;
+	float phongNorm = (N + 2) / (4 * pi);
+
+	float d = tMax - tMin;
+	int bounces = 1;
+
+	while (true) {
+
+		float t = -log(1 - random()) / Density; // Using Density as majorant
+		float tpdf = exp(-t * Density) * Density;
+
+		if (t >= d)
+			return SampleSkybox(D) + pow(max(0, dot(D, LightDirection)), N) * phongNorm * LightIntensity;
+
+		P += t * D;
+		
+		float3 tSamplePosition = (P - bMin) / (bMax - bMin);
+		float densityt = Data.SampleGrad(VolumeSampler, tSamplePosition, 0, 0) * Density;
+
+		float nullProb = Density - densityt;
+
+		float prob = 1 - nullProb / Density;
+
+		if (random() < prob) // scattering
+		{
+			float scatterPdf;
+			float3 scatterD;
+			GeneratePhase(D, scatterD, scatterPdf);
+
+			D = scatterD;
+			
+			tMin = 0;
+			tMax = 1000;
+			BoxIntersect(bMin, bMax, P, D, tMin, tMax);
+
+			P += D * tMin;
+
+			d = tMax - tMin;
+			bounces--;
+		}
+		else
+		{
+			d -= t;
+		}
+	}
+	return 0;
+}
+
+float3 PathtraceOK(float3 P, float3 D) {
+
+	float3 accum = 0;
+	float importance = 1;
+	int bounce = 0;
+
+	float3 bMin, bMax;
+	GetVolumeBox(bMin, bMax);
+
+	float tMin = 0;
+	float tMax = 1000;
+	BoxIntersect(bMin, bMax, P, D, tMin, tMax);
+
+	P += D * tMin; // Put P inside the volume
+
+	int N = 1000;
+	float phongNorm = (N + 2) / (2 * pi);
+
+	float d = tMax - tMin;
+	int bounces = 1;
+
+	while (bounces >= 0) {
+
+		float t = -log(1 - random()) / Density; // Using Density as majorant
+		float tpdf = exp(-t * Density) * Density;
+
+		if (t >= d)
+			return SampleSkybox(D) + pow(max(0, dot(D, LightDirection)), N) * phongNorm * LightIntensity;
+
+		P += t * D;
+
+		float3 tSamplePosition = (P - bMin) / (bMax - bMin);
+		float densityt = Data.SampleGrad(VolumeSampler, tSamplePosition, 0, 0) * Density;
+
+		float nullProb = Density - densityt;
+
+		if (random() < 0.9999 - nullProb / Density) // scattering
+		{
+			float scatterPdf;
+			float3 scatterD;
+			GeneratePhase(D, scatterD, scatterPdf);
+
+			D = scatterD;
+
+			tMin = 0;
+			tMax = 1000;
+			BoxIntersect(bMin, bMax, P, D, tMin, tMax);
+
+			P += D * tMin;
+
+			d = tMax - tMin;
+			bounces--;
+		}
+		else
+			d -= t;
+	}
+	return 0;
+}
+
+
+float3 PathtraceOld(float3 P, float3 D) {
 
 	float3 accum = 0;
 	float importance = 1;
@@ -114,29 +216,36 @@ float3 Pathtrace2(float3 P, float3 D) {
 	float tMin = 0;
 	float tMax = 1000;
 	bool intersectVolume = BoxIntersect(bMin, bMax, P, D, tMin, tMax);
+	if (!intersectVolume) // skip volume => Ld no scattering
+		return SampleSkybox(D);
 
-	if (!intersectVolume) // traspased volume => Ld no scattering
-		return accum + importance * SampleSkybox(D);
+	while (bounce < 1) {
 
-	while (bounce < 2) {
 		float t = -log(1 - random()) / Density;
-		float tpdf = exp(-t*Density)*Density;
+		float tpdf = exp(-t * Density) * Density;
 
-		float T1, T2;
-		float3 totalLight;
-		ComputeIntegrals(0.5 * (1 << (2 * bounce)), P + D * tMin, P + D * tMax, t, bMin, bMax, T1, T2, totalLight);
+		float2 transmitancePower = GetTransmitancePower(0.5 * (1 << (2 * bounce)), P + D * tMin, P + D * tMax, t, bMin, bMax);
 
-		accum += importance*(totalLight + exp(-T2) * SampleSkybox(D));
+		accum += importance * exp(-transmitancePower.y) * SampleSkybox(D);
 
 		if (t >= tMax - tMin)
 			return accum;
 
 		float3 scatterP = P + D * (tMin + t);
 
+		float lMin, lMax;
+		BoxIntersect(bMin, bMax, scatterP, LightDirection, lMin, lMax);
+
+		float2 lightTP = GetTransmitancePower(0.5 * (1 << (bounce)), scatterP, scatterP + LightDirection * lMax, 10000, bMin, bMax);
+		
+		float3 Lin = exp(-lightTP.x) * LightIntensity * EvalPhase(D, LightDirection);
+
 		float3 tSamplePosition = (P + D * (tMin + t) - bMin) / (bMax - bMin);
 		float densityt = Data.SampleGrad(VolumeSampler, tSamplePosition, 0, 0) * Density;
 
-		importance *= exp(-T1) / tpdf;
+		importance *= exp(-transmitancePower.x) * densityt * (1 - Absortion) / tpdf;
+
+		accum += importance * Lin;
 
 		float scatterPdf;
 		float3 scatterD;
@@ -153,69 +262,6 @@ float3 Pathtrace2(float3 P, float3 D) {
 	}
 
 	return accum;
-}
-
-float3 Pathtrace(float3 P, float3 D) {
-
-	float3 accum = 0;
-	float3 importance = 1;
-
-	float3 bMin, bMax;
-	GetVolumeBox(bMin, bMax);
-
-	float tMin = 0;
-	float tMax = 1000;
-	BoxIntersect(bMin, bMax, P, D, tMin, tMax);
-
-	P += D * tMin; // Put P inside the volume
-
-	int N = 10000;
-	float phongNorm = (N + 2) / (2 * pi);
-
-	float d = tMax - tMin;
-
-	while (true) {
-
-		float t = -log(1 - random()) / Density; // Using Density as majorant
-		float tpdf = exp(-t * Density) * Density;
-
-		if (t >= d)
-			return SampleSkybox(D) + accum;// +pow(max(0, dot(D, LightDirection)), N) * phongNorm * LightIntensity;
-
-		P += t * D;
-
-		float3 tSamplePosition = (P - bMin) / (bMax - bMin);
-		float densityt = Data.SampleGrad(VolumeSampler, tSamplePosition, 0, 0) * Density;
-
-		float nullProb = Density - densityt;
-
-		float prob = 1 - nullProb / Density;
-
-		if (random() < prob) // scattering
-		{
-			float3 lightPosition = mul(float4(tSamplePosition, 1), FromVolToAcc).xyz;
-			float3 toLightDensity = Light.SampleGrad(VolumeSampler, lightPosition, 0, 0) * Density;
-
-			accum += exp(-toLightDensity) * LightIntensity * EvalPhase(D, LightDirection);
-
-			float scatterPdf;
-			float3 scatterD;
-			GeneratePhase(D, scatterD, scatterPdf);
-
-			D = scatterD;
-
-			tMin = 0;
-			tMax = 1000;
-			BoxIntersect(bMin, bMax, P, D, tMin, tMax);
-
-			P += D * tMin;
-
-			d = tMax - tMin;
-		}
-		else
-			d -= t;
-	}
-	return 0;
 }
 
 [numthreads(CS_2D_GROUPSIZE, CS_2D_GROUPSIZE, 1)]

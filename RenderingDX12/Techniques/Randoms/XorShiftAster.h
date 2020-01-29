@@ -22,6 +22,8 @@ float random()
 }
 
 void initializeRandom(ULONG seed) {
+	if (seed.h == 0 && seed.l == 0)
+		seed.l = 1231231231;
 	rng_state = seed;
 }
 

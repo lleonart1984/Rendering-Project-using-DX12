@@ -52,7 +52,7 @@ void GuiFor(gObj<IHasParalellism> t) {
 }
 void GuiFor(gObj<IHasLight> t) {
 	float3 light = t->Light->Intensity;
-	float maxCmp = max(light.x, max(light.y, light.z));
+	float maxCmp = max(1, max(light.x, max(light.y, light.z)));
 	float3 lightColor = light / maxCmp;
 	bool changedColor = ImGui::ColorEdit3("Light color", (float*)&lightColor);
 	bool changedIntensity = ImGui::SliderFloat("Light Intensity", &maxCmp, 0, 1000, "%.3f", 2);
@@ -80,8 +80,13 @@ void GuiFor(gObj<IHasLight> t) {
 }
 
 void GuiFor(gObj<IHasVolume> t) {
-	ImGui::SliderFloat("Density", &t->densityScale, 0, 100);
-	ImGui::SliderFloat("Absortion", &t->globalAbsortion, 0, 1);
+	if (
+		ImGui::SliderFloat("Density", &t->densityScale, 0, 1000) |
+		ImGui::SliderFloat("Absortion", &t->globalAbsortion, 0, 1)) {
+		auto asLight = t.Dynamic_Cast<IHasLight>();
+		if (asLight)
+			asLight->LightSourceIsDirty = true;
+	}
 }
 
 
@@ -125,6 +130,7 @@ bool DeviceManager::FORCE_FALLBACK_DEVICE = false;
 float3 cameraPositions[] = { float3(0,0.6,0), float3(0.14, 0.17, 0.14), float3(-0.14, 0.17, 0.14), float3(-0.14, 0.17, -0.15), float3(0.2, 0.02, 0.1) };
 float3 cameraTargets[] = { float3(0,0,-0.1), float3(-0.44, 0.1, 0.14 - 1),float3(0.44, 0.20, 0.14 - 1), float3(1+0.14, 0.3, 0.2+0.14),float3(0.2-1, 0.02, 0.1) };
 int movingCamera = -1;
+bool ScreenShotDesired;
 
 int main(int, char**)
 {
@@ -137,6 +143,8 @@ int main(int, char**)
 	// Show the window
 	ShowWindow(hWnd, SW_SHOWDEFAULT);
 	UpdateWindow(hWnd);
+
+	gObj<ScreenShotTechnique> screenshot;
 
 #ifdef FORCE_FALLBACK
 	DeviceManager::FORCE_FALLBACK_DEVICE = true;
@@ -159,6 +167,9 @@ int main(int, char**)
     presenter->Load(technique);
 #endif
 #endif
+
+	presenter->Load(screenshot);
+	screenshot->FileName = "screenshot.jpg";
 
 	gObj<IHasBackcolor> asBackcolorRenderer = technique.Dynamic_Cast<IHasBackcolor>();
 	gObj<IHasScene> asSceneRenderer = technique.Dynamic_Cast<IHasScene>();
@@ -251,15 +262,15 @@ int main(int, char**)
 		switch (USE_VOLUME) {
 		case 0:
 			volumePath = desktop_directory();
-			strcat(volumePath, "\\clouds\\cloud-1191.xyz");
+			//strcat(volumePath, "\\clouds\\cloud-1191.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-1940.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-190.xyz");
-			//strcat(volumePath, "\\clouds\\cloud-1196.xyz");
+			strcat(volumePath, "\\clouds\\cloud-1196.xyz");
 			volume = new Volume(volumePath);
 			lightSource->Position = float3(0.4, 0.5, 0.3);
-			lightSource->Direction = normalize(-1*float3(1, 1, 1));
-			lightSource->Intensity = float3(12);
-			camera->Position = float3(0, -1, 1);
+			lightSource->Direction = normalize(float3(1, 1, 1));
+			lightSource->Intensity = float3(4);
+			camera->Position = float3(0, -0.5, 1);
 			camera->Target = float3(0, 0, 0);
 
 			break;
@@ -351,6 +362,9 @@ int main(int, char**)
 				}
 				bool cameraChanged = false;
 
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter)))
+					ScreenShotDesired = true;
+
 				if (movingCamera >= 0) {
 					float d = length(camera->Position - cameraPositions[movingCamera]);
 					cameraChanged = d > 0;
@@ -407,6 +421,12 @@ int main(int, char**)
         // Rendering
 		presenter->Present(technique);
 
+		// Screen shot
+		if (ScreenShotDesired) {
+			presenter->Present(screenshot);
+			presenter->Present(screenshot);
+			ScreenShotDesired = false;
+		}
 
 		if (firstFrame)
 			ImGui::GetIO().Framerate;

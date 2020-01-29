@@ -33,6 +33,8 @@ float random()
 }
 
 void initializeRandom(uint seed) {
+	if (seed == 0)
+		seed = 1002039242112;
 	rng_state.a = seed;// ^ 0xFEFE;
 	rng_state.b = seed;
 	rng_state.c = seed;

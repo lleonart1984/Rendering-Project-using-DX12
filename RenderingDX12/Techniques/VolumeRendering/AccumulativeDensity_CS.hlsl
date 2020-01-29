@@ -25,7 +25,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 	int maxD = max(DenDimensions.x, max(DenDimensions.y, DenDimensions.z));
 
-	float scaleFactor = 1 / length(mul(float3(0, 0, 1), FromAccToCloud)) * 0.5 / AccDimensions.x;// / AccDimensions.x; // improve with matrix indices
+	float scaleFactor = 0.5 * length(mul(float3(1, 1, 1), FromAccToCloud)) / AccDimensions.x; // improve with matrix indices
 	//float scaleFactor = pow(0.5 / AccDimensions.x, 1);// / AccDimensions.x; // improve with matrix indices
 
 	float acc = 0;

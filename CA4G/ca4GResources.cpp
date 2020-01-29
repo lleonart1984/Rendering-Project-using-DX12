@@ -60,6 +60,43 @@ namespace CA4G {
 		}
 	}
 
+	void ResourceWrapper::CreateForDownloading() {
+		if (!this->downloadingResourceCache) {
+			mutex.Acquire();
+
+			if (!downloadingResourceCache) {
+				auto size = GetRequiredIntermediateSize(manager->device, desc);
+
+				D3D12_RESOURCE_DESC finalDesc = { };
+				finalDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+				finalDesc.Format = DXGI_FORMAT_UNKNOWN;
+				finalDesc.Width = size;
+				finalDesc.Height = 1;
+				finalDesc.DepthOrArraySize = 1;
+				finalDesc.MipLevels = 1;
+				finalDesc.SampleDesc.Count = 1;
+				finalDesc.SampleDesc.Quality = 0;
+				finalDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+				finalDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+				D3D12_HEAP_PROPERTIES downloadProp;
+				downloadProp.Type = D3D12_HEAP_TYPE_READBACK;
+				downloadProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+				downloadProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+				downloadProp.VisibleNodeMask = 1;
+				downloadProp.CreationNodeMask = 1;
+				DX_Resource res;
+				manager->device->CreateCommittedResource(&downloadProp, D3D12_HEAP_FLAG_NONE, &finalDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+					IID_PPV_ARGS(&res));
+
+				downloadingResourceCache = new ResourceWrapper(manager, this->desc, res, D3D12_RESOURCE_STATE_COPY_DEST);
+			}
+
+			mutex.Release();
+		}
+	}
+
+
 	void ResourceWrapper::UploadFullData(byte* data, long long dataSize, bool flipRows) {
 		D3D12_RANGE range{ };
 
@@ -82,10 +119,33 @@ namespace CA4G {
 			MemcpySubresource(&DestData, &subData, static_cast<SIZE_T>(pRowSizesInBytes[i]), pNumRows[i], pLayouts[i].Footprint.Depth, flipRows);
 			srcOffset += pRowSizesInBytes[i] * pNumRows[i];
 		}
+	}
 
-		delete[] pLayouts;
-		delete[] pNumRows;
-		delete[] pRowSizesInBytes;
+	void ResourceWrapper::DownloadFullData(byte* data, long long dataSize, bool flipRows) {
+		D3D12_RANGE range{ 0, dataSize };
+
+		mutex.Acquire();
+		auto hr = internalResource->Map(0, &range, &mappedData);
+
+		int srcOffset = 0;
+		for (UINT i = 0; i < 1; ++i)
+		{
+			D3D12_SUBRESOURCE_DATA DestData = {
+				(byte*)mappedData + pLayouts[i].Offset,
+				pLayouts[i].Footprint.RowPitch,
+				SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i])
+			};
+			D3D12_MEMCPY_DEST subData;
+			subData.pData = data + srcOffset;
+			subData.RowPitch = pRowSizesInBytes[i];
+			subData.SlicePitch = pRowSizesInBytes[i] * pNumRows[i];
+
+			MemcpySubresource(&subData, &DestData, static_cast<SIZE_T>(pRowSizesInBytes[i]), pNumRows[i], pLayouts[i].Footprint.Depth, flipRows);
+			srcOffset += pRowSizesInBytes[i] * pNumRows[i];
+		}
+		D3D12_RANGE emptyRange{ 0, 0 };
+		internalResource->Unmap(0, &emptyRange);
+		mutex.Release();
 	}
 
 	

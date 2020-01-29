@@ -75,6 +75,7 @@
     <FxCompile Include="Techniques\VolumeRendering\AccumulativeDensity_CS.hlsl" />
     <FxCompile Include="Techniques\VolumeRendering\VolumeMipMaps_CS.hlsl" />
     <FxCompile Include="Techniques\VolumeRendering\PathtracingVolume_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\PurePathtracing_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -170,6 +171,8 @@
     <ClInclude Include="Techniques\VolumeRendering\VolumePathtracingTechnique.h" />
     <ClInclude Include="Techniques\VolumeRendering\PhaseIso.h" />
     <ClInclude Include="Techniques\VolumeRendering\PhaseAniso.h" />
+    <ClInclude Include="Techniques\VolumeRendering\PureVPathtracingTechnique.h" />
+    <ClInclude Include="Techniques\Common\ScreenShotTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

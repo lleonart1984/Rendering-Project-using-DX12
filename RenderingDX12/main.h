@@ -71,6 +71,7 @@
 //gObj<BasicVolumeTechnique> technique;
 //gObj<SingleScatteringVolumeTechnique> technique;
 gObj<VolumePathtracingTechnique> technique;
+//gObj<PureVPathtracingTechnique> technique;
 
 
 //#define TEST_WSAPIT

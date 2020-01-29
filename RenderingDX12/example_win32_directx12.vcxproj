@@ -211,6 +211,7 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="Techniques\Common\ConstantBuffers.h" />
     <ClInclude Include="Techniques\Common\CS_Constants.h" />
     <ClInclude Include="Techniques\Common\RetainedSceneLoader.h" />
+    <ClInclude Include="Techniques\Common\ScreenShotTechnique.h" />
     <ClInclude Include="Techniques\DeferredShading\DeferredLighting.h" />
     <ClInclude Include="Techniques\DeferredShading\GBufferConstruction.h" />
     <ClInclude Include="Techniques\GUI_Traits.h" />
@@ -253,6 +254,7 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="Techniques\VolumeRendering\BasicVolumeTechnique.h" />
     <ClInclude Include="Techniques\VolumeRendering\PhaseAniso.h" />
     <ClInclude Include="Techniques\VolumeRendering\PhaseIso.h" />
+    <ClInclude Include="Techniques\VolumeRendering\PureVPathtracingTechnique.h" />
     <ClInclude Include="Techniques\VolumeRendering\SingleScatteringVolumeTechnique.h" />
     <ClInclude Include="Techniques\VolumeRendering\VolumeLoader.h" />
     <ClInclude Include="Techniques\VolumeRendering\VolumePathtracingTechnique.h" />
@@ -1139,6 +1141,12 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='HLSL|Win32'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='HLSL|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='HLSL|x64'">4.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Techniques\VolumeRendering\PurePathtracing_CS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
     </FxCompile>
     <FxCompile Include="Techniques\VolumeRendering\SingleScattering_CS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>

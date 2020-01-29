@@ -10,12 +10,44 @@ namespace CA4G {
 		}
 		else
 		{
-			if (dst->internalResource->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+			if (dst->internalResource->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && src->internalResource->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
 			{ // both buffers
 				cmdList->CopyBufferRegion(
 					dst->internalResource, 0, src->internalResource, 0, src->internalResource->GetDesc().Width);
 			}
 			else
+				if (dst->internalResource->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+				{ // readback buffer
+					// Buffer from upload to any resource on the gpu
+					auto device = getInternalDevice();
+
+					int numberOfSubresources = src->desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? src->desc.MipLevels :
+						src->desc.MipLevels * src->desc.DepthOrArraySize;
+
+					D3D12_PLACED_SUBRESOURCE_FOOTPRINT* Layouts = new D3D12_PLACED_SUBRESOURCE_FOOTPRINT[numberOfSubresources];
+					UINT* NumRows = new UINT[numberOfSubresources];
+					UINT64* BytesForRow = new UINT64[numberOfSubresources];
+					UINT64 totalBytes;
+					device->GetCopyableFootprints(&dst->desc, 0, numberOfSubresources, 0, Layouts, NumRows, BytesForRow, &totalBytes);
+
+					for (int i = 0; i < numberOfSubresources; i++) {
+
+						D3D12_TEXTURE_COPY_LOCATION Dst{};
+						Dst.pResource = src->internalResource;
+						Dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+						Dst.SubresourceIndex = i;
+
+						D3D12_TEXTURE_COPY_LOCATION Src{};
+						Src.pResource = dst->internalResource;
+						Src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+						Src.PlacedFootprint = Layouts[i];
+						cmdList->CopyTextureRegion(&Src, 0, 0, 0, &Dst, nullptr);
+					}
+					delete[] Layouts;
+					delete[] NumRows;
+					delete[] BytesForRow;
+				}
+				else
 			{
 				// Buffer from upload to any resource on the gpu
 				auto device = getInternalDevice();
@@ -66,6 +98,18 @@ namespace CA4G {
 		texture->resource->CreateForUploading();
 		texture->resource->uploadingResourceCache->UploadFullData(data->Data, data->DataSize, data->FlipY);
 		manager->__All(texture->resource, texture->resource->uploadingResourceCache);
+	}
+
+	void CommandListManager::Loading::ToData(gObj<Texture2D> texture, gObj<TextureData>& data) {
+		
+		data = TextureData::CreateEmpty(texture->Width, texture->Height, 1, 1, texture->resource->desc.Format);
+
+		texture->resource->CreateForDownloading();
+		
+		texture->ChangeStateTo(manager->cmdList, D3D12_RESOURCE_STATE_GENERIC_READ);
+
+		manager->__All(texture->resource->downloadingResourceCache, texture->resource);
+		texture->resource->downloadingResourceCache->DownloadFullData(data->Data, data->DataSize, false);
 	}
 
 	inline DX_Device CommandListManager::getInternalDevice() { return manager->device; }

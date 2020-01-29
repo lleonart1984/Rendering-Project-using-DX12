@@ -1,5 +1,5 @@
 #include "ca4G_Private.h"
-
+#include "DirectXTex.h"
 
 namespace CA4G {
 
@@ -20,7 +20,7 @@ namespace CA4G {
 		Data(data),
 		DataSize(dataSize),
 		FlipY(flipY),
-		pixelStride(DirectX::BitsPerPixel(format)),
+		pixelStride(DirectX::BitsPerPixel(format) / 8),
 		Dimension(D3D12_RESOURCE_DIMENSION_TEXTURE2D)
 	{
 		footprints = new D3D12_PLACED_SUBRESOURCE_FOOTPRINT[mipMaps * slices];
@@ -57,7 +57,7 @@ namespace CA4G {
 		Data(data),
 		DataSize(dataSize),
 		FlipY(flipY),
-		pixelStride(DirectX::BitsPerPixel(format)),
+		pixelStride(DirectX::BitsPerPixel(format) / 8),
 		Dimension(D3D12_RESOURCE_DIMENSION_TEXTURE3D)
 	{
 		footprints = new D3D12_PLACED_SUBRESOURCE_FOOTPRINT[1];
@@ -77,12 +77,12 @@ namespace CA4G {
 
 	gObj<TextureData> TextureData::CreateEmpty(int width, int height, int mipMaps, int slices, DXGI_FORMAT format) {
 
-		int pixelStride = DirectX::BitsPerPixel(format);
+		int pixelStride = DirectX::BitsPerPixel(format) / 8;
 		UINT64 total = 0;
 		int w = width, h = height;
 		for (int i = 0; i < mipMaps; i++)
 		{
-			total += w * h*pixelStride;
+			total += w * h* pixelStride;
 			w /= 2;
 			h /= 2;
 			w = max(1, w);
@@ -95,7 +95,7 @@ namespace CA4G {
 	}
 
 	gObj<TextureData> TextureData::CreateEmpty(int width, int height, int depth, DXGI_FORMAT format) {
-		int pixelStride = DirectX::BitsPerPixel(format);
+		int pixelStride = DirectX::BitsPerPixel(format) / 8;
 		UINT64 total = width * height* depth * pixelStride;
 		byte* data = new byte[total];
 		ZeroMemory(data, total);
@@ -130,5 +130,27 @@ namespace CA4G {
 		return CreateTextureDataFromScratchImage(metadata, scratchImage, true);
 	}
 
+	void TextureData::SaveToFile(gObj<TextureData> data, const char* filename) {
+		static bool InitializedWic = false;
+
+		if (!InitializedWic) {
+			void* res = nullptr;
+			CoInitialize(res);
+			InitializedWic = true;
+		}
+
+		DirectX::Image img;
+		img.format = data->Format;
+		img.width = data->Width;
+		img.height = data->Height;
+		img.rowPitch = data->pixelStride * data->Width;
+		img.slicePitch = data->pixelStride * data->Width * data->Height;
+		img.pixels = data->Data;
+
+		wchar_t* file = new wchar_t[strlen(filename) + 1];
+		OemToCharW(filename, file);
+
+		DirectX::SaveToWICFile(img, DirectX::WIC_FLAGS_NONE, DirectX::GetWICCodec(DirectX::WIC_CODEC_JPEG), file);
+	}
 
 }
