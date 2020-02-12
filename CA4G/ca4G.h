@@ -15674,6 +15674,13 @@ namespace CA4G {
 			view = LookAtRH(Position, Target, Up);
 			projection = PerspectiveFovRH(FoV, screenHeight / (float)screenWidth, NearPlane, FarPlane);
 		}
+
+		// Gets the matrices for view and projection transforms
+		void GetMatricesLH(int screenWidth, int screenHeight, float4x4& view, float4x4& projection)
+		{
+			view = LookAtLH(Position, Target, Up);
+			projection = PerspectiveFovLH(FoV, screenHeight / (float)screenWidth, NearPlane, FarPlane);
+		}
 	};
 
 	// Represents a light source definition
@@ -15757,6 +15764,9 @@ namespace CA4G {
 			fread_s(&vy, 8, 8, 1, f);
 			fread_s(&vz, 8, 8, 1, f);
 			data = new float[width * height * slices];
+			float* sum = new float[width * height * slices];
+			float* sqrSum = new float[width * height * slices];
+
 			float* xorderData = new float[width * height * slices];
 			fread_s(xorderData, width * height * slices * 4, 4, width * height * slices, f);
 			fclose(f);
@@ -15775,10 +15785,55 @@ namespace CA4G {
 			for (int i = 0; i < p; i++)
 				data[i] /= maxValue; // normalize densities 0..1
 
+			for (int i = 0; i < p; i++)
+				sum[i] = data[i]; // initialize sum matrix
+			
+			for (int i = 0; i < p; i++)
+				sqrSum[i] = data[i]*data[i]; // initialize sqrSum matrix
+
+			ComputeTotalSum(sum, width, height, slices);
+			
+			ComputeTotalSum(sqrSum, width, height, slices);
+
+			sums = new float2[width * height * slices];
+			for (int i = 0; i < p; i++)
+				sums[i] = float2(sum[i], sqrSum[i]);
+
+			delete sum;
+			delete sqrSum;
 			delete xorderData;
 		}
 		int width, height, slices;
 		float* data;
+		float2* sums;
+
+		void ComputeTotalSum(float* sum, int width, int height, int slices) {
+			int dimxy = width * height;
+
+			// Accumulate in z direction
+			for (int y = 0; y < height; y++)
+				for (int x = 0; x < width; x++)
+				{
+					for (int z = 1; z < slices; z++)
+						sum[z * dimxy + y * width + x] += sum[(z - 1) * dimxy + y * width + x];
+				}
+
+			// Accumulate in y direction
+			for (int z = 0; z < slices; z++)
+				for (int x = 0; x < width; x++)
+				{
+					for (int y = 1; y < height; y++)
+						sum[z * dimxy + y * width + x] += sum[z * dimxy + (y - 1) * width + x];
+				}
+
+			// Accumulate in x direction
+			for (int z = 0; z < slices; z++)
+				for (int y = 0; y < height; y++)
+				{
+					for (int x = 1; x < width; x++)
+						sum[z * dimxy + y * width + x] += sum[z * dimxy + y * width + (x - 1)];
+				}
+		}
 	};
 }
 

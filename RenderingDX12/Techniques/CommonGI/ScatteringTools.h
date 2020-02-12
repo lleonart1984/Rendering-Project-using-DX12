@@ -134,6 +134,7 @@ float3 ComputeDirectLightingNoShadowCast(
 	float3 SpecularRatio = SpecularBRDF(V, L, surfel.N, NdotL, material) ;
 
 	return
+		material.Diffuse * material.Roulette.x * 0.1 +
 		// Direct diffuse and glossy lighting
 		(material.Roulette.x*DiffuseRatio + material.Roulette.y*SpecularRatio)*NdotL
 		*Ip;
@@ -220,7 +221,8 @@ float3 ComputeDirectLighting(
 	// Direct Intensity gathered by refraction impulse
 	float3 DirectRefraction = material.Specular * HitLight(L, T.xyz, d, lightRadius);
 
-	return shadowFactor * (
+	return
+		shadowFactor * (
 		// Direct diffuse and glossy lighting
 		(material.Roulette.x * DiffuseRatio + material.Roulette.y * SpecularRatio) * NdotL * Ip *(!invertNormal)
 		+ (R.w * DirectReflection + T.w * DirectRefraction) * I / (4 * pi * lightRadius * lightRadius));

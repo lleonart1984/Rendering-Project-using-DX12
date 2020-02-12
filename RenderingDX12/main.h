@@ -70,9 +70,13 @@
 // Volume Rendering
 //gObj<BasicVolumeTechnique> technique;
 //gObj<SingleScatteringVolumeTechnique> technique;
-gObj<VolumePathtracingTechnique> technique;
+//gObj<VolumePathtracingTechnique> technique;
+//gObj<FilteredVolumePathtracingTechnique> technique;
 //gObj<PureVPathtracingTechnique> technique;
-
+//gObj<PhotonMapVolumeTechnique> technique;
+//gObj<PhotonMapVolumeTechnique2> technique;
+//gObj<AdaptiveTrackingVolumeTechnique> technique;
+gObj<GridTrackingVolumeTechnique> technique;
 
 //#define TEST_WSAPIT
 //#define TEST_WSMRAPIT
@@ -89,3 +93,6 @@ gObj<RaymarchRT<WorldSpaceAPIT, APITDescription>> technique;
 //gObj<DebugWSMRAPIT> technique;
 gObj<RaymarchRT<WorldSpaceMRAPIT, MRAPITDescription>> technique;
 #endif
+
+
+//#define GENERATE_IMAGES 1000

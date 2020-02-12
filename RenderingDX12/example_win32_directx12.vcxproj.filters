@@ -76,6 +76,20 @@
     <FxCompile Include="Techniques\VolumeRendering\VolumeMipMaps_CS.hlsl" />
     <FxCompile Include="Techniques\VolumeRendering\PathtracingVolume_CS.hlsl" />
     <FxCompile Include="Techniques\VolumeRendering\PurePathtracing_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\VolumePhotonTracing_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\PerspectiveAccumulation_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\VolPhotonSplat_VS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\VolPhotonSplat_GS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\VolPhotonSplat_PS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\Combining_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\VolumePhotonTracing2_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\VolPhotonSplat2_GS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\VolPhotonSplat2_PS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\VolumePathtraceWithGBuffer_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\Filter_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\Wavelet_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\AdaptivePathtracingVolume_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\GridVolumePathtracing_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -173,6 +187,12 @@
     <ClInclude Include="Techniques\VolumeRendering\PhaseAniso.h" />
     <ClInclude Include="Techniques\VolumeRendering\PureVPathtracingTechnique.h" />
     <ClInclude Include="Techniques\Common\ScreenShotTechnique.h" />
+    <ClInclude Include="Techniques\VolumeRendering\PhotonMapVolumeTechnique.h" />
+    <ClInclude Include="Techniques\VolumeRendering\PhotonMapVolumeTechnique2.h" />
+    <ClInclude Include="Techniques\VolumeRendering\FilteredVolumePathtracingTechnique.h" />
+    <ClInclude Include="Techniques\VolumeRendering\Convolution.h" />
+    <ClInclude Include="Techniques\VolumeRendering\AdaptiveTrackingVolumeTechnique.h" />
+    <ClInclude Include="Techniques\VolumeRendering\GridPathtracingVolumeTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

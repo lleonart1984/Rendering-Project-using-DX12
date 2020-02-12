@@ -61,13 +61,13 @@ void RayTraversal(float3 beg, float3 end, float3 bMin, float3 bMax, out float3 t
 	float3 V = -D;
 	float3 L = normalize(LightDirection);
 
-	float step = 0.5 / max(Dimensions.x, max(Dimensions.y, Dimensions.z)); // half of a voxel size
+	float step = .5 / max(Dimensions.x, max(Dimensions.y, Dimensions.z)); // half of a voxel size
 
 	total = 0;
 
 	float intSigmaT = 0;
 
-	float t = 0;
+	float t = 0;// -(((int)(beg.z + 20 * cos(2 + beg.x + 13 * beg.y)) * 10000) % 100) / 100.0;
 	while (t < totalDistance)
 	{
 		float3 samplePosition = (beg + D * t - bMin)/(bMax - bMin);
@@ -82,14 +82,14 @@ void RayTraversal(float3 beg, float3 end, float3 bMin, float3 bMax, out float3 t
 		float sigmaS = density * (1 - Absortion); // scattering
 		float sigmaT = sigmaA + sigmaS;
 
-		total += step * exp(-(intSigmaT + step * 0.5 * sigmaT));// *sigmaS* exp(-toLightDensity)* LightIntensity / (4 * 3.14159);
+		total += step * exp(-(intSigmaT)) *sigmaS* exp(-toLightDensity)* LightIntensity / (4 * 3.14159);
 		intSigmaT += step * sigmaT;
 
 		// Move to next step
 		t += step;
 	}
 
-	//total += exp(-intSigmaT) * float3(0.5, 0.6, 1);
+	total += exp(-intSigmaT) * float3(0.5, 0.6, 1);
 }
 
 [numthreads(CS_2D_GROUPSIZE, CS_2D_GROUPSIZE, 1)]
@@ -115,7 +115,6 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 	float3 total = 0;
 	float importance = 1;
-	int Samples = 1000;
 	float tMin = 0;
 	float tMax = 1000;
 	if (BoxIntersect(bMin, bMax, O, D, tMin, tMax)) {

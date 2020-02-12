@@ -53,6 +53,11 @@ using namespace CA4G;
 #include "Techniques/VolumeRendering/BasicVolumeTechnique.h"
 #include "Techniques/VolumeRendering/SingleScatteringVolumeTechnique.h"
 #include "Techniques/VolumeRendering/VolumePathtracingTechnique.h"
+#include "Techniques/VolumeRendering/AdaptiveTrackingVolumeTechnique.h"
+#include "Techniques/VolumeRendering/GridPathtracingVolumeTechnique.h"
+#include "Techniques/VolumeRendering/FilteredVolumePathtracingTechnique.h"
 #include "Techniques/VolumeRendering/PureVPathtracingTechnique.h"
+#include "Techniques/VolumeRendering/PhotonMapVolumeTechnique.h"
+#include "Techniques/VolumeRendering/PhotonMapVolumeTechnique2.h"
 
 #include "main.h"

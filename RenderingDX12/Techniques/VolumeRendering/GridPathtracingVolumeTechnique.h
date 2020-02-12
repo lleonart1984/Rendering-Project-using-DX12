@@ -3,9 +3,8 @@
 #include "../GUI_Traits.h"
 #include "../../stdafx.h"
 
-class VolumePathtracingTechnique : public VolumeLoader, public IHasCamera, public IHasLight
+class GridTrackingVolumeTechnique : public VolumeLoader, public IHasCamera, public IHasLight
 {
-
 	struct Accumulation : public ComputePipelineBindings {
 		void Setup() {
 			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\AccumulativeDensity_CS.cso"));
@@ -29,11 +28,13 @@ class VolumePathtracingTechnique : public VolumeLoader, public IHasCamera, publi
 
 	struct MultiScatteringMarch : public ComputePipelineBindings {
 		void Setup() {
-			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\PathtracingVolume_CS.cso"));
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\GridVolumePathtracing_CS.cso"));
 		}
 
 		gObj<Texture3D> VolumeData;
 		gObj<Texture3D> LightData;
+		gObj<Texture3D> Majorants;
+
 		gObj<Texture2D> Accumulation;
 		gObj<Texture2D> Output;
 
@@ -49,6 +50,7 @@ class VolumePathtracingTechnique : public VolumeLoader, public IHasCamera, publi
 
 			SRV(0, VolumeData, ShaderType_Any);
 			SRV(1, LightData, ShaderType_Any);
+			SRV(2, Majorants, ShaderType_Any);
 
 			Static_SMP(0, Sampler::LinearWithoutMipMaps(), ShaderType_Any);
 			Static_SMP(1, Sampler::LinearWithoutMipMaps(), ShaderType_Any);
@@ -71,8 +73,30 @@ protected:
 
 	int accSize = 512;
 
+	float* majorants;
+
 	void Startup() {
 		VolumeLoader::Startup();
+
+		int mWidth = (int)ceil(VolumeWidth / (float)MAJORANT_VOLUMEN_CELL_DIM);
+		int mHeight = (int)ceil(VolumeHeight / (float)MAJORANT_VOLUMEN_CELL_DIM);
+		int mSlices = (int)ceil(VolumeSlices / (float)MAJORANT_VOLUMEN_CELL_DIM);
+
+		majorants = new float[mWidth * mHeight * mSlices];
+
+		for (int z = 0; z < mSlices ; z++)
+			for (int y =0; y < mHeight; y++)
+				for (int x = 0; x < mWidth; x++)
+				{
+					float m = 0;
+
+					for (int vz = z * MAJORANT_VOLUMEN_CELL_DIM; vz < min(z * MAJORANT_VOLUMEN_CELL_DIM + MAJORANT_VOLUMEN_CELL_DIM, VolumeSlices); vz++)
+						for (int vy = y * MAJORANT_VOLUMEN_CELL_DIM; vy < min(y * MAJORANT_VOLUMEN_CELL_DIM + MAJORANT_VOLUMEN_CELL_DIM, VolumeHeight); vy++)
+							for (int vx = x * MAJORANT_VOLUMEN_CELL_DIM; vx < min(x * MAJORANT_VOLUMEN_CELL_DIM + MAJORANT_VOLUMEN_CELL_DIM, VolumeWidth); vx++)
+								m = max(m, Volume->data[vz * (VolumeWidth * VolumeHeight) + vy * VolumeWidth + vx]);
+
+					majorants[z * (mWidth * mHeight) + y * mWidth + x] = m;
+				}
 
 		_ gLoad Pipeline(accumulation);
 		_ gLoad Pipeline(raymarch);
@@ -86,9 +110,17 @@ protected:
 		raymarch->Camera = _ gCreate ConstantBuffer<float4x4>();
 		raymarch->VolumeInfo = _ gCreate ConstantBuffer<VolumeInfo>();
 		raymarch->VolumeData = VolumeData;
+		raymarch->Majorants = _ gCreate ReadonlyTexture3D<float>(mWidth, mHeight, mSlices);
 		raymarch->LightData = accumulation->Accumulation;
 		raymarch->Transforms = _ gCreate ConstantBuffer<float4x4>();
 		raymarch->Lighting = _ gCreate ConstantBuffer<Lighting>();
+
+		perform(LoadMajorants);
+	}
+
+	void LoadMajorants(gObj<DXRManager> manager) {
+		raymarch->Majorants->SetDebugName(L"Volume Data Buffer for sums");
+		manager gCopy PtrData(raymarch->Majorants, majorants);
 	}
 
 	void Frame() {
@@ -102,7 +134,7 @@ protected:
 
 		if (LightSourceIsDirty)
 		{
-			float3 lightDirection = -1*normalize(Light->Direction);
+			float3 lightDirection = -1 * normalize(Light->Direction);
 			float3 corner = float3(VolumeWidth, VolumeHeight, VolumeSlices) / max(VolumeWidth, max(VolumeHeight, VolumeSlices));
 			float size = length(corner);
 			float3 accY = normalize(cross(
@@ -158,7 +190,7 @@ protected:
 				densityScale,
 				globalAbsortion
 				});
-			
+
 			compute gCopy ValueData(raymarch->Lighting,
 				Lighting{
 					Light->Position, 0,

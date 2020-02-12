@@ -203,7 +203,6 @@ float3 PathtraceOK(float3 P, float3 D) {
 	return 0;
 }
 
-
 float3 PathtraceOld(float3 P, float3 D) {
 
 	float3 accum = 0;

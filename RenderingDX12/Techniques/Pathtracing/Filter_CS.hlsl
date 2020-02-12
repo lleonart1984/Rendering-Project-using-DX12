@@ -62,7 +62,7 @@ void main( uint3 DTid : SV_DispatchThreadID )
 	if (!GetPrimaryIntersection(DTid.xy, DTid.xy + 0.5, surfel, material))
 		return;
 
-	int window = 10;
+	int window = 4;
 
 	float3 final = 0;
 	float kernelInt = 0;

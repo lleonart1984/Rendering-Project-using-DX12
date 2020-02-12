@@ -108,7 +108,7 @@ void StartRandomSeedForRay(uint2 gridDimensions, int maxBounces, uint2 raysIndex
 	dim *= maxBounces;
 
 	ULONG INDEX = { 0, index };
-	ULONG FRAME = { 0, frame };
+	ULONG FRAME = { index%13, frame };
 	ULONG DIM = { 0, dim };
 
 	//index += frame * dim;
@@ -116,7 +116,26 @@ void StartRandomSeedForRay(uint2 gridDimensions, int maxBounces, uint2 raysIndex
 
 	initializeRandom(INDEX);
 
-	for (int i = 0; i < 10 + index%13; i++)
+	for (int i = 0; i < 23 + index % 13; i++)
+		random();
+}
+
+void StartRandomSeedForThread(uint gridDimensions, int maxBounces, uint index, int bounce, int frame) {
+	uint dim = 1;
+	dim *= gridDimensions;
+	index += bounce * dim;
+	dim *= maxBounces;
+
+	ULONG INDEX = { 0, index };
+	ULONG FRAME = { index % 13, frame };
+	ULONG DIM = { 0, dim };
+
+	//index += frame * dim;
+	INDEX = ADD(INDEX, MUL(FRAME, DIM));
+
+	initializeRandom(INDEX);
+
+	for (int i = 0; i < 23 + index % 13; i++)
 		random();
 }
 

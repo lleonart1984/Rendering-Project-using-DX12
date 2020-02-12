@@ -81,7 +81,7 @@ void GuiFor(gObj<IHasLight> t) {
 
 void GuiFor(gObj<IHasVolume> t) {
 	if (
-		ImGui::SliderFloat("Density", &t->densityScale, 0, 1000) |
+		ImGui::SliderFloat("Density", &t->densityScale, 0.001, 1000) |
 		ImGui::SliderFloat("Absortion", &t->globalAbsortion, 0, 1)) {
 		auto asLight = t.Dynamic_Cast<IHasLight>();
 		if (asLight)
@@ -127,10 +127,27 @@ public:
 
 bool DeviceManager::FORCE_FALLBACK_DEVICE = false;
 
-float3 cameraPositions[] = { float3(0,0.6,0), float3(0.14, 0.17, 0.14), float3(-0.14, 0.17, 0.14), float3(-0.14, 0.17, -0.15), float3(0.2, 0.02, 0.1) };
-float3 cameraTargets[] = { float3(0,0,-0.1), float3(-0.44, 0.1, 0.14 - 1),float3(0.44, 0.20, 0.14 - 1), float3(1+0.14, 0.3, 0.2+0.14),float3(0.2-1, 0.02, 0.1) };
+// Good cameras for bunny
+//float3 cameraPositions[] = { float3(0.4,0.3,0), float3(0.24, 0.37, 0.54), float3(-0.24, 0.57, 0.44), float3(-0.14, 0.17, -0.35), float3(0.2, 0.02, 0.3) };
+
+// Good cameras for clouds
+float3 cameraPositions[] = { float3(1.2,0.1,0), float3(0.84, -0.37, 0.64), float3(-1.4, -0.17, 0.4), float3(-0.54, -0.17, -0.75), float3(0.2, 0.02, 0.3) };
+
+// Good cameras for sponza
+//float3 cameraPositions[] = { float3(0.1,0.1,0), float3(0.14, 0.17, 0.14), float3(-0.14, 0.17, 0.14), float3(-0.14, 0.17, -0.15), float3(0.2, 0.02, 0.1) };
+//float3 cameraPositions[] = { float3(0,0.6,0), float3(0.14, 0.17, 0.14), float3(-0.14, 0.17, 0.14), float3(-0.14, 0.17, -0.15), float3(0.2, 0.02, 0.1) };
+//float3 cameraTargets[] = { float3(0,0,-0.1), float3(-0.44, 0.1, 0.14 - 1),float3(0.44, 0.20, 0.14 - 1), float3(1 + 0.14, 0.3, 0.2 + 0.14),float3(0.2 - 1, 0.02, 0.1) };
+float3 cameraTargets[] = { float3(0,0,0), float3(-0, 0, 0),float3(0, 0, 0), float3(0, 0, 0),float3(0, 0, 0) };
 int movingCamera = -1;
 bool ScreenShotDesired;
+
+float randomf() {
+	return rand() / (float)RAND_MAX;
+}
+
+float3 generateInBox() {
+	return float3(randomf(), randomf(), randomf());
+}
 
 int main(int, char**)
 {
@@ -311,6 +328,12 @@ int main(int, char**)
 	static float lastTime = ImGui::GetTime();
 	static bool firstFrame = true;
 
+	static int CurrentFrame = 0;
+
+	static int GeneratedImages = 0;
+
+	srand(GetTickCount());
+
     while (msg.message != WM_QUIT)
     {
 		float deltaTime = ImGui::GetTime() - lastTime;
@@ -360,7 +383,7 @@ int main(int, char**)
 					if (movingCamera == ARRAYSIZE(cameraPositions))
 						movingCamera = 0;
 				}
-				bool cameraChanged = false;
+				bool cameraChanged = CurrentFrame == 1;
 
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter)))
 					ScreenShotDesired = true;
@@ -420,7 +443,39 @@ int main(int, char**)
 
         // Rendering
 		presenter->Present(technique);
+		CurrentFrame++;
 
+#ifdef GENERATE_IMAGES
+		if (CurrentFrame > 1000 && GeneratedImages < GENERATE_IMAGES) {
+
+			char screenShotName[100];
+			ZeroMemory(screenShotName, 100);
+			char screenShotNumber[100];
+			ZeroMemory(screenShotNumber, 100);
+			itoa(GeneratedImages, screenShotNumber, 10);
+			strcat(screenShotName, "screenshot");
+			strcat(screenShotName, screenShotNumber);
+			strcat(screenShotName, ".jpg");
+
+			screenshot->FileName = screenShotName;
+			presenter->Present(screenshot);
+			presenter->Present(screenshot);
+			GeneratedImages++;
+
+			CurrentFrame = 0;
+
+			if (asCameraRenderer != nullptr) // generate a new camera position
+			{
+				movingCamera = -1;
+				int referenceCameraIndex = rand() % ARRAYSIZE(cameraPositions);
+				asCameraRenderer->Camera->Position = cameraPositions[referenceCameraIndex] + (generateInBox() * 2 - 1) * 0.3;
+				asCameraRenderer->Camera->Target = (generateInBox() * 2 - 1) * 0.01;
+				//asCameraRenderer->Camera->Target = (generateInBox() * 2 - 1) * 0.14;
+			}
+		}
+
+
+#endif
 		// Screen shot
 		if (ScreenShotDesired) {
 			presenter->Present(screenshot);

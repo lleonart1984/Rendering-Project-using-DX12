@@ -3,9 +3,8 @@
 #include "../GUI_Traits.h"
 #include "../../stdafx.h"
 
-class VolumePathtracingTechnique : public VolumeLoader, public IHasCamera, public IHasLight
+class AdaptiveTrackingVolumeTechnique : public VolumeLoader, public IHasCamera, public IHasLight
 {
-
 	struct Accumulation : public ComputePipelineBindings {
 		void Setup() {
 			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\AccumulativeDensity_CS.cso"));
@@ -29,11 +28,13 @@ class VolumePathtracingTechnique : public VolumeLoader, public IHasCamera, publi
 
 	struct MultiScatteringMarch : public ComputePipelineBindings {
 		void Setup() {
-			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\PathtracingVolume_CS.cso"));
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\AdaptivePathtracingVolume_CS.cso"));
 		}
 
 		gObj<Texture3D> VolumeData;
 		gObj<Texture3D> LightData;
+		gObj<Texture3D> Sums;
+
 		gObj<Texture2D> Accumulation;
 		gObj<Texture2D> Output;
 
@@ -49,6 +50,7 @@ class VolumePathtracingTechnique : public VolumeLoader, public IHasCamera, publi
 
 			SRV(0, VolumeData, ShaderType_Any);
 			SRV(1, LightData, ShaderType_Any);
+			SRV(2, Sums, ShaderType_Any);
 
 			Static_SMP(0, Sampler::LinearWithoutMipMaps(), ShaderType_Any);
 			Static_SMP(1, Sampler::LinearWithoutMipMaps(), ShaderType_Any);
@@ -86,6 +88,7 @@ protected:
 		raymarch->Camera = _ gCreate ConstantBuffer<float4x4>();
 		raymarch->VolumeInfo = _ gCreate ConstantBuffer<VolumeInfo>();
 		raymarch->VolumeData = VolumeData;
+		raymarch->Sums = SumData;
 		raymarch->LightData = accumulation->Accumulation;
 		raymarch->Transforms = _ gCreate ConstantBuffer<float4x4>();
 		raymarch->Lighting = _ gCreate ConstantBuffer<Lighting>();
@@ -102,7 +105,7 @@ protected:
 
 		if (LightSourceIsDirty)
 		{
-			float3 lightDirection = -1*normalize(Light->Direction);
+			float3 lightDirection = -1 * normalize(Light->Direction);
 			float3 corner = float3(VolumeWidth, VolumeHeight, VolumeSlices) / max(VolumeWidth, max(VolumeHeight, VolumeSlices));
 			float size = length(corner);
 			float3 accY = normalize(cross(
@@ -158,7 +161,7 @@ protected:
 				densityScale,
 				globalAbsortion
 				});
-			
+
 			compute gCopy ValueData(raymarch->Lighting,
 				Lighting{
 					Light->Position, 0,

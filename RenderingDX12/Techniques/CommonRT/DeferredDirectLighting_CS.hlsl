@@ -107,9 +107,6 @@ void main( uint3 DTid : SV_DispatchThreadID )
 
 	float shadow = ShadowCast(surfel);
 
-	if (shadow == 0)
-		return;
-
 	float NdotV;
 	bool invertNormal;
 	float3 fN;
@@ -119,6 +116,7 @@ void main( uint3 DTid : SV_DispatchThreadID )
 	float3 color = ComputeDirectLighting(
 		// Inputs
 		V, surfel, material, LightPosition, LightIntensity,
+		shadow,
 		/// Outputs
 		// absolute cosine of angle to viewer theta(w_in)
 		NdotV,

@@ -28,15 +28,13 @@ struct Vertex
 	float3 B;
 };
 
-static float pi = 3.1415926535897932384626433832795;
-
-static float piOverTwo = 1.5707963267948966192313216916398;
-
-static float inverseOfPi = 0.31830988618379067153776752674503;
-
-static float inverseOfTwoPi = 0.15915494309189533576888376337251;
-
-static float two_pi = 6.283185307179586476925286766559;
+#ifndef pi
+#define pi 3.1415926535897932384626433832795
+#define piOverTwo 1.5707963267948966192313216916398
+#define inverseOfPi 0.31830988618379067153776752674503
+#define inverseOfTwoPi 0.15915494309189533576888376337251
+#define two_pi 6.283185307179586476925286766559
+#endif
 
 // Transform every surfel component with a specific transform
 // Valid for isometric transformation since directions are transformed
