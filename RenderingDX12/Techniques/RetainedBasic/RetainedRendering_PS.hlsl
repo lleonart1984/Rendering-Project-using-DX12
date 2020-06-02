@@ -34,6 +34,7 @@ SamplerState Sampler : register(s0);
 
 float4 main(PSInput input) : SV_TARGET
 {
+
 	//return float4(input.normal, 1);
 	float3 L = LightPosition - input.position;
 	float d = length(L);
@@ -55,6 +56,9 @@ float4 main(PSInput input) : SV_TARGET
 	float3x3 worldToTangent = { input.tangent, input.binormal, input.normal };
 
 	float3 normal = normalize(mul(BumpTex * 2 - 1, worldToTangent));
+
+	return float4(normal,1);
+	return float4(exp(-length(cross(input.tangent, input.binormal)))*float3(1,1,1), 1);
 
 	float3 V = normalize(-input.position);
 	float3 H = normalize(V + L);

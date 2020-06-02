@@ -148,6 +148,8 @@ protected:
 		{
 			FrameIndex = 0;
 
+			compute gClear UAV(raymarch->Accumulation, uint4(0));
+
 			float4x4 proj, view;
 			Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
 			compute gCopy ValueData(raymarch->Camera, mul(proj.getInverse(), view.getInverse()));

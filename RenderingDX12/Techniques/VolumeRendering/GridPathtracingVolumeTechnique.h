@@ -3,7 +3,7 @@
 #include "../GUI_Traits.h"
 #include "../../stdafx.h"
 
-class GridTrackingVolumeTechnique : public VolumeLoader, public IHasCamera, public IHasLight
+class GridTrackingVolumeTechnique : public VolumeLoader, public IHasCamera, public IHasLight, public IHasAccumulative
 {
 	struct Accumulation : public ComputePipelineBindings {
 		void Setup() {
@@ -174,7 +174,6 @@ protected:
 
 		static int FrameIndex = 0;
 
-		raymarch->PassCount = FrameIndex++;
 
 		if (CameraIsDirty || LightSourceIsDirty)
 		{
@@ -199,9 +198,18 @@ protected:
 				});
 		}
 
-		compute gSet Pipeline(raymarch);
+		raymarch->PassCount = FrameIndex;
 
-		compute gDispatch Threads((int)ceil(render_target->Width / (float)CS_2D_GROUPSIZE), (int)ceil(render_target->Height / (float)CS_2D_GROUPSIZE));
+		if (StopFrame == 0 || FrameIndex < StopFrame) {
+
+			CurrentFrame = FrameIndex;
+
+			compute gSet Pipeline(raymarch);
+
+			compute gDispatch Threads((int)ceil(render_target->Width / (float)CS_2D_GROUPSIZE), (int)ceil(render_target->Height / (float)CS_2D_GROUPSIZE));
+
+			FrameIndex++;
+		}
 
 		compute gCopy All(render_target, raymarch->Output);
 	}

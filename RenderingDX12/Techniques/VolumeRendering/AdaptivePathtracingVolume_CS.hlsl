@@ -100,7 +100,7 @@ float EstimateMajorant(float3 bMin, float3 bMax, float3 P, float3 D, float tMax)
 
 	float mn = sums.x / volume; // mean value
 
-	float var = sums.y / volume - mn * mn;
+	float var = abs(sums.y / volume - mn * mn);
 
 	float sd = sqrt(var);
 

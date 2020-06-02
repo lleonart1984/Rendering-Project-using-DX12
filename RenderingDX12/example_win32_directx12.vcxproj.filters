@@ -90,6 +90,16 @@
     <FxCompile Include="Techniques\VolumeRendering\Wavelet_CS.hlsl" />
     <FxCompile Include="Techniques\VolumeRendering\AdaptivePathtracingVolume_CS.hlsl" />
     <FxCompile Include="Techniques\VolumeRendering\GridVolumePathtracing_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\Wavelet2_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\SphereVolPathtracing_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\BUVoxelization_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\VolDeferredLight_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\VolPathtracer_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\Voxelization_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\VolSTPathtracer_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\GridVoxelization_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\GridSpread_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\VolSTPathtracerWithDF_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -193,6 +203,15 @@
     <ClInclude Include="Techniques\VolumeRendering\Convolution.h" />
     <ClInclude Include="Techniques\VolumeRendering\AdaptiveTrackingVolumeTechnique.h" />
     <ClInclude Include="Techniques\VolumeRendering\GridPathtracingVolumeTechnique.h" />
+    <ClInclude Include="Techniques\VolumeRendering\VarianceBasedConvolution.h" />
+    <ClInclude Include="Techniques\VolumeRendering\SphereScatteringTestTechnique.h" />
+    <ClInclude Include="Techniques\VolumeRendering\ScatteringModel.h" />
+    <ClInclude Include="Techniques\VolumeRendering\SphereScatteringWithDL.h" />
+    <ClInclude Include="Techniques\VolumePathtracing\VolDirectLightingTechnique.h" />
+    <ClInclude Include="Techniques\VolumePathtracing\VolPathtracerTechnique.h" />
+    <ClInclude Include="Techniques\VolumePathtracing\VolSTPathtracerTechnique.h" />
+    <ClInclude Include="Techniques\VolumePathtracing\VolumeScattering.h" />
+    <ClInclude Include="Techniques\VolumePathtracing\VolSTPathtracerWithDFTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

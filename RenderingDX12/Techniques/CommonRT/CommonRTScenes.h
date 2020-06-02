@@ -22,6 +22,7 @@ SamplerState gSmp : register(TEXTURES_SAMPLER_REG);
 cbuffer Lighting : register(LIGHTING_CB_REG) {
 	float3 LightPosition;
 	float3 LightIntensity;
+	float3 LightDirection;
 }
 
 struct ObjInfo {

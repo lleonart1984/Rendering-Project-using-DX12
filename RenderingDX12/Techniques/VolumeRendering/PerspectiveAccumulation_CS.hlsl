@@ -45,7 +45,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	for (int z = 0; z < AccDimensions.z; z++) {
 		float3 enterCell = TransformFromAccToWorld(float3(DTid.xy + 0.5, z) / AccDimensions);
 		float3 exitCell = TransformFromAccToWorld(float3(DTid.xy + 0.5, z + 1) / AccDimensions);
-		double stepSize = length(enterCell - exitCell);
+		float stepSize = length(enterCell - exitCell);
 
 		acc += stepSize * SampleDensity(((enterCell + exitCell) * 0.5 - bMin) / (bMax - bMin));
 		Accumulated[int3(DTid.xy, z)] = acc;

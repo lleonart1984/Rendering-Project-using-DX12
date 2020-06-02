@@ -39,9 +39,64 @@ RWTexture2D<float3> Gradient		: register(u3); // density gradient in scattered p
 //#include "PhaseIso.h"
 #include "PhaseAniso.h"
 
+#define BR 1.0
+#define BM 1.0
+#define GC 0
+
+
+
 float3 SampleSkybox(float3 L) {
+
+	//return float3(0, 0, 1);
+	float3 BG_COLORS[5] =
+	{
+		float3(0.00f, 0.0f, 0.02f), // GROUND DARKER BLUE
+		float3(0.01f, 0.05f, 0.2f), // HORIZON GROUND DARK BLUE
+		float3(0.7f, 0.9f, 1.0f), // HORIZON SKY WHITE
+		float3(0.1f, 0.3f, 1.0f),  // SKY LIGHT BLUE
+		float3(0.01f, 0.1f, 0.7f)  // SKY BLUE
+	};
+
+	float BG_DISTS[5] =
+	{
+		-1.0f,
+		-0.04f,
+		0.0f,
+		0.5f,
+		1.0f
+	};
+
+	float3 col = BG_COLORS[0];
+	//for (int i = 1; i < 5; i++)
+	col = lerp(col, BG_COLORS[1], smoothstep(BG_DISTS[0], BG_DISTS[1], L.y));
+	col = lerp(col, BG_COLORS[2], smoothstep(BG_DISTS[1], BG_DISTS[2], L.y));
+	col = lerp(col, BG_COLORS[3], smoothstep(BG_DISTS[2], BG_DISTS[3], L.y));
+	col = lerp(col, BG_COLORS[4], smoothstep(BG_DISTS[3], BG_DISTS[4], L.y));
+	return col;
+}
+
+float3 SampleSkybox2(float3 L) {
+	float3 seaFactor = 1;
+	if (L.y <= 0) // Sea
+	{
+		L = reflect(L, float3(0, 1, 0)); // Reflect sky
+		seaFactor = float3(0.3, 0.5, 0.8);
+	}
+	float3 H = float3(0, 0.1, 0);
+
+	float3 Lr = normalize(LightDirection + H * 1);
+	float3 Lg = normalize(LightDirection + H * 10);
+	float3 Lb = normalize(LightDirection + H * 100);
+
+	float3 cosTheta = abs(float3(dot(L, Lr), dot(L, Lg), dot(L, Lb)));
+
+	float3 BR_T = 3.0 / (16) * BR * (1 + cosTheta * cosTheta);
+	float3 BM_T = BM / (4) * (1 - GC) / pow(1 + GC * GC + 2 * GC * cosTheta, 1.5);
+
+	// Sky
+//return LightIntensity * 0.6 * (BR_T + BM_T) / (BR + BM) * seaFactor;
 	float azim = L.y;
-	return lerp(float3(0.7, 0.8, 1), float3(0.5, 0.3, 0.2), 0.5 - azim * 0.5);
+	return lerp(float3(0.0, 0.0, 0.1), float3(0.1, 0.1, 0.4), 0.5 - azim * 0.5);
 }
 
 void GetVolumeBox(out float3 minim, out float3 maxim) {
@@ -82,7 +137,7 @@ bool NextDistance(float3 bMin, float3 bMax, inout float3 P, float3 D, float exit
 	density = 0;
 	tSamplePosition = (P - bMin) / (bMax - bMin);
 	while (true) {
-		t = -log(1 - random()) / Density; // Using Density as majorant
+		t = -log(max(0.000000001, 1 - random())) / Density; // Using Density as majorant
 		P += t * D;
 
 		if (t >= exitDistance)
@@ -118,6 +173,9 @@ float3 Pathtrace(float3 bMin, float3 bMax, float3 P, float3 D) {
 		float density;
 		if (!NextDistance(bMin, bMax, P, D, d, density, tSamplePosition, t, tpdf))
 			return SampleSkybox(D) + accum;
+
+		//if (any(isnan(P)) || any(isnan(D)))
+		//	return 0;
 
 		// next-estimation in pathtracing
 		float3 lightPosition = mul(float4(tSamplePosition, 1), FromVolToAcc).xyz;
@@ -180,9 +238,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		return;
 
 	// Compute Gradient at P
-	float3 dx = P + float3(0.005, 0, 0);
-	float3 dy = P + float3(0, 0.005, 0);
-	float3 dz = P + float3(0, 0, 0.005);
+	float3 dx = P + float3(0.01, 0, 0);
+	float3 dy = P + float3(0, 0.01, 0);
+	float3 dz = P + float3(0, 0, 0.01);
 
 	float3 gradient = float3(
 		SampleDensity(bMin, bMax, dx) - density,
@@ -190,7 +248,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		SampleDensity(bMin, bMax, dz) - density
 		);
 
-	Gradient[DTid.xy] = normalize(gradient / Density);
+	Gradient[DTid.xy] = 0;// any(gradient) ? normalize(gradient / Density) : 0;
 	Positions[DTid.xy] = float4(P, tpdf);
 	// Scatters to a new direction
 	float scatterPdf;

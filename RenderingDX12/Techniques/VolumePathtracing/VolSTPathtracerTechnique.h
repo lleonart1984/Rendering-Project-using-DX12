@@ -3,13 +3,54 @@
 #include "../../Techniques/GUI_Traits.h"
 #include "../DeferredShading/GBufferConstruction.h"
 #include "../CommonGI/Parameters.h"
-#include "../CommonRT/DirectLightingTechnique.h"
+#include "../VolumePathtracing/VolDirectLightingTechnique.h"
 
-struct IterativePathtracer : public DirectLightingTechnique, public IHasAccumulative {
+struct VolSTPathtracerTechnique : public VolDirectLightingTechnique, public IHasAccumulative {
 public:
 
-	~IterativePathtracer() {
+	~VolSTPathtracerTechnique() {
 	}
+
+	struct Voxelizer : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\Voxelization_CS.cso"));
+		}
+
+		gObj<Buffer> Vertices;
+		gObj<Buffer> OB;
+		gObj<Buffer> Transforms;
+		
+		gObj<Buffer> Grid;
+
+		gObj<Buffer> GridInfo;
+
+		void Globals() {
+			SRV(0, Vertices, ShaderType_Any);
+			SRV(1, OB, ShaderType_Any);
+			SRV(2, Transforms, ShaderType_Any);
+
+			UAV(0, Grid, ShaderType_Any);
+
+			CBV(0, GridInfo, ShaderType_Any);
+		}
+	};
+
+	struct BUVoxelizer : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\BUVoxelization_CS.cso"));
+		}
+
+		gObj<Buffer> Grid;
+		int2 GridRange;
+
+		void Globals() {
+			UAV(0, Grid, ShaderType_Any);
+		}
+
+		void Locals() {
+			CBV(0, GridRange, ShaderType_Any);
+		}
+	};
 
 	// DXR pipeline for pathtracing stage
 	struct DXR_PT_Pipeline : public RTPipelineManager {
@@ -20,7 +61,7 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\Pathtracing\\IterativePathtracer_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\VolSTPathtracer_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -31,7 +72,7 @@ public:
 
 		struct DXR_RT_Program : public RTProgram<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(4 * 3 * 4 + 4); // 4 float3
+				_ gSet Payload(4 * 3 * 4 + 4 + 4 + 8); // 4 float3 + int + 2 uint
 				_ gSet StackSize(1); // No recursion needed!
 				_ gLoad Shader(Context()->PTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
@@ -50,13 +91,19 @@ public:
 			// GBuffer from light for visibility test during direct lighting
 			gObj<Texture2D> LightPositions;
 
-			gObj<Texture2D> *Textures;
+			gObj<Buffer> Grid;
+
+			gObj<Texture2D>* Textures;
 			int TextureCount;
 
 			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
 			gObj<Buffer> LightTransforms;
 			int Frame;
+			gObj<Buffer> ParticipatingMedia;
+			gObj<Buffer> ProjToWorld;
+			gObj<Buffer> GridInfo;
+			int Debug;
 
 			gObj<Texture2D> DirectLighting;
 			gObj<Texture2D> Output;
@@ -85,7 +132,9 @@ public:
 
 				SRV(8, DirectLighting);
 
-				SRV_Array(9, Textures, TextureCount);
+				SRV(9, Grid);
+
+				SRV_Array(10, Textures, TextureCount);
 
 				Static_SMP(0, Sampler::Linear());
 				Static_SMP(1, Sampler::LinearWithoutMipMaps());
@@ -94,10 +143,14 @@ public:
 				CBV(1, LightingCB);
 				CBV(2, LightTransforms);
 				CBV(3, Frame);
+				CBV(4, ParticipatingMedia);
+				CBV(5, ProjToWorld);
+				CBV(6, GridInfo);
+				CBV(7, Debug);
 			}
 
 			void HitGroup_Locals() {
-				CBV(4, CurrentObjectInfo);
+				CBV(8, CurrentObjectInfo);
 			}
 		};
 		gObj<DXR_RT_Program> _Program;
@@ -147,15 +200,19 @@ public:
 		}
 	};
 
+	gObj<Voxelizer> voxelizer;
+	gObj<BUVoxelizer> buvoxelizer;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
 	gObj<Filter> filterPipeline;
 
 	void Startup() {
 
-		DirectLightingTechnique::Startup();
+		VolDirectLightingTechnique::Startup();
 
 		wait_for(signal(flush_all_to_gpu));
 
+		_ gLoad Pipeline(voxelizer);
+		_ gLoad Pipeline(buvoxelizer);
 		_ gLoad Pipeline(dxrPTPipeline);
 		_ gLoad Pipeline(filterPipeline);
 
@@ -164,6 +221,13 @@ public:
 
 		perform(CreateSceneOnGPU);
 	}
+
+	int gridSize = 128;
+	struct GridInfo {
+		int Size;
+		float3 Min;
+		float3 Max;
+	};
 
 	void CreatingAssets(gObj<CopyingManager> manager) {
 
@@ -175,6 +239,8 @@ public:
 		dxrPTPipeline->_Program->CameraCB = computeDirectLighting->ViewTransform;
 		dxrPTPipeline->_Program->LightingCB = computeDirectLighting->Lighting;
 		dxrPTPipeline->_Program->LightTransforms = computeDirectLighting->LightTransforms;
+		dxrPTPipeline->_Program->ProjToWorld = _ gCreate ConstantBuffer<float4x4>();
+		dxrPTPipeline->_Program->ParticipatingMedia = computeDirectLighting->ParticipatingMedia;
 
 		dxrPTPipeline->_Program->Positions = gBufferFromViewer->pipeline->GBuffer_P;
 		dxrPTPipeline->_Program->Normals = gBufferFromViewer->pipeline->GBuffer_N;
@@ -187,6 +253,34 @@ public:
 		dxrPTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		dxrPTPipeline->_Program->Accum = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 #pragma endregion
+
+		voxelizer->Vertices = sceneLoader->VertexBuffer;
+		voxelizer->Transforms = sceneLoader->TransformBuffer;
+		voxelizer->OB = sceneLoader->ObjectBuffer;
+		
+		int levelSize = gridSize * gridSize * gridSize / 64;
+		int totalGridSize = 0;
+		while (levelSize >= 1)
+		{
+			totalGridSize += levelSize;
+			levelSize /= 8;
+		}
+		voxelizer->Grid = _ gCreate RWStructuredBuffer<uint2>(totalGridSize);
+		voxelizer->GridInfo = _ gCreate ConstantBuffer<GridInfo>();
+
+		dxrPTPipeline->_Program->Grid = voxelizer->Grid;
+		dxrPTPipeline->_Program->GridInfo = voxelizer->GridInfo;
+
+		float3 dim = sceneLoader->Scene->getMaximum() - sceneLoader->Scene->getMinimum();
+		float maxDim = max(dim.x, max(dim.y, dim.z));
+
+		manager gCopy ValueData(voxelizer->GridInfo, GridInfo{
+			gridSize,
+			sceneLoader->Scene->getMinimum(),
+			sceneLoader->Scene->getMinimum() + float3(maxDim, maxDim, maxDim)
+			});
+
+		buvoxelizer->Grid = voxelizer->Grid;
 
 		filterPipeline->Accumulation = dxrPTPipeline->_Program->Accum;
 		filterPipeline->Background = DirectLighting;
@@ -225,14 +319,40 @@ public:
 		dxrPTPipeline->_Program->Scene = instances gCreate BakedScene();
 	}
 
-	float4x4 view, proj;
-	float4x4 lightView, lightProj;
-
 	void Frame() {
 
-		DirectLightingTechnique::Frame();
+		VolDirectLightingTechnique::Frame();
 
-		perform(Pathtracing);	
+		static bool first = true;
+
+		if (first) { // if dynamic scene this need to be done everyframe
+			perform(BuildGrid);
+			first = false;
+		}
+
+		perform(Pathtracing);
+	}
+
+	void BuildGrid(gObj<DXRManager> manager) {
+		auto compute = manager.Dynamic_Cast<ComputeManager>();
+
+		compute gClear UAV(voxelizer->Grid, uint4(0, 0, 0, 0));
+		compute gSet Pipeline(voxelizer);
+		compute gDispatch Threads((int)ceil(sceneLoader->VertexBuffer->ElementCount / 3.0 / CS_1D_GROUPSIZE));
+
+		compute gSet Pipeline(buvoxelizer);
+
+		int levelSize = gridSize * gridSize * gridSize / 64;
+		int start = 0;
+
+		while (levelSize >= 1)
+		{
+			buvoxelizer->GridRange = int2(start, start + levelSize);
+			compute gDispatch Threads((int)ceil(levelSize / 8.0 / CS_1D_GROUPSIZE));
+
+			start += levelSize;
+			levelSize /= 8;
+		}
 	}
 
 	void Pathtracing(gObj<DXRManager> manager) {
@@ -246,10 +366,12 @@ public:
 			FrameIndex = 0;
 			manager gClear UAV(rtProgram->Output, float4(0, 0, 0, 0));
 			manager gClear UAV(rtProgram->Accum, float4(0, 0, 0, 0));
-		}
 
+			manager gCopy ValueData(rtProgram->ProjToWorld, mul(view, proj).getInverse());
+		}
+		dxrPTPipeline->_Program->Debug = this->CountSteps ? 1 : 0;
 		rtProgram->Frame = FrameIndex;
-		
+
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrPTPipeline);
 		// Activate program with main shaders
@@ -288,9 +410,9 @@ public:
 		manager gSet RayGeneration(dxrPTPipeline->PTMainRays);
 
 		rtProgram->Frame = FrameIndex;
-		
+
 		if (FrameIndex < StopFrame || StopFrame == 0) {
-			
+
 			CurrentFrame = FrameIndex;
 
 			// Dispatch primary rays
@@ -300,7 +422,7 @@ public:
 		}
 
 		manager gCopy All(render_target, rtProgram->Output);
-		
+
 		//auto compute = manager.Dynamic_Cast<ComputeManager>();
 		//
 		//filterPipeline->PassCount = FrameIndex;

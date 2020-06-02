@@ -4,11 +4,12 @@
 #define BUNNY_OBJ 0
 #define CORNELL_OBJ 1
 #define RING_OBJ 2
-#define SPONZA_OBJ 3
-#define SIBENIK_OBJ 4
-#define SANMIGUEL_OBJ 5
+#define BUDDHA_OBJ 3
+#define SPONZA_OBJ 4
+#define SIBENIK_OBJ 5
+#define SANMIGUEL_OBJ 6
 
-#define USE_SCENE SPONZA_OBJ
+#define USE_SCENE BUDDHA_OBJ
 
 #define USE_VOLUME 0
 
@@ -76,7 +77,13 @@
 //gObj<PhotonMapVolumeTechnique> technique;
 //gObj<PhotonMapVolumeTechnique2> technique;
 //gObj<AdaptiveTrackingVolumeTechnique> technique;
-gObj<GridTrackingVolumeTechnique> technique;
+//gObj<GridTrackingVolumeTechnique> technique;
+
+//gObj<SphereScatteringTestTechnique> technique;
+
+//gObj<VolPathtracerTechnique> technique;
+//gObj<VolSTPathtracerTechnique> technique;
+gObj<VolSTPathtracerWithDFTechnique> technique;
 
 //#define TEST_WSAPIT
 //#define TEST_WSMRAPIT

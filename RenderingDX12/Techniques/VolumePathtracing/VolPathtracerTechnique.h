@@ -3,12 +3,12 @@
 #include "../../Techniques/GUI_Traits.h"
 #include "../DeferredShading/GBufferConstruction.h"
 #include "../CommonGI/Parameters.h"
-#include "../CommonRT/DirectLightingTechnique.h"
+#include "../VolumePathtracing/VolDirectLightingTechnique.h"
 
-struct IterativePathtracer : public DirectLightingTechnique, public IHasAccumulative {
+struct VolPathtracerTechnique : public VolDirectLightingTechnique, public IHasAccumulative {
 public:
 
-	~IterativePathtracer() {
+	~VolPathtracerTechnique() {
 	}
 
 	// DXR pipeline for pathtracing stage
@@ -20,7 +20,7 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\Pathtracing\\IterativePathtracer_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\VolPathtracer_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -31,7 +31,7 @@ public:
 
 		struct DXR_RT_Program : public RTProgram<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(4 * 3 * 4 + 4); // 4 float3
+				_ gSet Payload(4 * 3 * 4 + 4 + 8); // 4 float3 + int + 2 uint
 				_ gSet StackSize(1); // No recursion needed!
 				_ gLoad Shader(Context()->PTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
@@ -50,13 +50,15 @@ public:
 			// GBuffer from light for visibility test during direct lighting
 			gObj<Texture2D> LightPositions;
 
-			gObj<Texture2D> *Textures;
+			gObj<Texture2D>* Textures;
 			int TextureCount;
 
 			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
 			gObj<Buffer> LightTransforms;
 			int Frame;
+			gObj<Buffer> ParticipatingMedia;
+			gObj<Buffer> ProjToWorld;
 
 			gObj<Texture2D> DirectLighting;
 			gObj<Texture2D> Output;
@@ -94,10 +96,12 @@ public:
 				CBV(1, LightingCB);
 				CBV(2, LightTransforms);
 				CBV(3, Frame);
+				CBV(4, ParticipatingMedia);
+				CBV(5, ProjToWorld);
 			}
 
 			void HitGroup_Locals() {
-				CBV(4, CurrentObjectInfo);
+				CBV(6, CurrentObjectInfo);
 			}
 		};
 		gObj<DXR_RT_Program> _Program;
@@ -152,7 +156,7 @@ public:
 
 	void Startup() {
 
-		DirectLightingTechnique::Startup();
+		VolDirectLightingTechnique::Startup();
 
 		wait_for(signal(flush_all_to_gpu));
 
@@ -175,6 +179,8 @@ public:
 		dxrPTPipeline->_Program->CameraCB = computeDirectLighting->ViewTransform;
 		dxrPTPipeline->_Program->LightingCB = computeDirectLighting->Lighting;
 		dxrPTPipeline->_Program->LightTransforms = computeDirectLighting->LightTransforms;
+		dxrPTPipeline->_Program->ProjToWorld = _ gCreate ConstantBuffer<float4x4>();
+		dxrPTPipeline->_Program->ParticipatingMedia = computeDirectLighting->ParticipatingMedia;
 
 		dxrPTPipeline->_Program->Positions = gBufferFromViewer->pipeline->GBuffer_P;
 		dxrPTPipeline->_Program->Normals = gBufferFromViewer->pipeline->GBuffer_N;
@@ -225,14 +231,11 @@ public:
 		dxrPTPipeline->_Program->Scene = instances gCreate BakedScene();
 	}
 
-	float4x4 view, proj;
-	float4x4 lightView, lightProj;
-
 	void Frame() {
 
-		DirectLightingTechnique::Frame();
+		VolDirectLightingTechnique::Frame();
 
-		perform(Pathtracing);	
+		perform(Pathtracing);
 	}
 
 	void Pathtracing(gObj<DXRManager> manager) {
@@ -246,10 +249,12 @@ public:
 			FrameIndex = 0;
 			manager gClear UAV(rtProgram->Output, float4(0, 0, 0, 0));
 			manager gClear UAV(rtProgram->Accum, float4(0, 0, 0, 0));
+
+			manager gCopy ValueData(rtProgram->ProjToWorld, mul(view, proj).getInverse());
 		}
 
 		rtProgram->Frame = FrameIndex;
-		
+
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrPTPipeline);
 		// Activate program with main shaders
@@ -288,9 +293,9 @@ public:
 		manager gSet RayGeneration(dxrPTPipeline->PTMainRays);
 
 		rtProgram->Frame = FrameIndex;
-		
+
 		if (FrameIndex < StopFrame || StopFrame == 0) {
-			
+
 			CurrentFrame = FrameIndex;
 
 			// Dispatch primary rays
@@ -300,7 +305,7 @@ public:
 		}
 
 		manager gCopy All(render_target, rtProgram->Output);
-		
+
 		//auto compute = manager.Dynamic_Cast<ComputeManager>();
 		//
 		//filterPipeline->PassCount = FrameIndex;

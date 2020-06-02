@@ -60,4 +60,10 @@ using namespace CA4G;
 #include "Techniques/VolumeRendering/PhotonMapVolumeTechnique.h"
 #include "Techniques/VolumeRendering/PhotonMapVolumeTechnique2.h"
 
+#include "Techniques/VolumeRendering/SphereScatteringTestTechnique.h"
+
+#include "Techniques/VolumePathtracing/VolPathtracerTechnique.h"
+#include "Techniques/VolumePathtracing/VolSTPathtracerTechnique.h"
+#include "Techniques/VolumePathtracing/VolSTPathtracerWithDFTechnique.h"
+
 #include "main.h"

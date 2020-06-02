@@ -10,6 +10,13 @@ private:
 	virtual void Boo() {}
 };
 
+struct IHasAccumulative {
+	int CurrentFrame;
+	int StopFrame;
+private:
+	virtual void Boo() {}
+};
+
 // Defines this technique will use a camera
 struct IHasCamera {
 	Camera* Camera;
@@ -44,6 +51,25 @@ struct IHasVolume {
 	virtual void SetVolume(gObj<CA4G::Volume> volume) {
 		this->Volume = volume;
 	}
+};
+
+struct IHasHomogeneousVolume {
+	float densityScale = 1;
+	float globalAbsortion = 0.0;
+	float gFactor = 0.875;
+
+	virtual void Boo() {}
+};
+
+struct IHasScatteringEvents {
+	float density = 10;
+	float3 scatteringAlbedo = float3(1, 1, 1);
+	float3 gFactor = float3(1, 1, 1) * 0.0f;// 0.875;
+	float pathtracing = 0.5;
+	float3 phi = float3(1.0, 1.0, 1.0);
+	bool CountSteps = false;
+
+	virtual void Boo() {}
 };
 
 #define MAX_NUMBER_OF_TRIANGLES 10000

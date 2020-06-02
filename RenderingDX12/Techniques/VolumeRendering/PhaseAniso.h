@@ -1,4 +1,5 @@
-#define g (0.875)
+#define g (0.65)
+//(0.875)
 #define one_minus_g2 (1.0 - g * g)
 #define one_plus_g2 (1.0 + g * g)
 #define one_over_2g (0.5 / g)
@@ -22,7 +23,8 @@ float calcpdf(float costheta) {
 }
 
 void CreateOrthonormalBasis(float3 D, out float3 B, out float3 T) {
-	float3 other = abs(D.z) == 1 ? float3(1, 0, 0) : float3(0, 0, 1);
+	D = normalize(D);
+	float3 other = abs(D.z) >= 0.999 ? float3(1, 0, 0) : float3(0, 0, 1);
 	B = normalize(cross(other, D));
 	T = normalize(cross(D, B));
 }
@@ -30,15 +32,15 @@ void CreateOrthonormalBasis(float3 D, out float3 B, out float3 T) {
 //float random();
 
 void GeneratePhase(float3 D, out float3 L, out float pdf) {
-	float phi = random() * 2 * 3.14159;
+	float phi = random() * 2 * pi;
 	float cosTheta = invertcdf(random());
-	float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
+	float sinTheta = sqrt(max(0, 1.0f - cosTheta * cosTheta));
 
 	float3 t0, t1;
 	CreateOrthonormalBasis(D, t0, t1);
 
-	L = sinTheta * sin(phi) * t0 + sinTheta * cos(phi) * t1 +
-		cosTheta * D;
+	L = (sinTheta * sin(phi) * t0 + sinTheta * cos(phi) * t1 +
+		cosTheta * D);
 
 	pdf = calcpdf(cosTheta);
 }

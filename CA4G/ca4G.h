@@ -14496,12 +14496,27 @@ namespace CA4G {
 
 		}
 
+		int windowWidth;
+		int windowHeight;
+
 	public:
 
 		ID3D12Debug *debugController;
+		long renderTargetDescriptorSlot;
+
+		inline int getWindowWidth() { return windowWidth; }
+		inline int getWindowHeight() { return windowHeight; }
 
 		DX_Device getInnerD3D12Device() {
 			return manager->device;
+		}
+
+		D3D12_GPU_DESCRIPTOR_HANDLE getCurrentRTInGUI() {
+			int srv = this->renderTargetViews[CurrentBuffer]->getSRV();
+
+			manager->device->CopyDescriptorsSimple(1, manager->descriptors->gui_csu->getCPUVersion((int)renderTargetDescriptorSlot), manager->descriptors->cpu_csu->getCPUVersion(srv), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+			return manager->descriptors->gui_csu->getGPUVersion((int)renderTargetDescriptorSlot);
 		}
 
 		DX_DescriptorHeap getDescriptorsHeapForGUI() {
@@ -14587,8 +14602,8 @@ namespace CA4G {
 			// Describe and create the swap chain.
 			DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 			swapChainDesc.BufferCount = buffers;
-			swapChainDesc.Width = rect.right - rect.left;
-			swapChainDesc.Height = rect.bottom - rect.top;
+			swapChainDesc.Width = windowWidth = rect.right - rect.left;
+			swapChainDesc.Height = windowHeight = rect.bottom - rect.top;
 			swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 			swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 			swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
@@ -14627,6 +14642,9 @@ namespace CA4G {
 
 			CurrentBuffer = swapChain->GetCurrentBackBufferIndex();
 			manager->BackBuffer = renderTargetViews[CurrentBuffer];
+
+			renderTargetDescriptorSlot = manager->descriptors->gui_csu->MallocPersistent();
+
 			/*
 					manager->device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gui_allocator[0]));
 					manager->device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gui_allocator[1]));
@@ -14887,7 +14905,7 @@ namespace CA4G {
 				pos++;
 		}
 
-		bool readIntegerToken(int &i) {
+		bool readIntegerToken(long &i) {
 			i = 0;
 			if (isEol())
 				return false;
@@ -14912,6 +14930,28 @@ namespace CA4G {
 			pos = initialPos;
 			return false;
 		}
+
+		bool readFracPart(float& i)
+		{
+			i = 0;
+			float p = 1;
+			if (isEol())
+				return false;
+			int initialPos = pos;
+			ignoreWhiteSpaces();
+			int end = pos;
+			while (pos < count && !endsInteger(buffer[pos])) {
+				p /= 10.0f;
+				i = i + (buffer[pos] - '0') * p;
+				pos++;
+			}
+			if (pos > end)
+				return true;
+			pos = initialPos;
+			return false;
+		}
+
+
 		bool readFloatToken(float &f) {
 			int initialPos = pos;
 			int sign = 1;
@@ -14921,7 +14961,7 @@ namespace CA4G {
 				sign = -1;
 				pos++;
 			}
-			int intPart = 0;
+			long intPart = 0;
 			float scale = 1;
 			if ((pos < count && buffer[pos] == '.') || readIntegerToken(intPart))
 			{
@@ -14929,24 +14969,23 @@ namespace CA4G {
 				if (pos < count && buffer[pos] == '.')
 				{
 					int fracPos = pos;
-					int fracPart;
+					float fracPart;
 					pos++;
-					if (!readIntegerToken(fracPart))
+					if (!readFracPart(fracPart))
 					{
 						pos = initialPos;
 						return false;
 					}
 					else
 					{
-						int expPart = 0;
+						long expPart = 0;
 						if (buffer[pos] == 'e') {
 							pos++;
 							readIntegerToken(expPart);
 							scale = pow(10, expPart);
 						}
 					}
-					float fracPartf = fracPart / pow(10, pos - fracPos - 1);
-					f += fracPartf;
+					f += fracPart;
 				}
 				f *= sign * scale;
 				return true;
@@ -14994,20 +15033,26 @@ namespace CA4G {
 				float3 edge_1_3 = vertex3.Position - vertex1.Position;
 
 				float2 coordinate_2_1 = vertex2.Coordinates - vertex1.Coordinates;
-				float2 coordinate_3_1 = vertex3.Coordinates - vertex1.Coordinates;
+				
+				if (length(coordinate_2_1) <= 0.0001)
+					coordinate_2_1 = float2(1, 0);
 
-				float alpha = 1.0f / (coordinate_2_1.x * coordinate_3_1.y - coordinate_2_1.y * coordinate_3_1.x);
+				float2 coordinate_3_1 = vertex3.Coordinates - vertex1.Coordinates;
+				if (length(coordinate_3_1) <= 0.0001)
+					coordinate_3_1 = float2(0, 1);
+
+				float alpha = 1.0f;// / max(0.001f, coordinate_2_1.x * coordinate_3_1.y - coordinate_2_1.y * coordinate_3_1.x);
 
 				vertex1.Tangent = vertex2.Tangent = vertex3.Tangent = float3(
-					((edge_1_2.x * coordinate_3_1.y) - (edge_1_3.x * coordinate_2_1.y)) * alpha,
-					((edge_1_2.y * coordinate_3_1.y) - (edge_1_3.y * coordinate_2_1.y)) * alpha,
-					((edge_1_2.z * coordinate_3_1.y) - (edge_1_3.z * coordinate_2_1.y)) * alpha
+					max(0.00001, (edge_1_2.x * coordinate_3_1.y) - (edge_1_3.x * coordinate_2_1.y)) * alpha,
+					max(0.00001, (edge_1_2.y * coordinate_3_1.y) - (edge_1_3.y * coordinate_2_1.y)) * alpha,
+					max(0.00001, (edge_1_2.z * coordinate_3_1.y) - (edge_1_3.z * coordinate_2_1.y)) * alpha
 				);
 
 				vertex1.Binormal = vertex2.Binormal = vertex3.Binormal = float3(
-					((edge_1_2.x * coordinate_3_1.x) - (edge_1_3.x * coordinate_2_1.x)) * alpha,
-					((edge_1_2.y * coordinate_3_1.x) - (edge_1_3.y * coordinate_2_1.x)) * alpha,
-					((edge_1_2.z * coordinate_3_1.x) - (edge_1_3.z * coordinate_2_1.x)) * alpha
+					max(0.00001, (edge_1_2.x * coordinate_3_1.x) - (edge_1_3.x * coordinate_2_1.x)) * alpha,
+					max(0.00001, (edge_1_2.y * coordinate_3_1.x) - (edge_1_3.y * coordinate_2_1.x)) * alpha,
+					max(0.00001, (edge_1_2.z * coordinate_3_1.x) - (edge_1_3.z * coordinate_2_1.x)) * alpha
 				);
 			}
 
@@ -15118,7 +15163,22 @@ namespace CA4G {
 					continue;
 				}
 
-				if (t.match("Tf "))
+				if (t.match("d "))
+				{
+					float r, g, b;
+					t.readFloatToken(r);
+					if (r < 1) {
+						//t.readFloatToken(g);
+						//t.readFloatToken(b);
+						MaterialsData.last().Roulette.x = r;
+						MaterialsData.last().Roulette.y = r;
+						MaterialsData.last().Roulette.w = 1 - r;
+					}
+					t.skipCurrentLine();
+					continue;
+				}
+
+				/*if (t.match("Tf "))
 				{
 					float r, g, b;
 					t.readFloatToken(r);
@@ -15133,7 +15193,7 @@ namespace CA4G {
 					}
 					t.skipCurrentLine();
 					continue;
-				}
+				}*/
 
 				if (t.match("Ni "))
 				{
@@ -15210,7 +15270,7 @@ namespace CA4G {
 			bool te = false;
 			while (!t.isEol())
 			{
-				int indexRead;
+				long indexRead;
 				if (t.readIntegerToken(indexRead))
 				{
 					switch (type)
@@ -15309,7 +15369,7 @@ namespace CA4G {
 			bool te = false;
 			while (!t.isEol())
 			{
-				int indexRead;
+				long indexRead;
 				if (t.readIntegerToken(indexRead))
 				{
 					switch (type)
@@ -15505,13 +15565,16 @@ namespace CA4G {
 			float scaleZ = Maxim.z - Minim.z;
 			float scale = max(0.01f, max(scaleX, max(scaleY, scaleZ)));
 
+			Minim = Minim / scale;
+			Maxim = Maxim / scale;
+
 			for (int i = 0; i < positionIndices.size(); i++)
 			{
 				VerticesData[i].Position = positions[positionIndices[i] - 1] / scale;
 			}
 
 			for (int i = 0; i < positionIndices.size(); i++)
-				if (normalIndices[i] == 0)
+				//if (normalIndices[i] == 0)
 				{
 					float3 p0 = VerticesData[(i / 3) * 3 + 0].Position;
 					float3 p1 = VerticesData[(i / 3) * 3 + 1].Position;
@@ -15521,7 +15584,7 @@ namespace CA4G {
 
 			for (int i = 0; i < positionIndices.size(); i++)
 				if (normalIndices[i] != 0)
-					VerticesData[i].Normal = normals[normalIndices[i] - 1];
+					VerticesData[i].Normal = normalize(normals[normalIndices[i] - 1]);
 				else
 				{
 					VerticesData[i].Normal = normalize(computedNormals[positionIndices[i] - 1]);
@@ -15733,7 +15796,12 @@ namespace CA4G {
 		inline list<gObj<TextureData>>& Textures() {
 			return loader->Textures;
 		}
-
+		inline float3 getMinimum() {
+			return loader->Minim;
+		}
+		inline float3 getMaximum() {
+			return loader->Maxim;
+		}
 		Scene(const char* objFilePath) {
 
 			int len = strlen(objFilePath);

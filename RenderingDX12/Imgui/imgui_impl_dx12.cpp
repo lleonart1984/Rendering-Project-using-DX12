@@ -398,7 +398,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         param[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
         D3D12_STATIC_SAMPLER_DESC staticSampler = {};
-        staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
         staticSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         staticSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         staticSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -506,7 +506,8 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
             \
             float4 main(PS_INPUT input) : SV_Target\
             {\
-              float4 out_col = input.col * texture0.Sample(sampler0, input.uv); \
+			  float4 smp_col = texture0.Sample(sampler0, input.uv); \
+              float4 out_col = float4(input.col.xyz * smp_col.xyz, min(input.col.w , smp_col.w * 2)); \
               return out_col; \
             }";
 
@@ -520,14 +521,16 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     {
         D3D12_BLEND_DESC& desc = psoDesc.BlendState;
         desc.AlphaToCoverageEnable = false;
+		desc.IndependentBlendEnable = false;
         desc.RenderTarget[0].BlendEnable = true;
+		desc.RenderTarget[0].LogicOpEnable = false;
         desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
         desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
         desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-        desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
-        desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
-        desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
-        desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+        desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+        desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+        desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_MAX;
+		desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     }
 
     // Create the rasterizer state

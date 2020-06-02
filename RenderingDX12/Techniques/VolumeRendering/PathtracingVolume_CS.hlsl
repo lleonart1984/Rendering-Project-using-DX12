@@ -37,9 +37,32 @@ RWTexture2D<float3> Output			: register(u1);
 //#include "PhaseIso.h"
 #include "PhaseAniso.h"
 
+
+
 float3 SampleSkybox(float3 L) {
-	float azim = L.y;
-	return lerp(float3(0.7, 0.8, 1), float3(0.5, 0.3, 0.2), 0.5 - azim * 0.5);
+	//return float3(0, 0, 1);
+
+	float3 BG_COLORS[5] =
+	{
+		float3(0.00f, 0.0f, 0.02f), // GROUND DARKER BLUE
+		float3(0.01f, 0.05f, 0.2f), // HORIZON GROUND DARK BLUE
+		float3(0.7f, 0.9f, 1.0f), // HORIZON SKY WHITE
+		float3(0.1f, 0.3f, 1.0f),  // SKY LIGHT BLUE
+		float3(0.01f, 0.1f, 0.7f)  // SKY BLUE
+	};
+
+	float BG_DISTS[5] =
+	{
+		-1.0f,
+		-0.04f,
+		0.0f,
+		0.5f,
+		1.0f
+	};
+	float3 col = BG_COLORS[0];
+	for (int i = 1; i < 5; i++)
+		col = lerp(col, BG_COLORS[i], smoothstep(BG_DISTS[i - 1], BG_DISTS[i], L.y));
+	return col;
 }
 
 void GetVolumeBox(out float3 minim, out float3 maxim) {
@@ -67,7 +90,7 @@ void BoxIntersect(float3 bMin, float3 bMax, float3 P, float3 D, inout float tMax
 	float2x3 C = float2x3(bMin - P, bMax - P);
 	float2x3 D2 = float2x3(D, D);
 	float2x3 T = abs(D2) <= 0.000001 ? float2x3(float3(-1000, -1000, -1000), float3(1000, 1000, 1000)) : C / D2;
-	tMax = min(min(max(T._m00, T._m10), max(T._m01, T._m11)), max(T._m02, T._m12));
+	tMax = max (0, min(min(max(T._m00, T._m10), max(T._m01, T._m11)), max(T._m02, T._m12)));
 }
 
 //bool BoxIntersect(float3 bMin, float3 bMax, float3 P, float3 D, inout float tMax)
@@ -189,33 +212,25 @@ float3 Pathtrace(float3 P, float3 D) {
 
 	P += D * tMin; // Put P inside the volume
 
-	int N = 10000;
-	float phongNorm = (N + 2) / (2 * pi);
-
 	float d = tMax - tMin;
 
 	int bounces = 0;
 
+	float pdf = 1;
+
 	while(true)
 	//while (bounces < Absortion*200) 
 	{
-
-		float t = -log(1 - random()) / Density; // Using Density as majorant
-		float tpdf = exp(-t * Density) * Density;
+		float t = -log(max(0.000000001, 1.0 - random())) / Density; // Using Density as majorant
 
 		if (t >= d)
-			return 
-			SampleSkybox(D) 
-			+ accum;// +pow(max(0, dot(D, LightDirection)), N) * phongNorm * LightIntensity;
+			//return pdf;
+			return SampleSkybox(D) + accum;
 
 		P += t * D;
 
 		float3 tSamplePosition = (P - bMin) / (bMax - bMin);
-		float densityt = Data.SampleGrad(VolumeSampler, tSamplePosition, 0, 0) * Density;
-
-		float nullProb = Density - densityt;
-
-		float prob = 1 - nullProb / Density;
+		float prob = Data.SampleGrad(VolumeSampler, tSamplePosition, 0, 0);
 
 		if (random() < prob) // scattering
 		{
@@ -236,9 +251,11 @@ float3 Pathtrace(float3 P, float3 D) {
 			d = tMax;
 
 			bounces++;
+			pdf = 1;
 		}
 		else
 			d -= t;
+		pdf *= (1 - prob);
 	}
 
 	return accum;
@@ -266,10 +283,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 	float3 acc = Pathtrace(O, D);
 
-	//if (PassCount < 16)
-	{
-		Accumulation[DTid.xy] = (Accumulation[DTid.xy] * PassCount + acc) / (PassCount + 1);
-		Output[DTid.xy] = Accumulation[DTid.xy];
-	}
+	Accumulation[DTid.xy] += acc;
+	Output[DTid.xy] = Accumulation[DTid.xy] / (PassCount + 1);
 }
 

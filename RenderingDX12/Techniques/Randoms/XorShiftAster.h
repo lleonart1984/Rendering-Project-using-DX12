@@ -31,3 +31,7 @@ void initializeRandom(ULONG seed) {
 	rng_state = seed;
 }
 
+ULONG getRandomSeed() {
+	return rng_state;
+}
+

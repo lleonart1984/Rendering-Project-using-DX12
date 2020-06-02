@@ -61,12 +61,40 @@ bool GetPrimaryIntersection(uint2 screenCoordinates, float2 coordinates, out flo
 	surfel.T = float3(1, 0, 0);
 	surfel.B = cross(surfel.N, surfel.T);
 
+	V = -surfel.P / d;
+
+	material = materials[MaterialIndices[screenCoordinates]];
+
+	V = mul(float4(V, 0), ViewToWorld).xyz;
+
+	surfel = Transform(surfel, ViewToWorld);
+
+	// only update material, Normal is affected with bump map from gbuffer construction
+	AugmentMaterialWithTextureMapping(surfel, material, C.z, C.w);
+
+	return valid;
+}
+
+bool GetPrimaryIntersection(uint2 screenCoordinates, float2 coordinates, out float3 P, out float3 V, out Vertex surfel, out Material material) {
+	bool valid = any(Positions[screenCoordinates]);
+
+	float4 C = Coordinates[screenCoordinates];
+
+	surfel.P = Positions.SampleGrad(gSmp, coordinates, 0, 0);// [screenCoordinates];
+	float d = length(surfel.P);
+
+	surfel.N = Normals.SampleGrad(gSmp, coordinates, 0, 0);// [screenCoordinates];
+	surfel.C = C.xy;//// .SampleGrad(gSmp, coordinates, 0.0001, 0.0001);// [screenCoordinates];
+	surfel.T = float3(1, 0, 0);
+	surfel.B = cross(surfel.N, surfel.T);
+
 
 	V = -surfel.P / d;
 
 	material = materials[MaterialIndices[screenCoordinates]];
 
 	V = mul(float4(V, 0), ViewToWorld).xyz;
+	P = mul(float4(0,0,0, 1), ViewToWorld).xyz;
 
 	surfel = Transform(surfel, ViewToWorld);
 

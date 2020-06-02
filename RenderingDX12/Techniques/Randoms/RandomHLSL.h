@@ -73,11 +73,19 @@ float3 randomDirection()
 	float r2 = random() * 2 - 1;
 	float sqrR2 = r2 * r2;
 	float two_pi_by_r1 = two_pi * r1;
-	float sqrt_of_one_minus_sqrR2 = sqrt(1.0 - sqrR2);
+	float sqrt_of_one_minus_sqrR2 = sqrt(max(0, 1.0 - sqrR2));
 	float x = cos(two_pi_by_r1) * sqrt_of_one_minus_sqrR2;
 	float y = sin(two_pi_by_r1) * sqrt_of_one_minus_sqrR2;
 	float z = r2;
 	return float3(x, y, z);
+}
+
+float gauss(float mu = 0, float sigma = 1) {
+	float u1 = 1.0 - random(); //uniform(0,1] random doubles
+	float u2 = 1.0 - random();
+	float randStdNormal = sqrt(-2.0 * log(u1)) *
+		sin(2.0 * pi * u2); //random normal(0,1)
+	return mu + sigma * randStdNormal; //random normal(mean,stdDev^2)
 }
 
 float3 randomHSDirection(float3 N, out float NdotD)
@@ -137,6 +145,14 @@ void StartRandomSeedForThread(uint gridDimensions, int maxBounces, uint index, i
 
 	for (int i = 0; i < 23 + index % 13; i++)
 		random();
+}
+
+ULONG getCurrentSeed() {
+	return getRandomSeed();
+}
+
+void setCurrentSeed(ULONG seed) {
+	initializeRandom(seed);
 }
 
 #endif // RANDOMHLSL_H

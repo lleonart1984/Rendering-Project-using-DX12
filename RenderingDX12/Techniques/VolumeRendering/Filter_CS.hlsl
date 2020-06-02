@@ -59,6 +59,6 @@ void main( uint3 DTid : SV_DispatchThreadID )
 	//float3 acc = Positions[DTid.xy].w;
 	//float3 acc = isinf(Positions[DTid.xy].w) ? float3(1,1,0) : float3(1,0,0);
 
-	Accumulation[DTid.xy] = (Accumulation[DTid.xy] * PassCount + acc) / (PassCount + 1);
-	Output[DTid.xy] = Accumulation[DTid.xy];
+	Accumulation[DTid.xy] += acc;
+	Output[DTid.xy] = Accumulation[DTid.xy] / (PassCount + 1);
 }

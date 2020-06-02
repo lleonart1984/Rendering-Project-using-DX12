@@ -34,6 +34,7 @@ void RenderGUI(gObj<Technique> t) {
 	if (h)
 		GuiFor(h);
 }
+float lastFrameTimeInMS = 0;
 
 void GuiFor(gObj<IHasBackcolor> t) {
 	ImGui::ColorEdit3("clear color", (float*)&t->Backcolor); // Edit 3 floats representing a color
@@ -89,6 +90,46 @@ void GuiFor(gObj<IHasVolume> t) {
 	}
 }
 
+void GuiFor(gObj<IHasHomogeneousVolume> t) {
+	if (
+		ImGui::SliderFloat("Density", &t->densityScale, 0.001, 20) |
+		ImGui::SliderFloat("G", &t->gFactor, -0.99, 0.99) |
+		ImGui::SliderFloat("Absortion", &t->globalAbsortion, 0, 1)) {
+		auto asLight = t.Dynamic_Cast<IHasLight>();
+		if (asLight)
+			asLight->LightSourceIsDirty = true;
+	}
+}
+
+void GuiFor(gObj<IHasScatteringEvents> t) {
+	if (
+		ImGui::SliderFloat("Density", &t->density, 0.01, 1000, "%.3f", 2) |
+		ImGui::SliderFloat3("Sigma", (float*)&t->scatteringAlbedo, 0.0, 1.0) |
+		ImGui::SliderFloat3("G", (float*)&t->gFactor, -0.99, 0.99) |
+		ImGui::SliderFloat3("Phi", (float*)&t->phi, 0.0, 1.0) |
+		ImGui::SliderFloat("Pathtracing", &t->pathtracing, -.01, 1.01) |
+		ImGui::Checkbox("Debug", &t->CountSteps)
+		) {
+		auto asLight = t.Dynamic_Cast<IHasLight>();
+		if (asLight)
+			asLight->LightSourceIsDirty = true;
+	}
+}
+
+void GuiFor(gObj<IHasAccumulative> t) {
+	ImGui::Text("Current Frame %i", t->CurrentFrame);
+	if (t->StopFrame != 0)
+		ImGui::Text("ETA %.3f s", (t->StopFrame - t->CurrentFrame - 1) * lastFrameTimeInMS / 1000);
+
+	bool changeStop = ImGui::InputInt("Stop Frame", &t->StopFrame);
+
+	if (changeStop && t->StopFrame <= t->CurrentFrame && t->StopFrame != 0) {
+		auto asLight = t.Dynamic_Cast<IHasLight>();
+		if (asLight)
+			asLight->LightSourceIsDirty = true;
+	}
+}
+
 
 LPSTR desktop_directory()
 {
@@ -99,9 +140,13 @@ LPSTR desktop_directory()
 		return "ERROR";
 }
 
-void MixGlassMaterial(SCENE_MATERIAL* material, float alpha) {
-	material->RefractionIndex = 1.6;
+void MixGlassMaterial(SCENE_MATERIAL* material, float alpha, float eta = 1.6) {
+	material->RefractionIndex = eta;
 	material->Roulette = CA4G::lerp(material->Roulette, float4(0, 0, 0, 1), alpha);
+}
+
+void MixEmissiveMaterial(SCENE_MATERIAL* material, float3 emissive) {
+	material->Emissive = emissive;
 }
 
 void MixMirrorMaterial(SCENE_MATERIAL* material, float alpha) {
@@ -131,15 +176,16 @@ bool DeviceManager::FORCE_FALLBACK_DEVICE = false;
 //float3 cameraPositions[] = { float3(0.4,0.3,0), float3(0.24, 0.37, 0.54), float3(-0.24, 0.57, 0.44), float3(-0.14, 0.17, -0.35), float3(0.2, 0.02, 0.3) };
 
 // Good cameras for clouds
-float3 cameraPositions[] = { float3(1.2,0.1,0), float3(0.84, -0.37, 0.64), float3(-1.4, -0.17, 0.4), float3(-0.54, -0.17, -0.75), float3(0.2, 0.02, 0.3) };
+//float3 cameraPositions[] = { float3(1.2,0.1,0), float3(0.84, -0.37, 0.64), float3(-1.4, -0.17, 0.4), float3(-0.54, -0.17, -0.75), float3(0.2, 0.02, 0.3) };
 
 // Good cameras for sponza
 //float3 cameraPositions[] = { float3(0.1,0.1,0), float3(0.14, 0.17, 0.14), float3(-0.14, 0.17, 0.14), float3(-0.14, 0.17, -0.15), float3(0.2, 0.02, 0.1) };
-//float3 cameraPositions[] = { float3(0,0.6,0), float3(0.14, 0.17, 0.14), float3(-0.14, 0.17, 0.14), float3(-0.14, 0.17, -0.15), float3(0.2, 0.02, 0.1) };
-//float3 cameraTargets[] = { float3(0,0,-0.1), float3(-0.44, 0.1, 0.14 - 1),float3(0.44, 0.20, 0.14 - 1), float3(1 + 0.14, 0.3, 0.2 + 0.14),float3(0.2 - 1, 0.02, 0.1) };
-float3 cameraTargets[] = { float3(0,0,0), float3(-0, 0, 0),float3(0, 0, 0), float3(0, 0, 0),float3(0, 0, 0) };
+float3 cameraPositions[] = { float3(0,0.6,0), float3(0.14, 0.17, 0.14), float3(-0.14, 0.17, 0.14), float3(-0.14, 0.17, -0.15), float3(0.2, 0.02, 0.1) };
+float3 cameraTargets[] = { float3(0,0,-0.1), float3(-0.44, 0.1, 0.14 - 1),float3(0.44, 0.20, 0.14 - 1), float3(1 + 0.14, 0.3, 0.2 + 0.14),float3(0.2 - 1, 0.02, 0.1) };
+//float3 cameraTargets[] = { float3(0,0,0), float3(-0, 0, 0),float3(0, 0, 0), float3(0, 0, 0),float3(0, 0, 0) };
 int movingCamera = -1;
 bool ScreenShotDesired;
+
 
 float randomf() {
 	return rand() / (float)RAND_MAX;
@@ -197,8 +243,8 @@ int main(int, char**)
 
 	static Scene* scene = nullptr;
 	static Volume* volume = nullptr;
-	static Camera* camera = new Camera { float3(1,1.5f,2.0f), float3(0,0,0), float3(0,1,0), PI / 4, 0.001f, 1000.0f };
-	static LightSource *lightSource = new LightSource{ float3(0,1,0), float3(0,-1,0), 0, float3(10, 10, 10) };
+	static Camera* camera = new Camera { float3(0,0,4.0f), float3(0,0,0), float3(0,1,0), PI / 4, 0.001f, 1000.0f };
+	static LightSource *lightSource = new LightSource{ float3(2,2,0), float3(0,-1,0), 0, float3(10, 10, 10) };
 
 	if (asSceneRenderer)
 	{
@@ -215,7 +261,9 @@ int main(int, char**)
 			camera->Target = float3(0, 0, 0);
 			lightSource->Position = float3(0.0, 0.4, 0.1);
 			lightSource->Intensity = float3(400, 400, 400);
+			//MixMirrorMaterial(&scene->Materials()[5], 1);
 			MixGlassMaterial(&scene->Materials()[5], 1);
+			//MixEmissiveMaterial(&scene->Materials()[5], float3(10, 10, 0));
 			break;
 		case CORNELL_OBJ:
 			filePath = desktop_directory();
@@ -230,14 +278,33 @@ int main(int, char**)
 			break;
 		case RING_OBJ:
 			filePath = desktop_directory();
+			//strcat(filePath, "\\Models\\Jade_buddha.obj");
 			strcat(filePath, "\\Models\\weddingRing\\ring.obj");
 			scene = new Scene(filePath);
-			camera->Position = float3(.3f, .4f, -.25f);
-			camera->Target = float3(0, 0.1f, 0);
-			lightSource->Position = float3(0.1, 0.4, -0.2);
-			lightSource->Intensity = float3(240, 240, 240);
-			MixMirrorMaterial(&scene->Materials()[0], 1);
-			//MixGlassMaterial(&scene->Materials()[0], 1);
+			camera->Position = float3(-.1f, .1f, 0.25f);
+			camera->Target = float3(0, 0.0f, 0);
+			lightSource->Position = float3(1, 0.4, 0.2);
+			lightSource->Direction = normalize(float3(1, 1, 1));
+			lightSource->Intensity = float3(10, 10, 10);
+			//MixMirrorMaterial(&scene->Materials()[0], 1);
+			MixGlassMaterial(&scene->Materials()[0], 1, 2.6);
+			//MixEmissiveMaterial(&scene->Materials()[0], float3(1, 1, 0));
+			break;
+		case BUDDHA_OBJ:
+			filePath = desktop_directory();
+			//strcat(filePath, "\\Models\\dragon.obj");
+			strcat(filePath, "\\Models\\Jade_buddha.obj");
+			//strcat(filePath, "\\Models\\Bunny.obj");
+			//strcat(filePath, "\\Models\\weddingRing\\ring.obj");
+			scene = new Scene(filePath);
+			camera->Position = float3(-.0f, .5f, 0.45f);
+			camera->Target = float3(0, 0.5f, 0);
+			lightSource->Position = float3(0.1, 0.4, 0.2);
+			lightSource->Direction = normalize(float3(1, 1, 0));
+			lightSource->Intensity = float3(20, 20, 20);
+			//MixMirrorMaterial(&scene->Materials()[0], 1);
+			MixGlassMaterial(&scene->Materials()[0], 1, 2.7);
+			//MixEmissiveMaterial(&scene->Materials()[0], float3(1, 1, 0));
 			break;
 		case SPONZA_OBJ:
 			filePath = desktop_directory();
@@ -280,14 +347,14 @@ int main(int, char**)
 		case 0:
 			volumePath = desktop_directory();
 			//strcat(volumePath, "\\clouds\\cloud-1191.xyz");
-			//strcat(volumePath, "\\clouds\\cloud-1940.xyz");
+			strcat(volumePath, "\\clouds\\cloud-1940.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-190.xyz");
-			strcat(volumePath, "\\clouds\\cloud-1196.xyz");
+			//strcat(volumePath, "\\clouds\\cloud-1090.xyz");
 			volume = new Volume(volumePath);
 			lightSource->Position = float3(0.4, 0.5, 0.3);
 			lightSource->Direction = normalize(float3(1, 1, 1));
 			lightSource->Intensity = float3(4);
-			camera->Position = float3(0, -0.5, 1);
+			camera->Position = float3(0, 0, -1);
 			camera->Target = float3(0, 0, 0);
 
 			break;
@@ -363,17 +430,59 @@ int main(int, char**)
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
+		static int magnifierSize = 30;
+		static int magnifierPos[2] = { 300, 300 };
+		static bool magnifierOpen = true;
+
+		if (magnifierOpen)
+		{
+			ImGui::Begin("Magnifier frame", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration);
+			ImGui::SetWindowPos(ImVec2(magnifierPos[0] - magnifierSize - 9, magnifierPos[1] - magnifierSize - 9));
+			ImGui::SetWindowSize(ImVec2(magnifierSize * 2 + 17, magnifierSize*2 + 17));
+			ImGui::Image((void*)presenter->getCurrentRTInGUI().ptr, ImVec2(magnifierSize*2+1, magnifierSize*2+1),
+				ImVec2(0,0),
+				ImVec2(1,1), ImVec4(0,0,0,0), ImVec4(1,1,1, 1));
+			ImGui::End();
+
+			ImGui::Begin("Magnifier", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration );
+
+			//static ImVec2 mousePos = ImVec2(presenter->getWindowWidth() / 2, presenter->getWindowHeight() / 2);
+			//ImGui::InputFloat2("Mag pos", (float*)&mousePos);
+
+			ImVec2 mousePos = ImVec2(magnifierPos[0], magnifierPos[1]);// ImGui::GetMousePos();
+
+			float pixelWidth = 1.0 / presenter->getWindowWidth();
+			float pixelHeight = 1.0 / presenter->getWindowHeight();
+			
+			ImGui::Image((void*)presenter->getCurrentRTInGUI().ptr, ImVec2(300, 300),
+				ImVec2(mousePos.x* pixelWidth - pixelWidth * magnifierSize, mousePos.y* pixelHeight - pixelHeight * magnifierSize),
+				ImVec2(mousePos.x* pixelWidth + pixelWidth * magnifierSize, mousePos.y* pixelHeight + pixelHeight * magnifierSize), ImVec4(2, 2, 2, 1), ImVec4(0, 0, 0, 1));
+
+			ImGui::End();
+		}
+
         {
             ImGui::Begin("Rendering over DX12");                          // Create a window called "Hello, world!" and append into it.
-			
+
+			lastFrameTimeInMS = 1000.0f / ImGui::GetIO().Framerate;
+
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", lastFrameTimeInMS, ImGui::GetIO().Framerate);
+
 			RenderGUI<IHasBackcolor>(technique);
 			RenderGUI<IHasTriangleNumberParameter>(technique);
 			RenderGUI<IHasParalellism>(technique);
 			RenderGUI<IHasLight>(technique);
 			RenderGUI<IHasRaymarchDebugInfo>(technique);
+			RenderGUI<IHasHomogeneousVolume>(technique);
 			RenderGUI<IHasVolume>(technique);
-            
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+			RenderGUI<IHasAccumulative>(technique);
+			RenderGUI<IHasScatteringEvents>(technique);
+
+			if (magnifierOpen) {
+				ImGui::SliderInt("Magnifier size", &magnifierSize, 10, 100);
+				ImGui::InputInt2("Magnifier pos", magnifierPos);
+			}
+
             ImGui::End();
 
 			{
@@ -383,6 +492,13 @@ int main(int, char**)
 					if (movingCamera == ARRAYSIZE(cameraPositions))
 						movingCamera = 0;
 				}
+
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_V)))
+				{
+					magnifierOpen = !magnifierOpen;
+				}
+
+				
 				bool cameraChanged = CurrentFrame == 1;
 
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter)))
@@ -401,6 +517,15 @@ int main(int, char**)
 					camera->RotateAround(delta.x*0.01f, -delta.y*0.01f);
 				else
 					camera->Rotate(delta.x*0.01f, -delta.y*0.01f);
+
+				auto guiDelta = ImGui::GetMouseDragDelta(0);
+				if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow | ImGuiHoveredFlags_RootAndChildWindows) &&
+					!ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow))
+				{
+					magnifierPos[0] += guiDelta.x;
+					magnifierPos[1] += guiDelta.y;
+				}
+				ImGui::ResetMouseDragDelta(0);
 
 				if (delta.x != 0 || delta.y != 0)
 				{
@@ -490,6 +615,8 @@ int main(int, char**)
 
 		if (asLightRenderer)
 			asLightRenderer->LightSourceIsDirty = false;
+
+		//Sleep(500);
     }
 
 	presenter->Close();

@@ -38,10 +38,42 @@ RWTexture2D<float3> Output			: register(u1);
 //#include "PhaseIso.h"
 #include "PhaseAniso.h"
 
+#define BR 1.0
+#define BM 1.0
+#define GC 0
+
+
+
 float3 SampleSkybox(float3 L) {
-	float azim = L.y;
-	return lerp(float3(0.7, 0.8, 1), float3(0.5, 0.3, 0.2), 0.5 - azim * 0.5);
+
+	//return float3(0, 0, 1);
+	float3 BG_COLORS[5] =
+	{
+		float3(0.00f, 0.0f, 0.02f), // GROUND DARKER BLUE
+		float3(0.01f, 0.05f, 0.2f), // HORIZON GROUND DARK BLUE
+		float3(0.7f, 0.9f, 1.0f), // HORIZON SKY WHITE
+		float3(0.1f, 0.3f, 1.0f),  // SKY LIGHT BLUE
+		float3(0.01f, 0.1f, 0.7f)  // SKY BLUE
+	};
+
+	float BG_DISTS[5] =
+	{
+		-1.0f,
+		-0.04f,
+		0.0f,
+		0.5f,
+		1.0f
+	};
+
+	float3 col = BG_COLORS[0];
+	//for (int i = 1; i < 5; i++)
+	col = lerp(col, BG_COLORS[1], smoothstep(BG_DISTS[0], BG_DISTS[1], L.y));
+	col = lerp(col, BG_COLORS[2], smoothstep(BG_DISTS[1], BG_DISTS[2], L.y));
+	col = lerp(col, BG_COLORS[3], smoothstep(BG_DISTS[2], BG_DISTS[3], L.y));
+	col = lerp(col, BG_COLORS[4], smoothstep(BG_DISTS[3], BG_DISTS[4], L.y));
+	return col;
 }
+
 
 void GetVolumeBox(out float3 minim, out float3 maxim) {
 	float maxC = max(Dimensions.x, max(Dimensions.y, Dimensions.z));
@@ -57,7 +89,7 @@ bool BoxIntersect(float3 bMin, float3 bMax, float3 P, float3 D, inout float tMin
 	tMin = max(max(min(T._m00, T._m10), min(T._m01, T._m11)), min(T._m02, T._m12));
 	tMin = max(0.0, tMin);
 	tMax = min(min(max(T._m00, T._m10), max(T._m01, T._m11)), max(T._m02, T._m12));
-	if (tMax <= tMin || tMax <= 0) {
+	if (tMax <= tMin || tMax <= 0.001) {
 		return false;
 	}
 	return true;
@@ -68,7 +100,7 @@ void BoxIntersect(float3 bMin, float3 bMax, float3 P, float3 D, inout float tMax
 	float2x3 C = float2x3(bMin - P, bMax - P);
 	float2x3 D2 = float2x3(D, D);
 	float2x3 T = abs(D2) <= 0.000001 ? float2x3(float3(-1000, -1000, -1000), float3(1000, 1000, 1000)) : C / D2;
-	tMax = min(min(max(T._m00, T._m10), max(T._m01, T._m11)), max(T._m02, T._m12));
+	tMax = max(0, min(min(max(T._m00, T._m10), max(T._m01, T._m11)), max(T._m02, T._m12)));
 }
 
 bool NextDistance(float3 bMin, float3 bMax, inout float3 P, float3 D, float exitDistance, out float density, out float3 tSamplePosition, out float acct, out float pdf) {
@@ -80,52 +112,47 @@ bool NextDistance(float3 bMin, float3 bMax, inout float3 P, float3 D, float exit
 
 	float cellSize = (bMax.x - bMin.x) * MAJORANT_VOLUMEN_CELL_DIM / Dimensions.x;
 
-	float3 step = D == 0 ? 1000 : cellSize / abs(D);
+	float3 step = abs(D) <= 0.001 ? 1000 : cellSize / abs(D);
 
 	int3 voxelBorder = (D > 0) + cell;
 
-	float3 alpha = D == 0 ? 1000 : (voxelBorder * cellSize - (P - bMin)) / D;
+	float3 alpha = abs(D) <= 0.001 ? 1000 : (voxelBorder * cellSize - (P - bMin)) / D;
 
 	int3 voxelInc = D > 0 ? 1 : -1;
-
+	
 	acct = 0;
-	while (true) {
+	while(true) {
 
-		float majorant = max(0.001, Majorants[cell] * Density);
-
-		float t = -log(1 - random()) / majorant; // Using Majorants grid value as majorant
+		float majorant = max(0.00001, Majorants[cell] * Density);
+		float t = -log(max(0.0000001, 1 - random())) / majorant; // Using Majorants grid value as majorant
 		acct += t;
-		P += t * D;
 
 		int3 selection = alpha.x <= min(alpha.y, alpha.z) ? int3(1, 0, 0) : int3(0, alpha.y <= alpha.z, alpha.y > alpha.z);
 		float nextAlpha = dot(selection, alpha);
 
-		if (acct >= nextAlpha) // free passed through current cell
-		{
-			float backDistance = acct - nextAlpha;
-			acct = nextAlpha;
-			P -= backDistance * D;
-
+		if (acct >= nextAlpha) // go outside cell
+		{ // increase cell
+			acct = nextAlpha; // move to cell border
 			alpha += selection * step; // update alphas
 			cell += selection * voxelInc; // update cell
+			if (nextAlpha >= exitDistance) // across all volume
+				return false;
 		}
 		else
-		{
-			tSamplePosition = (P - bMin) / (bMax - bMin);
+		{ // probable to scatter
+			float3 sampleP = P + D * acct;
+
+			tSamplePosition = (sampleP - bMin) / (bMax - bMin);
 			density = Data.SampleGrad(VolumeSampler, tSamplePosition, 0, 0) * Density;
 
-			float nullProb = majorant - density;
-
-			float prob = 1 - nullProb / majorant;
-
-			if (random() < prob) // scattering
+			float prob = density / majorant;
+			pdf *= (1 - prob);
+			if (random() < prob)
+			{
+				P += D * acct;
 				return true;
-			
-			pdf *= (1 - density / majorant);
+			}
 		}
-
-		if (nextAlpha >= exitDistance)
-			return false;
 	}
 }
 
@@ -146,12 +173,8 @@ float3 Pathtrace(float3 P, float3 D) {
 
 	float d = tMax - tMin;
 
-	int bounces = 0;
-
 	while (true)
-		//while (bounces < Absortion*200) 
 	{
-
 		float t, tpdf;
 		float3 tSamplePosition;
 		float density;
@@ -171,8 +194,6 @@ float3 Pathtrace(float3 P, float3 D) {
 
 		d = 1000;
 		BoxIntersect(bMin, bMax, P, D, d);
-
-		bounces++;
 	}
 
 	return accum;
@@ -202,7 +223,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 	//if (PassCount < 1000) {
 	Accumulation[DTid.xy] = (Accumulation[DTid.xy] * PassCount + acc) / (PassCount + 1);
-	Output[DTid.xy] = Accumulation[DTid.xy];
+	Output[DTid.xy] = float4(Accumulation[DTid.xy].xyz, 1);
 	//}
 }
 

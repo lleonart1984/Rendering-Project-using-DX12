@@ -101,34 +101,6 @@ struct RTPayload
 // Perform photon gathering
 float3 ComputeDirectLightInWorldSpace(Vertex surfel, Material material, float3 V);
 
-float3 GetColor(int complexity) {
-
-	if (complexity <= 0)
-		return float3(1,0,1);// float3(1, 1, 1);
-
-	//return float3(1,1,1);
-
-	float level = log(complexity) / log(4);
-	float3 stopPoints[8] = {
-		float3(0,0,0.2), // 1
-		float3(0,0,1), // 4
-		float3(0,1,1), // 16
-		float3(0,1,0), // 64
-		float3(1,1,0), // 256
-		float3(1,0,0), // 1024
-		float3(1,0,1), // 4096
-		float3(1,1,1) // 16000
-	};
-
-	int l = (int)level;
-
-	if (l >= 7)
-		return stopPoints[7];
-
-	return lerp(stopPoints[l], stopPoints[l + 1], level % 1);
-}
-
-
 float3 RaytracingScattering(float3 V, Vertex surfel, Material material, int bounces)
 {
 	float3 total = float3(0, 0, 0);

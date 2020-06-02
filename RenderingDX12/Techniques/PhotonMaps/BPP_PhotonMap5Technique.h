@@ -5,7 +5,7 @@
 #include "../CommonGI/Parameters.h"
 #include "../CommonRT/DirectLightingTechnique.h"
 
-struct BPP_PhotonMap5Technique : public DirectLightingTechnique {
+struct BPP_PhotonMap5Technique : public DirectLightingTechnique, public IHasAccumulative {
 public:
 
 #include "DXR_PhotonTracing_Pipeline.h"
@@ -439,7 +439,6 @@ public:
 
 		ptRTProgram->ProgressivePass = FrameIndex;
 
-		FrameIndex++;
 
 		manager gCopy ValueData(ptRTProgram->CameraCB, lightView.getInverse());
 		
@@ -478,8 +477,12 @@ public:
 
 		manager gSet RayGeneration(dxrPTPipeline->PTMainRays);
 
-		manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
+		if (FrameIndex < StopFrame || StopFrame == 0)
+		{
+			FrameIndex++;
 
+			manager gDispatch Rays(PHOTON_DIMENSION, PHOTON_DIMENSION);
+		}
 #pragma endregion
 	}
 
@@ -569,8 +572,12 @@ public:
 		// Setup a raygen shader
 		manager gSet RayGeneration(dxrRTPipeline->RTMainRays);
 
-		// Dispatch primary rays
-		manager gDispatch Rays(render_target->Width, render_target->Height);
+		if (rtProgram->ProgressiveCB < StopFrame || StopFrame == 0)
+		{
+			CurrentFrame = rtProgram->ProgressiveCB;
+			// Dispatch primary rays
+			manager gDispatch Rays(render_target->Width, render_target->Height);
+		}
 
 		// Copy DXR output texture to the render target
 		manager gCopy All(render_target, rtProgram->Output);

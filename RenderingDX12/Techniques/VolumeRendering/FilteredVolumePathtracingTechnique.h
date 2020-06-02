@@ -3,7 +3,7 @@
 #include "../GUI_Traits.h"
 #include "../../stdafx.h"
 
-class FilteredVolumePathtracingTechnique : public VolumeLoader, public IHasCamera, public IHasLight
+class FilteredVolumePathtracingTechnique : public VolumeLoader, public IHasCamera, public IHasLight, public IHasAccumulative
 {
 
 	struct Accumulation : public ComputePipelineBindings {
@@ -71,13 +71,15 @@ class FilteredVolumePathtracingTechnique : public VolumeLoader, public IHasCamer
 
 	struct Wavelets : public ComputePipelineBindings {
 		void Setup() {
-			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\Wavelet_CS.cso"));
+			//_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\Wavelet_CS.cso"));
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\Wavelet2_CS.cso"));
 		}
 
 		gObj<Texture2D> Radiance;
 		gObj<Texture2D> Positions;
 		gObj<Texture2D> Directions;
 		gObj<Texture2D> Gradient;
+		gObj<Texture2D> Accumulation;
 
 		gObj<Texture2D> Input;
 		gObj<Texture2D> Output;
@@ -91,7 +93,8 @@ class FilteredVolumePathtracingTechnique : public VolumeLoader, public IHasCamer
 			SRV(2, Positions, ShaderType_Any);
 			SRV(3, Directions, ShaderType_Any);
 			SRV(4, Gradient, ShaderType_Any);
-			
+			SRV(5, Accumulation, ShaderType_Any);
+
 			UAV(0, Output, ShaderType_Any);
 			
 			CBV(0, Info, ShaderType_Any);
@@ -164,12 +167,13 @@ protected:
 		wavelets->Positions = raymarch->Positions;
 		wavelets->Directions = raymarch->Directions;
 		wavelets->Gradient = raymarch->Gradient;
+		wavelets->Accumulation = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 
 		waveletOutputs = new gObj<Texture2D>[WAVELET_COUT];
 		for (int i=0; i< WAVELET_COUT; i++)
 			waveletOutputs[i] = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 
-		filtering->Accumulation = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
+		filtering->Accumulation = wavelets->Accumulation;
 		filtering->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		filtering->Radiance = waveletOutputs[WAVELET_COUT - 1];
 		filtering->Positions = raymarch->Positions;
@@ -230,6 +234,8 @@ protected:
 		{
 			FrameIndex = 0;
 
+			compute gClear UAV(filtering->Accumulation, uint4(0));
+
 			float4x4 proj, view;
 			Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
 			compute gCopy ValueData(raymarch->Camera, mul(proj.getInverse(), view.getInverse()));
@@ -251,23 +257,28 @@ protected:
 		
 		raymarch->PassCount = FrameIndex;
 
-		compute gSet Pipeline(raymarch);
-		compute gDispatch Threads((int)ceil(render_target->Width / (float)CS_2D_GROUPSIZE), (int)ceil(render_target->Height / (float)CS_2D_GROUPSIZE));
+		if (StopFrame == 0 || FrameIndex < StopFrame) {
+			
+			CurrentFrame = FrameIndex;
 
-		for (int i = 0; i < WAVELET_COUT; i++) {
-			wavelets->Info = int2 (1 << i, FrameIndex);
-			wavelets->Input = i == 0 ? raymarch->Radiance : waveletOutputs[i - 1];
-			wavelets->Output = waveletOutputs[i];
-			compute gSet Pipeline(wavelets);
+			compute gSet Pipeline(raymarch);
 			compute gDispatch Threads((int)ceil(render_target->Width / (float)CS_2D_GROUPSIZE), (int)ceil(render_target->Height / (float)CS_2D_GROUPSIZE));
-		}
 
-		filtering->PassCount = FrameIndex;
-		compute gSet Pipeline(filtering);
-		compute gDispatch Threads((int)ceil(render_target->Width / (float)CS_2D_GROUPSIZE), (int)ceil(render_target->Height / (float)CS_2D_GROUPSIZE));
+			for (int i = 0; i < WAVELET_COUT; i++) {
+				wavelets->Info = int2 (1 << i, FrameIndex);
+				wavelets->Input = i == 0 ? raymarch->Radiance : waveletOutputs[i - 1];
+				wavelets->Output = waveletOutputs[i];
+				compute gSet Pipeline(wavelets);
+				compute gDispatch Threads((int)ceil(render_target->Width / (float)CS_2D_GROUPSIZE), (int)ceil(render_target->Height / (float)CS_2D_GROUPSIZE));
+			}
+
+			filtering->PassCount = FrameIndex;
+			compute gSet Pipeline(filtering);
+			compute gDispatch Threads((int)ceil(render_target->Width / (float)CS_2D_GROUPSIZE), (int)ceil(render_target->Height / (float)CS_2D_GROUPSIZE));
+			FrameIndex++;
+		}
 
 		compute gCopy All(render_target, filtering->Output);
 
-		FrameIndex++;
 	}
 };

@@ -25,7 +25,6 @@ SamplerState shadowSmp : register(s1);
 cbuffer Lighting : register(b0) {
 	float3 LightPosition;
 	float3 LightIntensity;
-	float3 LightDirection;
 }
 
 // Global constant buffer with view to world transform matrix
@@ -37,6 +36,11 @@ cbuffer ViewToWorldTransform : register(b1) {
 cbuffer LightTransforms : register(b2) {
 	row_major matrix LightProj;
 	row_major matrix LightView;
+}
+
+cbuffer ParticipatingMedia : register(b3) {
+	float Extinction;
+	float Phi;
 }
 
 // Gets true if current surfel is lit by the light source
@@ -61,11 +65,11 @@ void AugmentMaterialWithTextureMapping(inout Vertex surfel, inout Material mater
 	float3 SpecularTex = material.Texture_Index.y >= 0 ? Textures[material.Texture_Index.y].SampleGrad(gSmp, surfel.C, ddx, ddy).xyz : material.Specular;
 	float3 MaskTex = material.Texture_Index.w >= 0 ? Textures[material.Texture_Index.w].SampleGrad(gSmp, surfel.C, ddx, ddy).xyz : 1;
 
-	material.Diffuse *= DiffTex * MaskTex.x; // set transparent if necessary.
+	material.Diffuse *= DiffTex.xyz * MaskTex.x; // set transparent if necessary.
 	material.Specular.xyz = max(material.Specular.xyz, SpecularTex);
 }
 
-bool GetPrimaryIntersection(uint2 screenCoordinates, float2 coordinates, out float3 V, out Vertex surfel, out Material material) {
+bool GetPrimaryIntersection(uint2 screenCoordinates, float2 coordinates, out float3 P, out float3 V,  out Vertex surfel, out Material material) {
 	bool valid = any(Positions[screenCoordinates]);
 
 	float4 C = Coordinates[screenCoordinates];
@@ -83,8 +87,9 @@ bool GetPrimaryIntersection(uint2 screenCoordinates, float2 coordinates, out flo
 	material = materials[MaterialIndices[screenCoordinates]];
 
 	V = mul(float4(V, 0), ViewToWorld).xyz;
+	P = mul(float4(0,0,0, 1), ViewToWorld).xyz;
 
-	surfel = Transform(surfel, ViewToWorld);
+	surfel = Transform(surfel, (float4x3)ViewToWorld);
 
 	// only update material, Normal is affected with bump map from gbuffer construction
 	AugmentMaterialWithTextureMapping(surfel, material, C.z, C.w);
@@ -93,9 +98,10 @@ bool GetPrimaryIntersection(uint2 screenCoordinates, float2 coordinates, out flo
 }
 
 [numthreads(CS_2D_GROUPSIZE, CS_2D_GROUPSIZE, 1)]
-void main( uint3 DTid : SV_DispatchThreadID )
+void main(uint3 DTid : SV_DispatchThreadID)
 {
 	float3 V;
+	float3 P;
 	Vertex surfel;
 	Material material;
 	int width, height;
@@ -103,7 +109,7 @@ void main( uint3 DTid : SV_DispatchThreadID )
 
 	float2 screenPos = (DTid.xy + 0.5) / float2(width, height);
 
-	if (!GetPrimaryIntersection(DTid.xy, screenPos, V, surfel, material))
+	if (!GetPrimaryIntersection(DTid.xy, screenPos, P, V, surfel, material))
 		return;
 
 	float shadow = ShadowCast(surfel);
@@ -114,7 +120,8 @@ void main( uint3 DTid : SV_DispatchThreadID )
 	float4 R;
 	float4 T;
 
-	float3 color = ComputeDirectLighting(
+	float3 color = exp(-length(P - surfel.P) * Extinction) * (
+		exp(-length(LightPosition - surfel.P)*Extinction) * ComputeDirectLighting(
 		// Inputs
 		V, surfel, material, LightPosition, LightIntensity,
 		shadow,
@@ -129,7 +136,8 @@ void main( uint3 DTid : SV_DispatchThreadID )
 		R,
 		// refraction direction and factor
 		T
-	);
+	) + 
+		material.Emissive);
 
-	DirectLighting[DTid.xy] = 0;// color;
+	DirectLighting[DTid.xy] = color;
 }

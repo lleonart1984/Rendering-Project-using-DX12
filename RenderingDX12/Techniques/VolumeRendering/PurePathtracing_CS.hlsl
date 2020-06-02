@@ -119,7 +119,7 @@ float3 Pathtrace(float3 P, float3 D) {
 
 		float prob = 1 - nullProb / Density;
 
-		if (random() < prob) // scattering
+		if (random() < Data.SampleGrad(VolumeSampler, tSamplePosition, 0, 0)) // scattering
 		{
 			float scatterPdf;
 			float3 scatterD;
