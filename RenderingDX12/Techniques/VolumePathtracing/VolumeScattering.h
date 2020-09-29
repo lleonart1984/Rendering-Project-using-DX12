@@ -4,7 +4,7 @@
 #define one_over_2g (0.5 / (GFactor))
 
 float EvalPhase(float GFactor, float3 D, float3 L) {
-	if (GFactor == 0)
+	if (abs(GFactor) < 0.001)
 		return 0.25 / pi;
 	float cosTheta = dot(D, L);
 	return 0.25 / pi * (one_minus_g2) / pow(one_plus_g2 - 2 * GFactor * cosTheta, 1.5);
@@ -24,8 +24,9 @@ void CreateOrthonormalBasis(float3 D, out float3 B, out float3 T) {
 //float random();
 
 float3 GeneratePhase(float GFactor, float3 D) {
-	if (GFactor == 0) {
-		return randomDirection();
+	if (abs(GFactor) < 0.001) {
+		return randomDirection(-D);
+		//return randomDirectionWrong();
 	}
 
 	float phi = random() * 2 * pi;

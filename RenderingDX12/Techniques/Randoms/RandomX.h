@@ -1,71 +1,6 @@
-#ifndef RANDOMHLSL_H
-#define RANDOMHLSL_H
 
-// HLSL code for random functions
 
-#include "../CommonGI/Definitions.h"
-
-struct ULONG
-{
-	uint h, l;
-};
-
-ULONG XOR (ULONG x, ULONG y) {
-	ULONG r = { 0, 0 };
-	r.h = x.h ^ y.h;
-	r.l = x.l ^ y.l;
-	return r;
-}
-
-ULONG RSHIFT(ULONG x, int p) {
-	ULONG r = { 0, 0 };
-	r.l = (x.l >> p) | (x.h << (32 - p));
-	r.h = x.h >> p;
-	return r;
-}
-
-ULONG LSHIFT(ULONG x, int p) {
-	ULONG r = { 0, 0 };
-	r.h = (x.h << p) | (x.l >> (32 - p));
-	r.l = x.l << p;
-	return r;
-}
-
-ULONG ADD(ULONG x, ULONG y) {
-	ULONG r = { 0, 0 };
-	r.l = x.l + y.l;
-	r.h = x.h + y.h + (r.l < x.l); // carry a 1 when ls addition overflow
-	return r;
-}
-
-ULONG MUL(uint x, uint y) {
-	int h1 = x >> 16;
-	int l1 = x & 0xFFFF;
-	int h2 = y >> 16;
-	int l2 = y & 0xFFFF;
-
-	ULONG r1;
-	r1.h = h1 * h2;
-	r1.l = l1 * l2;
-
-	ULONG r2 = { l1 * h2, 0 };
-	ULONG r3 = { l2 * h1, 0 };
-
-	return ADD(r1, ADD(r2, r3));
-}
-
-ULONG MUL(ULONG x, ULONG y) {
-	return ADD(
-		LSHIFT(MUL(x.h, y.l), 32),
-		ADD(
-			LSHIFT(MUL(x.l, y.h), 32),
-			MUL(x.l, y.l)
-		));
-}
-
-//#include "MarsagliaRandoms.h"
-//#include "MarsagliasXorWow.h"
-#include "XorShiftAster.h"
+float random();
 
 float3 randomHSDirection(float3 N, out float NdotD)
 {
@@ -100,7 +35,7 @@ float3 randomDirection(float3 D) {
 	float x = cos(two_pi_by_r1) * sqrt_of_one_minus_sqrR2;
 	float y = sin(two_pi_by_r1) * sqrt_of_one_minus_sqrR2;
 	float z = r2;
-	
+
 	float3 t0, t1;
 	CreateOrthonormalBasis2(D, t0, t1);
 
@@ -164,56 +99,3 @@ float4 randomStdNormal4() {
 	return sqrt(-2.0 * log(max(0.0000000001, u1))) *
 		sin(2.0 * pi * u2); //random normal(0,1)
 }
-
-
-void StartRandomSeedForRay(uint2 gridDimensions, int maxBounces, uint2 raysIndex, int bounce, int frame) {
-	uint index = 0;
-	uint dim = 1;
-	index += raysIndex.x * dim;
-	dim *= gridDimensions.x;
-	index += raysIndex.y * dim;
-	dim *= gridDimensions.y;
-	index += bounce * dim;
-	dim *= maxBounces;
-
-	ULONG INDEX = { 0, index };
-	ULONG FRAME = { index ^ (index * 37), frame };
-	ULONG DIM = { 0, dim };
-
-	//index += frame * dim;
-	INDEX = ADD(INDEX, MUL(FRAME, DIM));
-
-	initializeRandom(INDEX);
-
-	for (int i = 0; i < 23 + index % 13; i++)
-		random();
-}
-
-void StartRandomSeedForThread(uint gridDimensions, int maxBounces, uint index, int bounce, int frame) {
-	uint dim = 1;
-	dim *= gridDimensions;
-	index += bounce * dim;
-	dim *= maxBounces;
-
-	ULONG INDEX = { 0, index };
-	ULONG FRAME = { index ^ (index * 37), frame };
-	ULONG DIM = { 0, dim };
-
-	//index += frame * dim;
-	INDEX = ADD(INDEX, MUL(FRAME, DIM));
-
-	initializeRandom(INDEX);
-
-	for (int i = 0; i < 23 + index % 13; i++)
-		random();
-}
-
-ULONG getCurrentSeed() {
-	return getRandomSeed();
-}
-
-void setCurrentSeed(ULONG seed) {
-	initializeRandom(seed);
-}
-
-#endif // RANDOMHLSL_H

@@ -1,4 +1,4 @@
-#define g (0.65)
+#define g (0.85)
 //(0.875)
 #define one_minus_g2 (1.0 - g * g)
 #define one_plus_g2 (1.0 + g * g)

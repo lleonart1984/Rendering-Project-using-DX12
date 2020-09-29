@@ -32,17 +32,34 @@ float random()
 	return xorwow() / 4294967296.0;
 }
 
-void initializeRandom(uint seed) {
-	if (seed == 0)
-		seed = 1002039242112;
-	rng_state.a = seed;// ^ 0xFEFE;
-	rng_state.b = seed;
-	rng_state.c = seed;
-	rng_state.d = seed;
-	rng_state.counter = 0;
+//void initializeRandom(uint seed) {
+//	if (seed == 0)
+//		seed = 1002039242112;
+//	rng_state.a = seed;// ^ 0xFEFE;
+//	rng_state.b = seed;
+//	rng_state.c = seed;
+//	rng_state.d = seed;
+//	rng_state.counter = 0;
+//
+//	/*[loop]
+//	for (int i = 0; i < seed % 7 + 2; i++)
+//		random();*/
+//}
 
-	/*[loop]
-	for (int i = 0; i < seed % 7 + 2; i++)
-		random();*/
+
+void initializeRandom(ULONG seed) {
+	if (seed.l == 0)
+		seed.l = 1002039242;
+	rng_state.a = seed.l;// ^ 0xFEFE;
+	rng_state.b = seed.l;
+	rng_state.c = seed.l;
+	rng_state.d = seed.l;
+	rng_state.counter = 0;
 }
+
+ULONG getRandomSeed() {
+	ULONG r = { rng_state.c, rng_state.d };
+	return r;
+}
+
 

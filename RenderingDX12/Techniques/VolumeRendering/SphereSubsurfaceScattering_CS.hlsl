@@ -20,7 +20,7 @@ cbuffer DebugInfo : register(b2) {
 #define one_plus_g2 (1.0 + G * G)
 #define one_over_2g (0.5 / G)
 
-//#define USE_DIRECT_LIGHT
+#define USE_DIRECT_LIGHT
 
 //#ifndef pi
 //#define pi 3.1415926535897932384626433832795
@@ -133,11 +133,11 @@ float3 SampleSkybox(float3 L) {
 	col = lerp(col, BG_COLORS[3], smoothstep(BG_DISTS[2], BG_DISTS[3], L.y));
 	col = lerp(col, BG_COLORS[4], smoothstep(BG_DISTS[3], BG_DISTS[4], L.y));
 
-//#ifdef USE_DIRECT_LIGHT
-//	return 0;
-//#else
+	//#ifdef USE_DIRECT_LIGHT
+	//	return 0;
+	//#else
 	return pow(max(0, dot(L, LightDirection)), N) * phongNorm * LightIntensity;
-//#endif
+	//#endif
 
 	return 0;//col + 
 		//pow(max(0, dot(L, LightDirection)), N) * phongNorm * LightIntensity;
@@ -242,7 +242,7 @@ float3 PathtraceNoDirectLight(float G, float Phi, float Sigma, float3 P, float3 
 float3 Pathtrace(float G, float Phi, float Sigma, float3 P, float3 D, out int bounces) {
 	bounces = 0;
 	float3 A = 0;
-	[loop] 
+	[loop]
 	while (true)
 	{
 		bounces++;
@@ -275,7 +275,7 @@ float3 Pathtrace(float G, float Phi, float Sigma, float3 P, float3 D, out int bo
 				scatter = false;
 			}
 		}
-	
+
 		if (scatter) {
 			//[branch]
 			if (random() < 1 - Phi) // absortion
@@ -285,7 +285,7 @@ float3 Pathtrace(float G, float Phi, float Sigma, float3 P, float3 D, out int bo
 #ifdef USE_DIRECT_LIGHT
 			float3 Ld = LightDirection;
 			d = exitSphere(P, LightDirection);
-			A += exp(-d * Sigma) * EvalPhase(G, D, LightDirection) * LightIntensity / (2*pi);
+			A += exp(-d * Sigma) * EvalPhase(G, D, LightDirection) * LightIntensity / (2 * pi);
 #endif
 
 			D = GeneratePhase(G, D);
@@ -295,10 +295,10 @@ float3 Pathtrace(float G, float Phi, float Sigma, float3 P, float3 D, out int bo
 
 void GenerateVariables(float G, float Phi, float3 win, float density, out float3 x, out float3 w, out float3 X, out float3 W, out float accum, out float importance) {
 	//float prob = 1 - exp(-density);
-	
+
 	x = 0;
 	w = win;
-	
+
 	X = x;
 	W = w;
 	importance = Phi;
@@ -315,7 +315,7 @@ void GenerateVariables(float G, float Phi, float3 win, float density, out float3
 		return;
 	}
 
-	x = x + w*t;
+	x = x + w * t;
 	[loop]
 	while (true)
 	{
@@ -331,11 +331,11 @@ void GenerateVariables(float G, float Phi, float3 win, float density, out float3
 		w = GeneratePhase(G, w);
 
 		float d = exitSphere(x, w);
-		
+
 		xi = 1 - random();
 		t = abs(density) <= 0.001 ? 10000 : -log(max(0.0000000001, xi)) / density;
 
-		[branch] 
+		[branch]
 		if (t > d)
 		{
 			x += d * w;
@@ -346,166 +346,59 @@ void GenerateVariables(float G, float Phi, float3 win, float density, out float3
 	}
 }
 
-//#include "SphereScatteringWithDL.h"
-//
-///*void GenerateVariablesWithModel(float3 win, float3 Lpos, float density, out float3 x, out float3 w, out float3 X, out float Importance, out float Accum)
-//{
-//	float3 temp = abs(win.x) >= 0.999 ? float3(0, 0, 1) : float3(-1, 0, 0);
-//	float3 winY = normalize(cross(temp, win));
-//	float3 winX = cross(win, winY);
-//	float rAlpha = random() * 2 * pi;
-//	float3x3 R = (mul(float3x3(
-//		cos(rAlpha), -sin(rAlpha), 0,
-//		sin(rAlpha), cos(rAlpha), 0,
-//		0, 0, 1), float3x3(winX, winY, win)));
-//	Lpos = mul(Lpos, transpose(R)); // inverse transformation to get Lpos in 'aligned' space
-//
-//	// Generate path
-//	float pathInput[14];
-//	float pathOutput[8];
-//	pathInput[0] = density;
-//	pathInput[1] = Phi;
-//	pathInput[2] = G;
-//	pathInput[3] = Lpos.x;
-//	pathInput[4] = Lpos.y;
-//	pathInput[5] = Lpos.z;
-//	pathInput[6] = gauss();
-//	pathInput[7] = gauss();
-//	pathInput[8] = gauss();
-//	pathInput[9] = gauss();
-//	pathInput[10] = gauss();
-//	pathInput[11] = gauss();
-//	pathInput[12] = gauss();
-//	pathInput[13] = gauss();
-//	PathGen(pathInput, pathOutput);
-//	pathOutput = (float[8])saturate((float2x4)pathOutput);
-//	float theta = pathOutput[0] * pi;
-//	float wt = pathOutput[1] * 2 - 1;
-//	float wb = pathOutput[2] * sqrt(1 - wt * wt) * (random() < 0.5 ? -1 : 1);
-//	x = float3(0, sin(theta), cos(theta));
-//	float3 N = normalize(x);
-//	float3 B = float3(1, 0, 0);
-//	float3 T = cross(x, B);
-//	w = N * sqrt(max(0, 1 - wt * wt - wb * wb)) + T * wt + B * wb;
-//	float n = (0.5 / max(0.001, pathOutput[3] - 0.5));
-//	Importance = pow(Phi, max(1, n));// *Phi;
-//	float Xz = pathOutput[6] * 2 - 1;
-//	float Xy = (pathOutput[5] * 2 - 1) * sqrt(max(0, 1 - Xz * Xz));
-//	float Xx = (pathOutput[4] * 2 - 1) * sqrt(max(0, 1 - Xz * Xz - Xy * Xy));
-//	Accum = (0.5 / max(0.000001, pathOutput[7] - 0.5) - 1) * Phi;
-//	X = float3(Xx, Xy, Xz);
-//	
-//	x = mul(x, R);
-//	w = normalize(mul(w, R));
-//	X = mul(X, R);
-//}
-//*/
-//void GenerateVariablesWithModel(float G, float Phi, float3 win, float density, out float3 x, out float3 w, out float3 X, out float3 W, out float accum, out float absorption)
-//{
-//	x = float3(0, 0, 0);
-//	w = win;
-//
-//	X = x;
-//	W = w;
-//
-//	float prob = 1 - exp(-density);
-//	if (random() > prob) // single scattering
-//	{
-//		w = GeneratePhase(G, win);
-//		x = w;
-//		accum = Phi;
-//		absorption = 1 - Phi;
-//		return;
-//	}
-//
-//	float3 temp = abs(win.x) >= 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
-//	float3 winY = normalize(cross(temp, win));
-//	float3 winX = cross(win, winY);
-//	float rAlpha = random() * 2 * pi;
-//	float3x3 R = (mul(float3x3(
-//		cos(rAlpha), -sin(rAlpha), 0,
-//		sin(rAlpha), cos(rAlpha), 0,
-//		0, 0, 1), float3x3(winX, winY, win)));
-//
-//	// Generate path
-//	float pathInput[12];
-//	float pathOutput[4];
-//	pathInput[0] = density;
-//	pathInput[1] = Phi;
-//	pathInput[2] = G;
-//	pathInput[3] = gauss();
-//	pathInput[4] = gauss();
-//	pathInput[5] = gauss();
-//	pathInput[6] = gauss();
-//	pathInput[7] = gauss();
-//	pathInput[8] = gauss();
-//	pathInput[9] = gauss();
-//	pathInput[10] = gauss();
-//	pathInput[11] = gauss();
-//	PathGen(pathInput, pathOutput);
-//	float4 pO = float4(pathOutput[0], pathOutput[1], pathOutput[2], pathOutput[3]);
-//	pO = clamp(pO*2, -1, 1);
-//	float costheta = pO.x;
-//	float wt = pO.y;
-//	float dwt = sqrt(1 - wt * wt);
-//	float wb = clamp(pO.z * sign(random() - 0.5), -dwt, dwt);
-//	x = float3(0, sqrt(max(0, 1 - costheta*costheta)), costheta);
-//	float3 N = x;
-//	float3 B = float3(1, 0, 0);
-//	float3 T = cross(x, B);
-//	w = normalize(N * sqrt(max(0, 1 - wt * wt - wb * wb)) + T * wt + B * wb);
-//	float n = 2.0 / max(0.000001, 1 - pO.w);
-//	absorption = Phi == 1 ? 0 : 1 - pow(Phi, n);
-//	accum = Phi == 1 ? n : Phi * absorption / (1 - Phi);
-//	
-//	float scatInput[16];
-//	float scatOutput[6];
-//	scatInput[0] = density;
-//	scatInput[1] = Phi;
-//	scatInput[2] = G;
-//	scatInput[3] = pathOutput[0];
-//	scatInput[4] = pathOutput[1];
-//	scatInput[5] = pathOutput[2];
-//	scatInput[6] = pathOutput[3];
-//	scatInput[7] = gauss();
-//	scatInput[8] = gauss();
-//	scatInput[9] = gauss();
-//	scatInput[10] = gauss();
-//	scatInput[11] = gauss();
-//	scatInput[12] = gauss(); 
-//	scatInput[13] = gauss();
-//	scatInput[14] = gauss();
-//	scatInput[15] = gauss();
-//	//ScatGen(scatInput, scatOutput);
-//	X = clamp(float3(scatOutput[0], scatOutput[1], scatOutput[2])*2, -1, 1);
-//	W = normalize(clamp(float3(scatOutput[3], scatOutput[4], scatOutput[5])*2, -1, 1));
-//
-//	//if (random() < Phi / accum) // selected center as scattered point
-//	{
-//		X = float3(0, 0, 0);
-//		W = float3(0, 0, 1);
-//	}
-//
-//	x = mul(x, R);
-//	w = mul(w, R);
-//	X = mul(X, R);
-//	W = mul(W, R);
-//}
+int GenerateN(float G, float Phi, float density) {
+	//float prob = 1 - exp(-density);
 
-#include "../VolumeRendering/VAESphereScattering.h"
+	float3 x = 0;
+	float3 w = float3(0,0,1);
+
+	w = GeneratePhase(G, w);
+
+	float xi = 1 - random();
+	float t = abs(density) <= 0.001 ? 10000 : -log(max(0.00000001, xi)) / density;
+
+	if (t > 1) // single scattering
+	{
+		return 1;
+	}
+
+	int n = 1;
+
+	x = x + w * t;
+	[loop]
+	while (true)
+	{
+		w = GeneratePhase(G, w);
+		n++;
+
+		float d = exitSphere(x, w);
+
+		xi = 1 - random();
+		t = abs(density) <= 0.001 ? 10000 : -log(max(0.0000000001, xi)) / density;
+
+		[branch]
+		if (t > d)
+		{
+			x += d * w;
+			return n;
+		}
+
+		x += t * w;
+	}
+}
+
+
+#include "../VolumeRendering/IWAEScattering.h"
+
+float sampleNormal(float mu, float logVar) {
+	//return mu + gauss() * exp(logVar * 0.5);
+	return mu + gauss()*exp(clamp(logVar, -7, 70) * 0.5);
+}
 
 bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density, out float3 x, out float3 w)
 {
 	x = float3(0, 0, 0);
 	w = win;
-
-	float prob = 1 - exp(-density);
-	if (random() >= prob) // single scattering
-	{
-		w = GeneratePhase(G, win);
-		x = w;
-		return random() < Phi;
-	}
 
 	float3 temp = abs(win.x) >= 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
 	float3 winY = normalize(cross(temp, win));
@@ -516,57 +409,55 @@ bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density
 		sin(rAlpha), cos(rAlpha), 0,
 		0, 0, 1), float3x3(winX, winY, win)));
 
+	float codedDensity = pow(density/400.0, 0.125);
+
+	float2 lenLatent = randomStdNormal2();
 	// Generate length
 	float lenInput[4];
-	float lenOutput[1];
-	lenInput[0] = exp(-density/10);
+	float lenOutput[2];
+	lenInput[0] = codedDensity;
 	lenInput[1] = G;
-	lenInput[2] = gauss();
-	lenInput[3] = gauss();
-	//lenInput[4] = gauss();
-	//lenInput[5] = gauss();
-	//lenInput[6] = gauss();
-	//lenInput[7] = gauss();
-	LengthGen(lenInput, lenOutput);
+	lenInput[2] = lenLatent.x;
+	lenInput[3] = lenLatent.y;
+	lenModel(lenInput, lenOutput);
+	
+	float logN = max(0, sampleNormal(lenOutput[0], lenOutput[1]));
+	float n = exp(logN);
 
-	int n = (int)max(2, exp(lenOutput[0]));
+	//float logN = log(GenerateN(G, Phi, density));
+	//float n = exp(logN);
 
 	if (random() >= pow(Phi, n))
 		return false;
 
+	float4 pathLatent14 = randomStdNormal4();
+	float pathLatent5 = randomStdNormal();
 	// Generate path
-	float pathInput[12];
-	float pathOutput[3];
-	pathInput[0] = exp(-density / 10);
+	float pathInput[8];
+	float pathOutput[6];
+	pathInput[0] = codedDensity;
 	pathInput[1] = G;
-	pathInput[2] = log(n);
-	pathInput[3] = gauss();
-	pathInput[4] = gauss();
-	pathInput[5] = gauss();
-	pathInput[6] = gauss();
-	pathInput[7] = gauss();
-	pathInput[8] = gauss();
-	pathInput[9] = gauss();
-	pathInput[10] = gauss();
-	pathInput[11] = gauss();
-	/*pathInput[12] = gauss();
-	pathInput[13] = gauss();
-	pathInput[14] = gauss();
-	pathInput[15] = gauss();*/
-	PathGen(pathInput, pathOutput);
-	float3 pO = clamp(float3(pathOutput[0], pathOutput[1], pathOutput[2]), -0.9999999, 0.9999999);
-	float costheta = pO.x;
-	float wt = pO.y;
-	float dwt = sqrt(1 - wt * wt);
-	float wb = clamp(pO.z, -dwt, dwt);
+	pathInput[2] = logN;
+	pathInput[3] = pathLatent14.x;
+	pathInput[4] = pathLatent14.y;
+	pathInput[5] = pathLatent14.z;
+	pathInput[6] = pathLatent14.w;
+	pathInput[7] = pathLatent5.x;
+	pathModel(pathInput, pathOutput);
+	float3 sampling = randomStdNormal3();
+	float3 pathMu = float3(pathOutput[0], pathOutput[1], pathOutput[2]);
+	float3 pathLogVar = float3(pathOutput[3], pathOutput[4], pathOutput[5]);
+	float3 pathOut = clamp(pathMu + exp(pathLogVar * 0.5) * sampling, -0.9999, 0.9999);
+	float costheta = pathOut.x;
+	float wt = pathOut.y;
+	float wb = pathOut.z;
 	x = float3(0, sqrt(1 - costheta * costheta), costheta);
 	float3 N = x;
 	float3 B = float3(1, 0, 0);
 	float3 T = cross(x, B);
 	w = normalize(N * sqrt(max(0, 1 - wt * wt - wb * wb)) + T * wt + B * wb);
-
-	x = mul(x, R);
-	w = mul(w, R);
+	x = mul(x, (R));
+	w = mul(w, (R)); // move to radial space
 
 	return true;// random() >= 1 - pow(Phi, n);
 }
@@ -579,21 +470,6 @@ bool GenerateFullVariablesWithNewModel(float G, float Phi, float3 win, float den
 	W = win;
 	factor = 1;
 
-	if (density < 5)
-	{
-		w = GeneratePhase(G, win);
-		return random() < Phi;
-	}
-
-	float prob = 1 - exp(-density);
-	if (random() >= prob) // single scattering
-	{
-		w = GeneratePhase(G, win);
-		x = w;
-		factor = 1 / Phi;
-		return random() < Phi;
-	}
-
 	float3 temp = abs(win.x) >= 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
 	float3 winY = normalize(cross(temp, win));
 	float3 winX = cross(win, winY);
@@ -603,50 +479,46 @@ bool GenerateFullVariablesWithNewModel(float G, float Phi, float3 win, float den
 		sin(rAlpha), cos(rAlpha), 0,
 		0, 0, 1), float3x3(winX, winY, win)));
 
+	float codedDensity = pow(density / 400.0, 0.125);
+
+	float2 lenLatent = randomStdNormal2();
+
 	// Generate length
 	float lenInput[4];
-	float lenOutput[1];
-	lenInput[0] = exp(-density/10);
+	float lenOutput[2];
+	lenInput[0] = codedDensity;
 	lenInput[1] = G;
-	lenInput[2] = gauss();
-	lenInput[3] = gauss();
-	/*lenInput[4] = gauss();
-	lenInput[5] = gauss();
-	lenInput[6] = gauss();
-	lenInput[7] = gauss();*/
-	LengthGen(lenInput, lenOutput);
+	lenInput[2] = lenLatent.x;
+	lenInput[3] = lenLatent.y;
+	lenModel(lenInput, lenOutput);
 
-	int n = max(2, (int)round( random() + (exp(lenOutput[0]))));
-	//float n = (int)max(2, ((exp(lenOutput[0]))));
+	float logN = max(log(1), sampleNormal(lenOutput[0], lenOutput[1]));
+	float n = exp(logN);
 
 	if (random() >= pow(Phi, n))
 		return false;
 
+	float4 pathLatent14 = randomStdNormal4();
+	float pathLatent5 = randomStdNormal();
 	// Generate path
-	float pathInput[12];
-	float pathOutput[3];
-	pathInput[0] = exp(-density/10);
+	float pathInput[8];
+	float pathOutput[6];
+	pathInput[0] = codedDensity;
 	pathInput[1] = G;
-	pathInput[2] = log(n);
-	pathInput[3] = gauss();
-	pathInput[4] = gauss();
-	pathInput[5] = gauss();
-	pathInput[6] = gauss();
-	pathInput[7] = gauss();
-	pathInput[8] = gauss();
-	pathInput[9] = gauss();
-	pathInput[10] = gauss();
-	pathInput[11] = gauss();
-	/*pathInput[12] = gauss();
-	pathInput[13] = gauss();
-	pathInput[14] = gauss();
-	pathInput[15] = gauss();*/
-	PathGen(pathInput, pathOutput);
-	float3 pO = clamp(float3(pathOutput[0], pathOutput[1], pathOutput[2]), -1, 1);// -0.9999999, 0.9999999);
-	float costheta = pO.x;
-	float wt = pO.y;
-	float dwt = sqrt(1 - wt * wt);
-	float wb = clamp(pO.z, -dwt, dwt);
+	pathInput[2] = logN;
+	pathInput[3] = pathLatent14.x;
+	pathInput[4] = pathLatent14.y;
+	pathInput[5] = pathLatent14.z;
+	pathInput[6] = pathLatent14.w;
+	pathInput[7] = pathLatent5.x;
+	pathModel(pathInput, pathOutput);
+	float3 sampling = randomStdNormal3();
+	float3 pathMu = float3(pathOutput[0], pathOutput[1], pathOutput[2]);
+	float3 pathLogVar = float3(pathOutput[3], pathOutput[4], pathOutput[5]);
+	float3 pathOut = clamp(pathMu + exp(pathLogVar * 0.5) * sampling, -0.9999, 0.9999);
+	float costheta = pathOut.x;
+	float wt = pathOut.y;
+	float wb = pathOut.z;
 	x = float3(0, sqrt(1 - costheta * costheta), costheta);
 	float3 N = x;
 	float3 B = float3(1, 0, 0);
@@ -658,11 +530,11 @@ bool GenerateFullVariablesWithNewModel(float G, float Phi, float3 win, float den
 	// Generate Scattering
 
 	float scatInput[16];
-	float scatOutput[6];
-	scatInput[0] = exp(-density/10);
-	scatInput[1] = pow(1 - Phi, 0.1);
-	scatInput[2] = G;
-	scatInput[3] = log(n);
+	float scatOutput[12];
+	scatInput[0] = codedDensity;
+	scatInput[1] = G;
+	scatInput[2] = pow(1.00000 - Phi, 0.1);
+	scatInput[3] = logN;
 	scatInput[4] = costheta;
 	scatInput[5] = wt;
 	scatInput[6] = wb;
@@ -679,32 +551,37 @@ bool GenerateFullVariablesWithNewModel(float G, float Phi, float3 win, float den
 	scatInput[17] = gauss();
 	scatInput[18] = gauss();
 	scatInput[19] = gauss();*/
-	ScatGen(scatInput, scatOutput);
+	scatModel(scatInput, scatOutput);
 
 	/*float accum = 0;
 	for (int i = 1; i <= n; i++)
 		accum += pow(Phi, i);*/
 
 	float accum = Phi >= 0.9999 ? n : Phi * (1 - pow(Phi, n)) / (1 - Phi);
-	
+
 	float probFirstScattering = Phi / accum;
 
 	//if (false)
-	if (random() < 1 - probFirstScattering)
+	//if (random() < 1 - probFirstScattering)
 	{
-		X = float3(scatOutput[0], scatOutput[1], scatOutput[2]);
+		X = clamp(float3(
+			sampleNormal(scatOutput[0], scatOutput[6]), 
+			sampleNormal(scatOutput[1], scatOutput[7]),
+			sampleNormal(scatOutput[2], scatOutput[8])), -1, 1);
 		X /= max(1, length(X));
-		W = normalize(float3(scatOutput[3], scatOutput[4], scatOutput[5]));
+		W = normalize(clamp(float3(
+			sampleNormal(scatOutput[3], scatOutput[9]),
+			sampleNormal(scatOutput[4], scatOutput[10]),
+			sampleNormal(scatOutput[5], scatOutput[11])), -1, 1));
 		//W /= max(0.000001, length(W));
 		X = mul(X, (R));
 		W = mul(W, (R)); // move to radial space
 	} // second scatter comes from nn
-	
+
 	factor = accum / pow(Phi, n);
 
 	return true;// random() >= 1 - pow(Phi, n);
 }
-
 
 float3 SpherePathtracing(float G, float Phi, float Sigma, float3 x, float3 w, out int bounces)
 {
@@ -739,14 +616,15 @@ float3 SpherePathtracing(float G, float Phi, float Sigma, float3 x, float3 w, ou
 		}
 
 		if (scatter) {
-			float r = 1 - length(x);
-			//float r = min(1 - length(x), 300 / Sigma);
+			float r = max(0, 1 - length(x));
+			//float r = min(1 - length(x), 50 / Sigma);
 			float density = Sigma * r;
 
 			float3 X, W;
 			float3 ox, ow;
 			float accum;
 			float importance;
+
 			[branch]
 			if (!GenerateVariablesWithNewModel(G, Phi, w, density, ox, ow))
 				return A;
@@ -770,6 +648,7 @@ float3 SpherePathtracing(float G, float Phi, float Sigma, float3 x, float3 w, ou
 		}
 	}
 }
+
 
 float3 SpherePathtracingWithDirectLight(float G, float Phi, float Sigma, float3 x, float3 w, out int bounces)
 {
@@ -804,8 +683,8 @@ float3 SpherePathtracingWithDirectLight(float G, float Phi, float Sigma, float3 
 		}
 
 		if (scatters) {
-			float r = 1 - length(x);
-			//float r = min(1 - length(x), 100 / Sigma);
+			float r = max(0, 0.99 - length(x));
+			//float r = min(1 - length(x), 500 / Sigma);
 			float density = Sigma * r;
 
 			float3 X, W;
@@ -814,7 +693,7 @@ float3 SpherePathtracingWithDirectLight(float G, float Phi, float Sigma, float3 
 			// Using the Model
 			if (!GenerateFullVariablesWithNewModel(G, Phi, w, density, ox, ow, factor, X, W))
 				return A;
-			
+
 			// Using the generator
 			//float accum, importance;
 			//GenerateVariables(G, Phi, w, density, ox, ow, X, W, accum, importance);
@@ -873,7 +752,7 @@ bool GenerateVariablesAnalytically(float Phi, float density, float3 win, out flo
 	//	return true;
 	//}
 
-	if (-log(1 - random())/density >= 1) // single scattering
+	if (-log(1 - random()) / density >= 1) // single scattering
 	{
 		return true;
 	}
@@ -889,7 +768,7 @@ bool GenerateVariablesAnalytically(float Phi, float density, float3 win, out flo
 	float3 oB = abs(x.z) < .9999 ? float3(0, 0, 1) : float3(1, 0, 0);
 	float3 oT = normalize(cross(oB, x));
 	oB = cross(oT, x);
-	
+
 	float randomRot = random() * 2 * pi;
 
 	float gamma = pi * 0.5 * randomKum(AlphaFor(density, Phi), BetaFor(density, Phi));
@@ -897,7 +776,7 @@ bool GenerateVariablesAnalytically(float Phi, float density, float3 win, out flo
 	//float singamma = sqrt(max(0, 1 - cosgamma * cosgamma));
 	float cosgamma = cos(gamma);
 	float singamma = sin(gamma);// sqrt(max(0, 1 - cosgamma * cosgamma));
-	
+
 	w = singamma * cos(randomRot) * oB + singamma * sin(randomRot) * oT + cosgamma * x;
 	return true;
 }
@@ -919,7 +798,7 @@ float GenerateVariablesAnalytically2(float Phi, float density, float3 win, out f
 	float vlogN = 0.34273;
 
 	float logN = gauss(mlogN, sqrt(vlogN));
-	
+
 	absorption = (1 - pow(Phi, max(2, (int)exp(logN))));
 
 	float3 oB = abs(x.z) < 1 ? float3(0, 0, 1) : float3(1, 0, 0);
@@ -999,7 +878,7 @@ float3 IsotropicSpherePathtracing(float G, float Phi, float Sigma, float3 x, flo
 				scatter = false;
 			}
 		}
-		
+
 		if (scatter) {
 			float r = max(0, 1 - length(x));
 			float density = Sigma * r;
@@ -1033,7 +912,7 @@ float3 IsotropicSpherePathtracing(float G, float Phi, float Sigma, float3 x, flo
 float3 filter(float3 color) {
 	return color;
 
-	float x = min(1, dot(color, 1)/3.0f);
+	float x = min(1, dot(color, 1) / 3.0f);
 	if (sin(x * 70) > 0.95)
 		return 0;
 
@@ -1073,8 +952,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	{
 		O += D * inT; // move to sphere surface
 		float3 N = normalize(O);
-		float F = ComputeFresnel(dot(N, -D), 1/1.76);
-		float3 T = refract(D, N, 1/1.76); // refraction index
+		float F = ComputeFresnel(dot(N, -D), 1 / 1.76);
+		float3 T = refract(D, N, 1 / 1.76); // refraction index
 		float3 R = reflect(D, N);
 
 		if (random() < F)
@@ -1083,7 +962,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		{
 			D = T;
 
-			int cmpSel = 3*random();
+			int cmpSel = 3 * random();
 			float3 filter = 0;
 			filter[cmpSel] = 1;
 			float g = dot(filter, G);
@@ -1095,7 +974,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 			//else
 			if (O.x * 0.5 + 0.5 < PathtracingPercentage)
 				acc = Pathtrace(g, phi, sigma, O, D, bounces) * filter;
-				//acc = PathtraceNoDirectLight(g, phi, sigma, O, D, bounces) * filter;
+			//acc = PathtraceNoDirectLight(g, phi, sigma, O, D, bounces) * filter;
 			else
 #ifdef USE_DIRECT_LIGHT
 				//acc = PathtraceNoDirectLight(g, phi, sigma, O, D, bounces) * filter;

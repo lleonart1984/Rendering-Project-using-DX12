@@ -56,7 +56,7 @@ public:
 			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
 			gObj<Buffer> LightTransforms;
-			int Frame;
+			int2 Frame;
 
 			gObj<Texture2D> DirectLighting;
 			gObj<Texture2D> Output;
@@ -127,7 +127,7 @@ public:
 
 		gObj<Texture2D> Final;
 
-		int PassCount;
+		int2 PassCount;
 
 		void Globals() {
 			SRV(0, Accumulation, ShaderType_Any);
@@ -248,7 +248,7 @@ public:
 			manager gClear UAV(rtProgram->Accum, float4(0, 0, 0, 0));
 		}
 
-		rtProgram->Frame = FrameIndex;
+		rtProgram->Frame = int2(FrameIndex, 0);
 		
 		// Set DXR Pipeline
 		manager gSet Pipeline(dxrPTPipeline);
@@ -287,7 +287,7 @@ public:
 		// Setup a raygen shader
 		manager gSet RayGeneration(dxrPTPipeline->PTMainRays);
 
-		rtProgram->Frame = FrameIndex;
+		rtProgram->Frame = int2(FrameIndex, 0);
 		
 		if (FrameIndex < StopFrame || StopFrame == 0) {
 			

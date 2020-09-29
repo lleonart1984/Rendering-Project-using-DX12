@@ -129,7 +129,7 @@ public:
 
 			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
-			int ProgressiveCB;
+			int2 ProgressiveCB;
 			gObj<Buffer> LightTransforms;
 			
 			gObj<Buffer> Morton;
@@ -355,7 +355,7 @@ public:
 		if (CameraIsDirty || LightSourceIsDirty)
 			FrameIndex = 0;
 
-		ptRTProgram->ProgressivePass = FrameIndex;
+		ptRTProgram->ProgressivePass = int2(FrameIndex, 0);
 
 		FrameIndex++;
 

@@ -1,5 +1,5 @@
 #include "../CommonGI/Parameters.h"
-#include "../Randoms/RandomHLSL.h"
+#include "../Randoms/RandomUsed.h"
 
 cbuffer Camera : register(b0) {
 	row_major matrix FromProjectionToWorld;

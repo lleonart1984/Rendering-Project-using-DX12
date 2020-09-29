@@ -1,7 +1,7 @@
 #ifndef SCATTERING_TOOLS_H
 #define SCATTERING_TOOLS_H
 
-#include "../Randoms/RandomHLSL.h"
+#include "../Randoms/RandomUsed.h"
 #include "Parameters.h"
 
 // Prototype function will be implemented by

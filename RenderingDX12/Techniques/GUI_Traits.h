@@ -62,11 +62,24 @@ struct IHasHomogeneousVolume {
 };
 
 struct IHasScatteringEvents {
-	float density = 10;
-	float3 scatteringAlbedo = float3(1, 1, 1);
-	float3 gFactor = float3(1, 1, 1) * 0.0f;// 0.875;
+
+	float size = 512;
+	float3 scattering = float3(1.2, 1.5, 1.0);
+	float3 absorption = float3(0.02, 0.002, 1) * 0.01f;
+	//float3 absorption = float3(0.2, 0.002, 0.02);
+
+	float3 extinction() {
+		return size * (scattering + absorption);
+	}
+
+	float3 gFactor = float3(1, 1, 1) * 0.8;// 0.75;// 0.875;
+	
 	float pathtracing = 0.5;
-	float3 phi = float3(1.0, 1.0, 1.0);
+	
+	float3 phi() {
+		return scattering * size / extinction();
+	}
+	
 	bool CountSteps = false;
 
 	virtual void Boo() {}

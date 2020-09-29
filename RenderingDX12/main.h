@@ -83,7 +83,9 @@
 
 //gObj<VolPathtracerTechnique> technique;
 //gObj<VolSTPathtracerTechnique> technique;
-gObj<VolSTPathtracerWithDFTechnique> technique;
+//gObj<VolSTPathtracerWithDFTechnique> technique;
+gObj<AVolSTWithDFTechnique> technique;
+//gObj<VolPurePTTechnique> technique;
 
 //#define TEST_WSAPIT
 //#define TEST_WSMRAPIT

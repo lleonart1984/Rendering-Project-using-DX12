@@ -100,6 +100,9 @@
     <FxCompile Include="Techniques\VolumePathtracing\GridVoxelization_CS.hlsl" />
     <FxCompile Include="Techniques\VolumePathtracing\GridSpread_CS.hlsl" />
     <FxCompile Include="Techniques\VolumePathtracing\VolSTPathtracerWithDF_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\VolPurePathtracing_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumeRendering\SphereSubsurfaceScattering_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\AVolSTWithDF_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -212,6 +215,15 @@
     <ClInclude Include="Techniques\VolumePathtracing\VolSTPathtracerTechnique.h" />
     <ClInclude Include="Techniques\VolumePathtracing\VolumeScattering.h" />
     <ClInclude Include="Techniques\VolumePathtracing\VolSTPathtracerWithDFTechnique.h" />
+    <ClInclude Include="Techniques\VolumePathtracing\VolPurePTTechnique.h" />
+    <ClInclude Include="Techniques\VolumeRendering\VAESphereScattering.h" />
+    <ClInclude Include="Techniques\CommonRT\CommonComplexity.h" />
+    <ClInclude Include="Techniques\Randoms\HybridTausRandoms.h" />
+    <ClInclude Include="Techniques\Randoms\RandomX.h" />
+    <ClInclude Include="Techniques\Randoms\RandomUsed.h" />
+    <ClInclude Include="Techniques\VolumeRendering\VAESphereScatteringBuffered.h" />
+    <ClInclude Include="Techniques\VolumeRendering\IWAEScattering.h" />
+    <ClInclude Include="Techniques\VolumePathtracing\AVolSTWithDFTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

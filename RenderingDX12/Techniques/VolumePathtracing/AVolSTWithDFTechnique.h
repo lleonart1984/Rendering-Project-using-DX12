@@ -1,14 +1,12 @@
 #pragma once
 
 #include "../../Techniques/GUI_Traits.h"
-#include "../DeferredShading/GBufferConstruction.h"
 #include "../CommonGI/Parameters.h"
-#include "../VolumePathtracing/VolDirectLightingTechnique.h"
 
-struct VolSTPathtracerWithDFTechnique : public DirectLightingTechnique, public IHasScatteringEvents, public IHasAccumulative {
+struct AVolSTWithDFTechnique : public Technique, public IHasScene, public IHasLight, public IHasCamera, public IHasScatteringEvents, public IHasAccumulative {
 public:
 
-	~VolSTPathtracerWithDFTechnique() {
+	~AVolSTWithDFTechnique() {
 	}
 
 	struct Voxelizer : public ComputePipelineBindings {
@@ -52,7 +50,7 @@ public:
 		}
 
 		void Locals() {
-			
+
 			CBV(1, LevelInfo, ShaderType_Any);
 		}
 	};
@@ -66,7 +64,7 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\VolSTPathtracerWithDF_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDF_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -88,22 +86,12 @@ public:
 			gObj<Buffer> Vertices;
 			gObj<Buffer> Materials;
 
-			// GBuffer Information
-			gObj<Texture2D> Positions;
-			gObj<Texture2D> Normals;
-			gObj<Texture2D> Coordinates;
-			gObj<Texture2D> MaterialIndices;
-			// GBuffer from light for visibility test during direct lighting
-			gObj<Texture2D> LightPositions;
-
 			gObj<Buffer> Grid;
 
 			gObj<Texture2D>* Textures;
 			int TextureCount;
 
-			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
-			gObj<Buffer> LightTransforms;
 			int2 Frame;
 			gObj<Buffer> ParticipatingMedia;
 			gObj<Buffer> ProjToWorld;
@@ -128,34 +116,25 @@ public:
 				SRV(1, Vertices);
 				SRV(2, Materials);
 
-				SRV(3, Positions);
-				SRV(4, Normals);
-				SRV(5, Coordinates);
-				SRV(6, MaterialIndices);
+				SRV(3, DirectLighting);
 
-				SRV(7, LightPositions);
+				SRV(4, Grid);
 
-				SRV(8, DirectLighting);
-
-				SRV(9, Grid);
-
-				SRV_Array(10, Textures, TextureCount);
+				SRV_Array(5, Textures, TextureCount);
 
 				Static_SMP(0, Sampler::Linear());
 				Static_SMP(1, Sampler::LinearWithoutMipMaps());
 
-				CBV(0, CameraCB);
-				CBV(1, LightingCB);
-				CBV(2, LightTransforms);
-				CBV(3, Frame);
-				CBV(4, ParticipatingMedia);
-				CBV(5, ProjToWorld);
-				CBV(6, GridInfo);
-				CBV(7, Debug);
+				CBV(0, LightingCB);
+				CBV(1, Frame);
+				CBV(2, ParticipatingMedia);
+				CBV(3, ProjToWorld);
+				CBV(4, GridInfo);
+				CBV(5, Debug);
 			}
 
 			void HitGroup_Locals() {
-				CBV(8, CurrentObjectInfo);
+				CBV(6, CurrentObjectInfo);
 			}
 		};
 		gObj<DXR_RT_Program> _Program;
@@ -168,59 +147,26 @@ public:
 	};
 
 
-	struct Filter : public ComputePipelineBindings {
-		void Setup() {
-			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\Pathtracing\\Filter_CS.cso"));
-		}
-
-		gObj<Texture2D> Accumulation;
-		gObj<Texture2D> Background;
-		gObj<Texture2D> Positions;
-		gObj<Texture2D> Normals;
-		gObj<Texture2D> Coordinates;
-		gObj<Texture2D> MaterialIndices;
-		gObj<Buffer> Materials;
-		gObj<Texture2D>* Textures;
-		int TextureCount;
-
-		gObj<Texture2D> Final;
-
-		int PassCount;
-
-		void Globals() {
-			SRV(0, Accumulation, ShaderType_Any);
-			SRV(1, Background, ShaderType_Any);
-			SRV(2, Positions, ShaderType_Any);
-			SRV(3, Normals, ShaderType_Any);
-			SRV(4, Coordinates, ShaderType_Any);
-			SRV(5, MaterialIndices, ShaderType_Any);
-			SRV(6, Materials, ShaderType_Any);
-			SRV_Array(7, Textures, TextureCount, ShaderType_Any);
-
-			Static_SMP(0, Sampler::Linear(), ShaderType_Any);
-
-			UAV(0, Final, ShaderType_Any);
-
-			CBV(0, PassCount, ShaderType_Any);
-		}
-	};
-
+	// Scene loading process to retain scene on the GPU
+	gObj<RetainedSceneLoader> sceneLoader; 
+	
 	gObj<Voxelizer> voxelizer;
 	gObj<Spreading> spreading;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
-	gObj<Filter> filterPipeline;
 
 	void Startup() {
 
-		DirectLightingTechnique::Startup();
+		// Load and setup scene loading process
+		sceneLoader = new RetainedSceneLoader();
+		sceneLoader->SetScene(this->Scene);
+		_ gLoad Subprocess(sceneLoader);
 
 		wait_for(signal(flush_all_to_gpu));
 
 		_ gLoad Pipeline(voxelizer);
 		_ gLoad Pipeline(spreading);
 		_ gLoad Pipeline(dxrPTPipeline);
-		_ gLoad Pipeline(filterPipeline);
-
+		
 		// Load assets to render the deferred lighting image
 		perform(CreatingAssets);
 
@@ -243,7 +189,13 @@ public:
 		float3 Phi;
 		float Pathtracer;
 	};
-	
+
+	void SetScene(gObj<CA4G::Scene> scene) {
+		IHasScene::SetScene(scene);
+		if (sceneLoader != nullptr)
+			sceneLoader->SetScene(scene);
+	}
+
 	void CreatingAssets(gObj<CopyingManager> manager) {
 
 #pragma region DXR Pathtracing Pipeline Objects
@@ -251,19 +203,11 @@ public:
 		dxrPTPipeline->_Program->Textures = sceneLoader->Textures;
 		dxrPTPipeline->_Program->Materials = sceneLoader->MaterialBuffer;
 		dxrPTPipeline->_Program->Vertices = sceneLoader->VertexBuffer;
-		dxrPTPipeline->_Program->CameraCB = computeDirectLighting->ViewTransform;
-		dxrPTPipeline->_Program->LightingCB = computeDirectLighting->Lighting;
-		dxrPTPipeline->_Program->LightTransforms = computeDirectLighting->LightTransforms;
+		dxrPTPipeline->_Program->LightingCB = _ gCreate ConstantBuffer<Lighting>();
 		dxrPTPipeline->_Program->ProjToWorld = _ gCreate ConstantBuffer<float4x4>();
 		dxrPTPipeline->_Program->ParticipatingMedia = _ gCreate ConstantBuffer<ScatteringParameters>();
 
-		dxrPTPipeline->_Program->Positions = gBufferFromViewer->pipeline->GBuffer_P;
-		dxrPTPipeline->_Program->Normals = gBufferFromViewer->pipeline->GBuffer_N;
-		dxrPTPipeline->_Program->Coordinates = gBufferFromViewer->pipeline->GBuffer_C;
-		dxrPTPipeline->_Program->MaterialIndices = gBufferFromViewer->pipeline->GBuffer_M;
-		dxrPTPipeline->_Program->LightPositions = gBufferFromLight->pipeline->GBuffer_P;
-
-		dxrPTPipeline->_Program->DirectLighting = DirectLighting;
+		dxrPTPipeline->_Program->DirectLighting = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 		//dxrPTPipeline->_Program->Output = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
 		dxrPTPipeline->_Program->Output = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 		dxrPTPipeline->_Program->Accum = _ gCreate DrawableTexture2D<float4>(render_target->Width, render_target->Height);
@@ -275,7 +219,7 @@ public:
 
 		Grid = _ gCreate RWStructuredBuffer<unsigned int>(gridSize * gridSize * gridSize / 8);
 		GridTmp = _ gCreate RWStructuredBuffer<unsigned int>(gridSize * gridSize * gridSize / 8);
-		
+
 		voxelizer->GridInfo = _ gCreate ConstantBuffer<GridInfo>();
 		dxrPTPipeline->_Program->GridInfo = voxelizer->GridInfo;
 		spreading->GridInfo = voxelizer->GridInfo;
@@ -288,17 +232,6 @@ public:
 			sceneLoader->Scene->getMinimum(),
 			sceneLoader->Scene->getMinimum() + float3(maxDim, maxDim, maxDim)
 			});
-
-		filterPipeline->Accumulation = dxrPTPipeline->_Program->Accum;
-		filterPipeline->Background = DirectLighting;
-		filterPipeline->Positions = computeDirectLighting->Positions;
-		filterPipeline->Normals = computeDirectLighting->Normals;
-		filterPipeline->Coordinates = computeDirectLighting->Coordinates;
-		filterPipeline->MaterialIndices = computeDirectLighting->MaterialIndices;
-		filterPipeline->Materials = computeDirectLighting->Materials;
-		filterPipeline->TextureCount = computeDirectLighting->TextureCount;
-		filterPipeline->Textures = computeDirectLighting->Textures;
-		filterPipeline->Final = _ gCreate DrawableTexture2D<RGBA>(render_target->Width, render_target->Height);
 	}
 
 	gObj<Buffer> VB;
@@ -328,8 +261,6 @@ public:
 
 	void Frame() {
 
-		DirectLightingTechnique::Frame();
-
 		static bool first = true;
 
 		if (first) { // if dynamic scene this need to be done everyframe
@@ -351,7 +282,7 @@ public:
 
 		int radius = 1;
 		//for (int level = 0; level < 2; level++)
-		for (int level = 0; level < ceil(log(gridSize)/log(2)); level++)
+		for (int level = 0; level < ceil(log(gridSize) / log(2)); level++)
 		{
 			compute gClear UAV(GridTmp, uint4(0));
 			spreading->GridDst = GridTmp;
@@ -370,6 +301,8 @@ public:
 		dxrPTPipeline->_Program->Grid = Grid;
 	}
 
+	float4x4 view, proj;
+
 	void Pathtracing(gObj<DXRManager> manager) {
 
 		static int FrameIndex = 0;
@@ -378,12 +311,21 @@ public:
 
 		if (CameraIsDirty || LightSourceIsDirty)
 		{
+			Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
+
+			// Update Light intensity and position
+			manager gCopy ValueData(rtProgram->LightingCB, Lighting{
+					Light->Position, 0,
+					Light->Intensity, 0,
+					Light->Direction, 0
+				});
+
 			FrameIndex = 0;
 			manager gClear UAV(rtProgram->Output, float4(0, 0, 0, 0));
 			manager gClear UAV(rtProgram->Accum, float4(0, 0, 0, 0));
 
 			manager gCopy ValueData(rtProgram->ProjToWorld, mul(view, proj).getInverse());
-		
+
 			manager gCopy ValueData(rtProgram->ParticipatingMedia, ScatteringParameters{
 					this->extinction(), 0,
 					this->gFactor, 0,

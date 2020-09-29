@@ -161,9 +161,9 @@ public:
 				});
 
 			manager gCopy ValueData(computeDirectLighting->ParticipatingMedia, ScatteringParameters{
-				this->density*this->scatteringAlbedo, 0,
+				this->extinction(), 0,
 				this->gFactor, 0,
-				this->phi,
+				this->phi(),
 				this->pathtracing
 				});
 

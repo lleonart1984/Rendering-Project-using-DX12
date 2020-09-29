@@ -15,16 +15,6 @@ cbuffer LevelInfo : register(b1) {
 	int Radius;
 }
 
-uint GetValueAt(int3 cell) {
-	int index = Size * (cell.y + cell.z * Size) + cell.x;
-	return (GridSrc[index >> 3] >> (index & 0x7) * 4) & 0xF;
-}
-
-void SetValueAt(int3 cell, uint value) {
-	int index = Size * (cell.y + cell.z * Size) + cell.x;
-	InterlockedOr(GridDst[index >> 3], value << (index & 0x7) * 4);
-}
-
 int split3(int value) {
 
 	int ans = value & 0x3FF; // allow 10 bits only.
@@ -44,6 +34,18 @@ int split3(int value) {
 
 int morton(int3 pos) {
 	return split3(pos.x) | (split3(pos.y) << 1) | (split3(pos.z) << 2);
+}
+
+uint GetValueAt(int3 cell) {
+	//int index = Size * (cell.y + cell.z * Size) + cell.x;
+	int index = morton(cell);
+	return (GridSrc[index >> 3] >> (index & 0x7) * 4) & 0xF;
+}
+
+void SetValueAt(int3 cell, uint value) {
+	//int index = Size * (cell.y + cell.z * Size) + cell.x;
+	int index = morton(cell);
+	InterlockedOr(GridDst[index >> 3], value << (index & 0x7) * 4);
 }
 
 [numthreads(CS_1D_GROUPSIZE, 1, 1)]

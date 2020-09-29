@@ -8,7 +8,8 @@ class SphereScatteringTestTechnique : public Technique, public IHasCamera, publi
 
 	struct MultiScatteringMarch : public ComputePipelineBindings {
 		void Setup() {
-			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\SphereVolPathtracing_CS.cso"));
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\SphereSubsurfaceScattering_CS.cso"));
+			//_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumeRendering\\SphereVolPathtracing_CS.cso"));
 		}
 
 		gObj<Texture2D> Accumulation;
@@ -81,9 +82,9 @@ protected:
 			Camera->GetMatrices(render_target->Width, render_target->Height, view, proj);
 			compute gCopy ValueData(raymarch->Camera, mul(proj.getInverse(), view.getInverse()));
 			compute gCopy ValueData(raymarch->ScatteringInfo, ScatteringParameters{
-				this->density * this->scatteringAlbedo, 0,
+				this->extinction(), 0,
 				this->gFactor, 0,
-				this->phi,
+				this->phi(),
 				this->pathtracing });
 
 			compute gCopy ValueData(raymarch->Lighting,

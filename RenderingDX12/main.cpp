@@ -103,10 +103,10 @@ void GuiFor(gObj<IHasHomogeneousVolume> t) {
 
 void GuiFor(gObj<IHasScatteringEvents> t) {
 	if (
-		ImGui::SliderFloat("Density", &t->density, 0.01, 1000, "%.3f", 2) |
-		ImGui::SliderFloat3("Sigma", (float*)&t->scatteringAlbedo, 0.0, 1.0) |
+		ImGui::SliderFloat("Size", &t->size, 0.01, 1000, "%.3f", 2) |
+		ImGui::SliderFloat3("Scattering", (float*)&t->scattering, 0.1, 5.0) |
+		ImGui::SliderFloat3("Absorption", (float*)&t->absorption, 0.0, 1.0, "%.5f", 4) |
 		ImGui::SliderFloat3("G", (float*)&t->gFactor, -0.99, 0.99) |
-		ImGui::SliderFloat3("Phi", (float*)&t->phi, 0.0, 1.0) |
 		ImGui::SliderFloat("Pathtracing", &t->pathtracing, -.01, 1.01) |
 		ImGui::Checkbox("Debug", &t->CountSteps)
 		) {
@@ -200,7 +200,16 @@ int main(int, char**)
     // Create application window
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("CA4G_Samples_Window"), NULL };
     RegisterClassEx(&wc);
-	HWND hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, 1280+1024-1008, 720+768-729, NULL, NULL, wc.hInstance, NULL);
+	
+	//int windowWidth = 1280;
+	int windowWidth = 600*7/5;
+	//int windowWidth = 1024;
+	//int windowWidth = 512;
+	//int windowHeight = 300;
+	//int windowHeight = 512;
+	//int windowHeight = 768;
+	int windowHeight = 800*7/5;
+	HWND hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, windowWidth+1024-1008, windowHeight+768-729, NULL, NULL, wc.hInstance, NULL);
 	//HWND hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, 1280+1024-1008, 800+768-729, NULL, NULL, wc.hInstance, NULL);
 
 	// Show the window
@@ -244,7 +253,8 @@ int main(int, char**)
 	static Scene* scene = nullptr;
 	static Volume* volume = nullptr;
 	static Camera* camera = new Camera { float3(0,0,4.0f), float3(0,0,0), float3(0,1,0), PI / 4, 0.001f, 1000.0f };
-	static LightSource *lightSource = new LightSource{ float3(2,2,0), float3(0,-1,0), 0, float3(10, 10, 10) };
+	static LightSource* lightSource = new LightSource{ float3(2,2,0), normalize(float3(0,1,1)), 0, float3(2, 2, 2) * 3 };
+	//static LightSource *lightSource = new LightSource{ float3(2,2,0), normalize(float3(1,1,1)), 0, float3(2, 2, 2)*3 };
 
 	if (asSceneRenderer)
 	{
@@ -281,29 +291,46 @@ int main(int, char**)
 			//strcat(filePath, "\\Models\\Jade_buddha.obj");
 			strcat(filePath, "\\Models\\weddingRing\\ring.obj");
 			scene = new Scene(filePath);
-			camera->Position = float3(-.1f, .1f, 0.25f);
+			camera->Position = float3(.2f, .2f, 0.25f);
 			camera->Target = float3(0, 0.0f, 0);
 			lightSource->Position = float3(1, 0.4, 0.2);
 			lightSource->Direction = normalize(float3(1, 1, 1));
-			lightSource->Intensity = float3(10, 10, 10);
+			lightSource->Intensity = float3(4, 4, 4);
 			//MixMirrorMaterial(&scene->Materials()[0], 1);
 			MixGlassMaterial(&scene->Materials()[0], 1, 2.6);
 			//MixEmissiveMaterial(&scene->Materials()[0], float3(1, 1, 0));
 			break;
 		case BUDDHA_OBJ:
 			filePath = desktop_directory();
+			strcat(filePath, "\\Models\\pitagoras\\model2.obj");
 			//strcat(filePath, "\\Models\\dragon.obj");
-			strcat(filePath, "\\Models\\Jade_buddha.obj");
+			//strcat(filePath, "\\Models\\Jade_buddha.obj");
+			//strcat(filePath, "\\Models\\lucy2.obj");
 			//strcat(filePath, "\\Models\\Bunny.obj");
+			//strcat(filePath, "\\Models\\afrodita\\model.obj");
+			//strcat(filePath, "\\Models\\cupid\\cupid.obj");
+			//strcat(filePath, "\\Models\\david\\david.obj");
 			//strcat(filePath, "\\Models\\weddingRing\\ring.obj");
+			
 			scene = new Scene(filePath);
-			camera->Position = float3(-.0f, .5f, 0.45f);
-			camera->Target = float3(0, 0.5f, 0);
+			
+			//camera->Up = float3(0, 0, 1);
+			//camera->Position = float3(0.1f, 0.65f, 0.80f);
+			camera->Position = float3(-.0f, .405f, -1.5f);
+			//camera->Position = float3(-.20f, .1205f, -1.25f);
+			//camera->Position = float3(-.4f, .60f, 1.8f);
+			
+			camera->Target = float3(0, 0.405f, 0);
+			//camera->Target = float3(0.5, 0.1205f, 0);
+			//camera->Target = float3(-0.2f, 0.4, 0.0f);
+			
 			lightSource->Position = float3(0.1, 0.4, 0.2);
-			lightSource->Direction = normalize(float3(1, 1, 0));
-			lightSource->Intensity = float3(20, 20, 20);
+			//lightSource->Direction = normalize(float3(0, 0.5f, -1));
+			lightSource->Direction = normalize(float3(1, 1, 1));
+			lightSource->Intensity = float3(6, 6, 6);
 			//MixMirrorMaterial(&scene->Materials()[0], 1);
-			MixGlassMaterial(&scene->Materials()[0], 1, 2.7);
+			MixGlassMaterial(&scene->Materials()[0], 1, 1.7);
+			//MixGlassMaterial(&scene->Materials()[1], 1, 1.7);
 			//MixEmissiveMaterial(&scene->Materials()[0], float3(1, 1, 0));
 			break;
 		case SPONZA_OBJ:
@@ -346,8 +373,9 @@ int main(int, char**)
 		switch (USE_VOLUME) {
 		case 0:
 			volumePath = desktop_directory();
+			strcat(volumePath, "\\clouds\\cloud-1196.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-1191.xyz");
-			strcat(volumePath, "\\clouds\\cloud-1940.xyz");
+			//strcat(volumePath, "\\clouds\\cloud-1940.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-190.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-1090.xyz");
 			volume = new Volume(volumePath);
@@ -399,6 +427,8 @@ int main(int, char**)
 
 	static int GeneratedImages = 0;
 
+	static bool ShowGUI = true;
+
 	srand(GetTickCount());
 
     while (msg.message != WM_QUIT)
@@ -434,7 +464,7 @@ int main(int, char**)
 		static int magnifierPos[2] = { 300, 300 };
 		static bool magnifierOpen = true;
 
-		if (magnifierOpen)
+		if (magnifierOpen && ShowGUI)
 		{
 			ImGui::Begin("Magnifier frame", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration);
 			ImGui::SetWindowPos(ImVec2(magnifierPos[0] - magnifierSize - 9, magnifierPos[1] - magnifierSize - 9));
@@ -461,6 +491,15 @@ int main(int, char**)
 			ImGui::End();
 		}
 
+		if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace)))
+		{
+			ShowGUI = !ShowGUI;
+		}
+
+		if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter)))
+			ScreenShotDesired = true;
+
+		if (ShowGUI)
         {
             ImGui::Begin("Rendering over DX12");                          // Create a window called "Hello, world!" and append into it.
 
@@ -501,9 +540,7 @@ int main(int, char**)
 				
 				bool cameraChanged = CurrentFrame == 1;
 
-				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter)))
-					ScreenShotDesired = true;
-
+				
 				if (movingCamera >= 0) {
 					float d = length(camera->Position - cameraPositions[movingCamera]);
 					cameraChanged = d > 0;

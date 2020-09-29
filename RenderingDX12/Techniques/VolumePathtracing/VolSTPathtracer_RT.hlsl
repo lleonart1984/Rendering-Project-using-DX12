@@ -47,7 +47,7 @@ struct RayPayload
 	Ray ScatteredRay;
 	int bounces;
 	int volBounces;
-	ULONG seed;
+	uint4 seed;
 };
 
 StructuredBuffer<uint2> Grid : register(t9);
@@ -494,7 +494,7 @@ float3 ComputePath(bool hit, float3 P, float3 V, Vertex surfel, Material materia
 	else
 		VolumeScattering(Extinction[cmp], G_Value[cmp], Phi[cmp], V, P - t * V, payload);
 
-	payload.seed = getCurrentSeed();
+	payload.seed = getRNG();
 
 	while (any(payload.Importance > 0.0001))
 	{
@@ -544,7 +544,7 @@ float3 ComputePath(bool hit, float3 P, float3 V, Vertex surfel, Material materia
 void EnvironmentMap(inout RayPayload payload)
 {
 	// Start seed here...
-	setCurrentSeed(payload.seed);
+	setRNG(payload.seed);
 	
 	int cmp = (int)dot(payload.Importance > 0, float3(0, 1, 2));
 
@@ -557,7 +557,7 @@ void EnvironmentMap(inout RayPayload payload)
 	else // hit media particle
 		VolumeScattering(Extinction[cmp], G_Value[cmp], Phi[cmp], -payload.ScatteredRay.Direction, P, payload);
 	
-	payload.seed = getCurrentSeed();
+	payload.seed = getRNG();
 }
 
 [shader("raygeneration")]
@@ -613,7 +613,7 @@ void PTScattering(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 	GetHitInfo(attr, surfel, material, 0, 0);
 
 	// Start seed here...
-	setCurrentSeed(payload.seed);
+	setRNG(payload.seed);
 
 	int cmp = (int)dot(payload.Importance > 0, float3(0, 1, 2));
 
@@ -636,5 +636,5 @@ void PTScattering(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 	else // hit media particle
 		VolumeScattering(Extinction[cmp], G_Value[cmp], Phi[cmp], -WorldRayDirection(), payload.ScatteredRay.Position + t * payload.ScatteredRay.Direction, payload);
 
-	payload.seed = getCurrentSeed();
+	payload.seed = getRNG();
 }

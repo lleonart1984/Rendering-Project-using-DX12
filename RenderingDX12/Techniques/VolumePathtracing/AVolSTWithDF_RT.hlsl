@@ -2,20 +2,14 @@
 /// Primary rays and shadow cast use GBuffer optimization
 /// Path-tracing with next-event estimation.
 
-#include "../CommonGI/Definitions.h"
-
 // Top level structure with the scene
 RaytracingAccelerationStructure Scene : register(t0, space0);
 
 #define VERTICES_REG				t1
 #define MATERIALS_REG				t2
-#define GBUFFER_POSITIONS_REG		t3
-#define GBUFFER_NORMALS_REG			t4
-#define GBUFFER_COORDINATES_REG		t5
-#define GBUFFER_MATERIALS_REG		t6
-#define LIGHTVIEW_POSITIONS_REG		t7
-#define BACKGROUND_IMG_REG			t8
-#define TEXTURES_REG				t10
+#define BACKGROUND_IMG_REG			t3
+StructuredBuffer<uint> Grid : register(t4);
+#define TEXTURES_REG				t5
 
 #define TEXTURES_SAMPLER_REG		s0
 #define SHADOW_MAP_SAMPLER_REG		s1
@@ -23,14 +17,11 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define OUTPUT_IMAGE_REG			u0
 #define ACCUM_IMAGE_REG				u1
 
-#define VIEWTOWORLD_CB_REG			b0
-#define LIGHTING_CB_REG				b1
-#define LIGHT_TRANSFORMS_CB_REG		b2
-#define ACCUMULATIVE_CB_REG			b3
-#define OBJECT_CB_REG				b8
+#define LIGHTING_CB_REG				b0
+#define ACCUMULATIVE_CB_REG			b1
+#define OBJECT_CB_REG				b6
 
-#include "../CommonRT/CommonDeferred.h"
-#include "../CommonRT/CommonShadowMaping.h"
+#include "../CommonRT/CommonRTScenes.h"
 #include "../CommonRT/CommonProgressive.h"
 #include "../CommonRT/CommonOutput.h"
 #include "../CommonGI/ScatteringTools.h"
@@ -50,26 +41,25 @@ struct RayPayload
 	uint4 seed;
 };
 
-StructuredBuffer<uint> Grid : register(t9);
 
-cbuffer ParticipatingMedia : register(b4) {
+cbuffer ParticipatingMedia : register(b2) {
 	float3 Extinction;
 	float3 G_Value;
 	float3 Phi;
 	float PathtracingPercentage;
 }
 
-cbuffer Transforming : register(b5) {
+cbuffer Transforming : register(b3) {
 	row_major matrix FromProjectionToWorld;
 }
 
-cbuffer GridInfo : register(b6) {
+cbuffer GridInfo : register(b4) {
 	int Size;
 	float3 MinimumGrid;
 	float3 MaximumGrid;
 }
 
-cbuffer DebugInfo : register(b7) {
+cbuffer DebugInfo : register(b5) {
 	int CountSteps;
 }
 
@@ -112,7 +102,7 @@ float MaximalRadius(float3 P) {
 
 		if (emptySizePower <= 0) // no empty cell
 			return 0;
-		
+
 		//float halfboxSize = pow(2, emptySizePower - 1) * 1.4142 - 0.5;// *0.5;
 		float halfboxSize = pow(2, emptySizePower - 1) - 0.5;// *0.5;
 		float3 minBox = (cell + 0.5 - halfboxSize) * cellSize + MinimumGrid;
@@ -296,7 +286,7 @@ bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density
 	float3 pathOut = clamp(pathMu + exp(clamp(pathLogVar, -20, 40) * 0.5) * sampling, -0.9999, 0.9999);
 	float costheta = pathOut.x;
 	float wt = pathOut.y;
-	float wb = pathOut.z; 
+	float wb = pathOut.z;
 	x = float3(0, sqrt(1 - costheta * costheta), costheta);
 	float3 N = x;
 	float3 B = float3(1, 0, 0);
@@ -307,63 +297,6 @@ bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density
 
 	return true;// random() >= 1 - pow(Phi, n);
 }
-
-float randomKum(float alpha, float beta) {
-	float u = random();
-	return pow(1 - pow(1 - u, 1 / beta), 1 / alpha);
-}
-
-float AlphaFor(float sigma, float phi) {
-	float a = 0.656585f;
-	float b = -0.293104f;
-	float c = 1.40309f;
-	float d = 0.865207f;
-	float e = 0.69545f;
-	return (a * phi + b) * atan(log(sigma) - c) + (d * phi + e);
-}
-
-float BetaFor(float sigma, float phi) {
-	return 2.94871f - 0.0783771f * atan(2.25587f - log(sigma)) + (0.11912f * phi - 0.210316f) * atan(0.392166f + log(sigma));
-}
-
-bool GenerateVariablesAnalytically(float Phi, float density, float3 win, out float3 x, out float3 w)
-{
-	x = randomDirection(-win);
-	w = x;
-
-	if (random() < 1 - Phi) // absorption at first scatteing
-	{
-		return false;
-	}
-
-	float prob = 1 - exp(-density);
-	if (random() > prob) // single scattering
-	{
-		return true;
-	}
-
-	float mlogN = -0.590368 + 0.968372 * log(density * density + 5.02256);
-	float vlogN = 0.34273;
-
-	float n = max(2, (int)exp(round(gauss(mlogN, sqrt(vlogN)))));
-
-	if (random() < (1 - pow(Phi, n - 1)))
-	{
-		return false;
-	}
-
-	float3 oB = abs(x.z) < 1 ? float3(0, 0, 1) : float3(1, 0, 0);
-	float3 oT = normalize(cross(oB, x));
-	oB = cross(oT, x);
-
-	float gamma = pi * 0.5 * randomKum(AlphaFor(density, Phi), BetaFor(density, Phi));
-	float randomRot = random() * 2 * pi;
-	float cosgamma = cos(gamma);
-	float singamma = sin(gamma);// sqrt(max(0, 1 - cosgamma * cosgamma));
-	w = singamma * cos(randomRot) * oB + singamma * sin(randomRot) * oT + cosgamma * x;
-	return true;
-}
-
 
 // Represents a single bounce of path tracing
 // Will accumulate emissive and direct lighting modulated by the carrying importance
@@ -392,54 +325,21 @@ void VolumeScattering(float Extinction, float G, float Phi, float3 V, float3 P, 
 		float r = MaximalRadius(P);
 		payload.volBounces++;// += r == 0 ? 1 : 0;
 
-		//if (Extinction * r < 2) {
-		//	if (random() < 1 - Phi)
-		//	{
-		//		payload.Importance = 0; // absorption
-		//	}
+		if (Extinction * r < 1) {
+			if (random() < 1 - Phi)
+			{
+				payload.Importance = 0; // absorption
+			}
 
-		//	float3 newDir = GeneratePhase(G, -V);
-		//	// Update scattered ray
-		//	payload.ScatteredRay.Direction = newDir;
-		//	payload.ScatteredRay.Position = P;
-		//}
-		//else
+			float3 newDir = GeneratePhase(G, -V);
+			// Update scattered ray
+			payload.ScatteredRay.Direction = newDir;
+			payload.ScatteredRay.Position = P;
+		}
+		else
 		{
 
 			float3 x, w, X, W;
-
-			//if (abs(G) <= 0.001) // isotropic case
-			//{
-			//	/*float sigmaS = Phi * Extinction;
-			//	float sigmaA = (1 - Phi) * Extinction;
-			//	float correctedSigmaS = sigmaS * pow(1 - G, 6);
-			//	float correctedExtinction = correctedSigmaS + sigmaA;
-			//	float correctedPhi = r == 0 ? Phi : correctedSigmaS / correctedExtinction;*/
-			//	
-			//	if (!GenerateVariablesAnalytically(Phi, Extinction * r, -V, x, w))
-			//	{
-			//		payload.Importance = 0;
-			//	}
-			//	//float absorption = GenerateVariablesAnalytically2( Phi, Extinction * r, -V, x, w);
-			//	//GenerateVariables(G, Phi, -V, L, Extinction * r, x, w, X, Importance, Accum);
-
-			//	//if (random() < absorption) // Absorption
-			//	//{
-			//	//	payload.Importance = 0;
-			//	//	//return;
-			//	//}
-
-			//}
-			//else 
-				//float Absorption, Accum;
-				//GenerateVariablesWithModel(G, Phi, -V, Extinction * r, x, w, X, W, Accum, Absorption);
-				////GenerateVariables(G, Phi, -V, L, Extinction * r, x, w, X, Importance, Accum);
-
-				//if (random() < Absorption) // Absorption
-				//{
-				//	payload.Importance = 0;
-				//	//return;
-				//}
 
 			if (!GenerateVariablesWithNewModel(G, Phi, -V, Extinction * r, x, w))
 				payload.Importance = 0;
@@ -447,69 +347,6 @@ void VolumeScattering(float Extinction, float G, float Phi, float3 V, float3 P, 
 			payload.ScatteredRay.Direction = w;
 			payload.ScatteredRay.Position = P + x * r;
 		}
-	}
-}
-
-
-// Represents a single bounce of path tracing
-// Will accumulate emissive and direct lighting modulated by the carrying importance
-// Will update importance with scattered ratio divided by pdf
-// Will output scattered ray to continue with
-void SurfelScatteringWithoutAccumulation(float3 V, Vertex surfel, Material material, inout RayPayload payload)
-{
-	TransformWavelengthMaterial(material, payload.Importance);
-
-	// Adding emissive and direct lighting
-	float NdotV;
-	bool invertNormal;
-	float3 fN;
-	float4 R, T;
-	ComputeImpulses(V, surfel, material,
-		NdotV,
-		invertNormal,
-		fN,
-		R,
-		T);
-
-	float3 ratio;
-	float3 direction;
-	float pdf;
-	RandomScatterRay(V, fN, R, T, material, ratio, direction, pdf);
-
-	// Update gathered Importance to the viewer
-	payload.Importance *= max(0, ratio);// / (1 - russianRoulette);
-	// Update scattered ray
-	payload.ScatteredRay.Direction = direction;
-	payload.ScatteredRay.Position = surfel.P + sign(dot(direction, fN)) * 0.001 * fN;
-}
-
-
-
-float3 DrawDistanceField(bool hit, float3 P, float3 V, Vertex surfel, Material material, int bounces)
-{
-	float d = length(surfel.P - P);
-
-	float t = -log(max(0.0000001, 1 - random())) / Extinction[0];
-
-	// initial scatter (primary rays)
-	if (hit && t > d)
-	{
-		return 0;// FreeCell(P - V * d) ? float3(0, 1, 0) : float3(0, 0, 1);
-	}
-	else
-	{
-		P = P - V * t;
-
-		//int3 cell = (P - MinimumGrid) * Size / (MaximumGrid - MinimumGrid);
-		//if (any(cell < 0) || any(cell >= Size))
-		//	return 0;
-		//uint level = GetValueAt(cell);
-		//return level <= 10 * (1 - Phi.x) ? 1000 : 0;
-
-		float freeSize = MaximalRadius(P);
-		if (freeSize < (1 << (int)(10 * (1 - Phi.x))) / 1024.0)
-			return float3(1, freeSize, freeSize) * LightIntensity / 100;
-		return 0;
 	}
 }
 
@@ -534,7 +371,7 @@ float3 SampleSkybox(float3 L) {
 		1.0f
 	};
 
-	int N = 30;
+	int N = 10;
 	float phongNorm = (N + 2) / (4 * pi);
 
 	float3 col = BG_COLORS[0];
@@ -543,35 +380,18 @@ float3 SampleSkybox(float3 L) {
 	col = lerp(col, BG_COLORS[2], smoothstep(BG_DISTS[1], BG_DISTS[2], L.y));
 	col = lerp(col, BG_COLORS[3], smoothstep(BG_DISTS[2], BG_DISTS[3], L.y));
 	col = lerp(col, BG_COLORS[4], smoothstep(BG_DISTS[3], BG_DISTS[4], L.y));
-	return //col + // *LightIntensity;// +
+	return col + // *LightIntensity;// +
 		pow(max(0, dot(L, LightDirection)), N) * phongNorm * LightIntensity;
 }
 
-float3 ComputePath(bool hit, float3 P, float3 V, Vertex surfel, Material material, int bounces, out int volBounces)
+float3 ComputePath(float3 O, float3 D, out int volBounces)
 {
 	RayPayload payload = (RayPayload)0;
 	int cmp = PassCount % 3;// random() * 3;
 	payload.Importance[cmp] = 3; // dividing 1 by 1/3.
-
-	float d = length(surfel.P - P);
-
-	float t = -log(max(0.0000001, 1 - random())) / Extinction[cmp];
-
-	// initial scatter (primary rays)
-	if (hit)
-	{
-		payload.bounces = 1;
-		SurfelScatteringWithoutAccumulation(V, surfel, material, payload);
-		if (material.Roulette.w > 0)
-			payload.bounces = -1;
-	}
-	else {
-		//payload.AccRadiance = 0;// float3(1, 1, 1);// SampleSkybox(-V);
-		payload.AccRadiance = SampleSkybox(-V);
-		payload.Importance = 0;
-	}
-	//else
-	//	VolumeScattering(Extinction[cmp], G_Value[cmp], Phi[cmp], V, P - t * V, payload);
+	payload.ScatteredRay.Position = O;
+	payload.ScatteredRay.Direction = D;
+	payload.bounces = 1;
 
 	payload.seed = getRNG();
 
@@ -629,7 +449,7 @@ void EnvironmentMap(inout RayPayload payload)
 	//	payload.AccRadiance = 1 / 0;
 	//else {
 	//if (payload.bounces != 0)
-		payload.AccRadiance += payload.Importance * SampleSkybox(payload.ScatteredRay.Direction);
+	payload.AccRadiance += payload.Importance * SampleSkybox(payload.ScatteredRay.Direction);
 	//}
 	payload.Importance = 0;
 
@@ -655,15 +475,9 @@ void PTMainRays()
 	uint2 raysDimensions = DispatchRaysDimensions();
 	StartRandomSeedForRay(raysDimensions, 1, raysIndex, 0, PassCount);
 
-	Vertex surfel;
-	Material material;
-	float3 V;
-	float3 P;
-	float2 coord = (raysIndex + 0.5) / raysDimensions;
+	float2 coord = (raysIndex.xy + float2(random(), random())) / raysDimensions;
 
-	bool hit = GetPrimaryIntersection(raysIndex, coord, P, V, surfel, material);
-
-	float4 ndcP = float4(2 * (raysIndex.xy + float2(random(), random())) / raysDimensions - 1, 0, 1);
+	float4 ndcP = float4(2 * coord - 1, 0, 1);
 	ndcP.y *= -1;
 	float4 ndcT = ndcP + float4(0, 0, 1, 0);
 
@@ -675,8 +489,6 @@ void PTMainRays()
 	float3 O = viewP.xyz;
 	float3 D = normalize(viewT.xyz - viewP.xyz);
 
-	V = -D;
-
 	//for (int i = 0; i < 10; i++)
 	{
 		int volBounces = 0;
@@ -684,7 +496,7 @@ void PTMainRays()
 
 		//color = DrawDistanceField(hit, P, V, surfel, material, PATH_TRACING_MAX_BOUNCES);
 
-		color = ComputePath(hit, P, V, surfel, material, PATH_TRACING_MAX_BOUNCES, volBounces);
+		color = ComputePath(O, D, volBounces);
 
 		//color = material.Roulette.w;
 
@@ -718,20 +530,20 @@ void PTScattering(inout RayPayload payload, in BuiltInTriangleIntersectionAttrib
 	{
 		if (abs(payload.bounces) > PATH_TRACING_MAX_BOUNCES)
 			//if (random() < 0.5)
-				payload.Importance = 0;
-			//else
-			//	payload.Importance *= 2;
+			payload.Importance = 0;
+		//else
+		//	payload.Importance *= 2;
 
 		if (any(payload.Importance)) {
 			// use bounces sign to know if it is in a medium
 			payload.bounces = sign(payload.bounces) * (abs(payload.bounces) + 1);
-				// This is not a recursive closest hit but it will accumulate in payload
-				// all the result of the scattering to this surface
+			// This is not a recursive closest hit but it will accumulate in payload
+			// all the result of the scattering to this surface
 			SurfelScattering(-WorldRayDirection(), surfel, material, payload);
 
 			if (any(material.Specular) && material.Roulette.w > 0) // some fresnel
 			{
-				payload.bounces = sign(dot(surfel.N, payload.ScatteredRay.Direction))*(abs(payload.bounces)-1);
+				payload.bounces = sign(dot(surfel.N, payload.ScatteredRay.Direction)) * (abs(payload.bounces) - 1);
 
 				//if (dot(surfel.N, -payload.ScatteredRay.Direction) > 0) // entering to the material
 				//	payload.bounces = -abs(payload.bounces); // switch from medium

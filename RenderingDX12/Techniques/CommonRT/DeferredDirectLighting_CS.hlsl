@@ -131,5 +131,5 @@ void main( uint3 DTid : SV_DispatchThreadID )
 		T
 	);
 
-	DirectLighting[DTid.xy] = 0;// color;
+	DirectLighting[DTid.xy] = color;
 }

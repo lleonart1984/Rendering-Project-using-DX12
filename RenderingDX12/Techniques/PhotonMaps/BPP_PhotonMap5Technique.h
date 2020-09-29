@@ -174,7 +174,7 @@ public:
 
 			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
-			int ProgressiveCB;
+			int2 ProgressiveCB;
 			gObj<Buffer> LightTransforms;
 
 			gObj<Texture2D> DirectLighting;
@@ -437,7 +437,7 @@ public:
 		if (CameraIsDirty || LightSourceIsDirty)
 			FrameIndex = 0;
 
-		ptRTProgram->ProgressivePass = FrameIndex;
+		ptRTProgram->ProgressivePass = int2(FrameIndex, 0);
 
 
 		manager gCopy ValueData(ptRTProgram->CameraCB, lightView.getInverse());
@@ -572,9 +572,9 @@ public:
 		// Setup a raygen shader
 		manager gSet RayGeneration(dxrRTPipeline->RTMainRays);
 
-		if (rtProgram->ProgressiveCB < StopFrame || StopFrame == 0)
+		if (rtProgram->ProgressiveCB.x < StopFrame || StopFrame == 0)
 		{
-			CurrentFrame = rtProgram->ProgressiveCB;
+			CurrentFrame = rtProgram->ProgressiveCB.x;
 			// Dispatch primary rays
 			manager gDispatch Rays(render_target->Width, render_target->Height);
 		}

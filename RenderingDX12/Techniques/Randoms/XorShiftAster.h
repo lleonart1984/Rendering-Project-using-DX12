@@ -1,14 +1,20 @@
 
 shared static ULONG rng_state;
+shared static ULONG initialSeed;
 
 /* The state array must be initialized to not be all zero in the first four words */
 uint xorshift64s()
 {
 	if (rng_state.h == 0 && rng_state.l == 0)
 	{
-		rng_state.l = 0x1FF2B12;
-		rng_state.h = 0x1FA3B12;
+		rng_state.l = initialSeed.h;
+		rng_state.h = initialSeed.l ^ (1 - initialSeed.h);
 	}
+
+	//if (rng_state.l == 0)
+	//{
+	//	rng_state.l = 0x1FF2B12;
+	//}
 
 	//x ^= x >> 12; // a
 	rng_state = XOR(rng_state, RSHIFT(rng_state, 12));
@@ -29,6 +35,7 @@ float random()
 
 void initializeRandom(ULONG seed) {
 	rng_state = seed;
+	initialSeed = seed;
 }
 
 ULONG getRandomSeed() {

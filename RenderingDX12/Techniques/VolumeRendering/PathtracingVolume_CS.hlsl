@@ -42,20 +42,29 @@ RWTexture2D<float3> Output			: register(u1);
 float3 SampleSkybox(float3 L) {
 	//return float3(0, 0, 1);
 
+	//float3 BG_COLORS[5] =
+	//{
+	//	float3(0.00f, 0.0f, 0.02f), // GROUND DARKER BLUE
+	//	float3(0.01f, 0.05f, 0.2f), // HORIZON GROUND DARK BLUE
+	//	float3(0.7f, 0.9f, 1.0f), // HORIZON SKY WHITE
+	//	float3(0.1f, 0.3f, 1.0f),  // SKY LIGHT BLUE
+	//	float3(0.01f, 0.1f, 0.7f)  // SKY BLUE
+	//};
+
 	float3 BG_COLORS[5] =
 	{
-		float3(0.00f, 0.0f, 0.02f), // GROUND DARKER BLUE
-		float3(0.01f, 0.05f, 0.2f), // HORIZON GROUND DARK BLUE
-		float3(0.7f, 0.9f, 1.0f), // HORIZON SKY WHITE
-		float3(0.1f, 0.3f, 1.0f),  // SKY LIGHT BLUE
-		float3(0.01f, 0.1f, 0.7f)  // SKY BLUE
+		float3(134 / 255.0f, 97 / 255.0f, 24 / 255.0f), // GROUND DARKER BLUE
+		float3(174/255.0f, 125/255.0f, 94/255.0f), // HORIZON GROUND DARK BLUE
+		float3(133 / 255.0f, 125 / 255.0f, 121 / 255.0f), // HORIZON SKY WHITE
+		float3(123/255.0f, 125/255.0f, 141/255.0f),  // SKY LIGHT BLUE
+		float3(92/255.0f, 101/255.0f, 198/255.0f)  // SKY BLUE
 	};
 
 	float BG_DISTS[5] =
 	{
 		-1.0f,
-		-0.04f,
-		0.0f,
+		-0.3f,
+		-0.2f,
 		0.5f,
 		1.0f
 	};

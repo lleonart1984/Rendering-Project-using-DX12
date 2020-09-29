@@ -81,7 +81,7 @@ public:
 			gObj<Buffer> CameraCB;
 			gObj<Buffer> LightingCB;
 			gObj<Buffer> LightTransforms;
-			int ProgressivePass;
+			int2 ProgressivePass;
 
 			gObj<Texture2D> Output;
 			gObj<Texture2D> Accum;

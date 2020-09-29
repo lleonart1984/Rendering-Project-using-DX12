@@ -14801,8 +14801,8 @@ namespace CA4G {
 	class Tokenizer
 	{
 		char* buffer;
-		int count;
-		int pos = 0;
+		size_t count;
+		size_t pos = 0;
 	public:
 		Tokenizer(FILE* stream) {
 			fseek(stream, 0, SEEK_END);
@@ -14810,8 +14810,8 @@ namespace CA4G {
 			fgetpos(stream, &count);
 			fseek(stream, 0, SEEK_SET);
 			buffer = new char[count];
-			int offset = 0;
-			int read;
+			size_t offset = 0;
+			size_t read;
 			do
 			{
 				read = fread_s(&buffer[offset], count, 1, min(count, 1024 * 1024 * 20), stream);
@@ -14845,8 +14845,8 @@ namespace CA4G {
 		{
 			while (!isEof() && (buffer[pos] == ' ' || buffer[pos] == '\t'))
 				pos++;
-			int initialPos = pos;
-			int p = 0;
+			size_t initialPos = pos;
+			size_t p = 0;
 			while (!isEof() && token[p] == buffer[pos]) {
 				p++; pos++;
 			}
@@ -14878,19 +14878,19 @@ namespace CA4G {
 
 		string readTextToken() {
 
-			int start = pos;
+			size_t start = pos;
 			while (!isEol() && buffer[pos] != ' ' && buffer[pos] != '/' && buffer[pos] != ';'&& buffer[pos] != ':'&& buffer[pos] != '.'&& buffer[pos] != ','&& buffer[pos] != '('&& buffer[pos] != ')')
 				pos++;
-			int end = pos - 1;
+			size_t end = pos - 1;
 			return string((char*)(buffer + start), end - start + 1);
 		}
 
 		string readToEndOfLine()
 		{
-			int start = pos;
+			size_t start = pos;
 			while (!isEol())
 				pos++;
-			int end = pos - 1;
+			size_t end = pos - 1;
 			if (!isEof()) pos++;
 			return string((char*)(buffer + start), end - start + 1);
 		}
@@ -14909,7 +14909,7 @@ namespace CA4G {
 			i = 0;
 			if (isEol())
 				return false;
-			int initialPos = pos;
+			size_t initialPos = pos;
 			ignoreWhiteSpaces();
 			int sign = 1;
 			if (buffer[pos] == '-')
@@ -14918,7 +14918,7 @@ namespace CA4G {
 				pos++;
 			}
 			ignoreWhiteSpaces();
-			int end = pos;
+			size_t end = pos;
 			while (pos < count && !endsInteger(buffer[pos])) {
 				i = i * 10 + (buffer[pos] - '0');
 				pos++;
@@ -14937,9 +14937,9 @@ namespace CA4G {
 			float p = 1;
 			if (isEol())
 				return false;
-			int initialPos = pos;
+			size_t initialPos = pos;
 			ignoreWhiteSpaces();
-			int end = pos;
+			size_t end = pos;
 			while (pos < count && !endsInteger(buffer[pos])) {
 				p /= 10.0f;
 				i = i + (buffer[pos] - '0') * p;
@@ -14953,7 +14953,7 @@ namespace CA4G {
 
 
 		bool readFloatToken(float &f) {
-			int initialPos = pos;
+			size_t initialPos = pos;
 			int sign = 1;
 			ignoreWhiteSpaces();
 			if (buffer[pos] == '-')
@@ -15542,6 +15542,7 @@ namespace CA4G {
 			}
 			if (groups.size() == 0) // no material used
 			{
+				addMaterial("default", SCENE_MATERIAL());
 				usedMaterials.add("default");
 				groups.add(0);
 			}
@@ -15563,7 +15564,7 @@ namespace CA4G {
 			float scaleX = Maxim.x - Minim.x;
 			float scaleY = Maxim.y - Minim.y;
 			float scaleZ = Maxim.z - Minim.z;
-			float scale = max(0.01f, max(scaleX, max(scaleY, scaleZ)));
+			float scale = max(0.000001f, max(scaleX, max(scaleY, scaleZ)));
 
 			Minim = Minim / scale;
 			Maxim = Maxim / scale;

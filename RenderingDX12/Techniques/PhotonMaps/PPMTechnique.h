@@ -282,7 +282,7 @@ public:
 
 		dxrPTPipeline->_Program->CameraCB = _ gCreate ConstantBuffer<float4x4>();
 		dxrPTPipeline->_Program->LightingCB = computeDirectLighting->Lighting;
-		dxrPTPipeline->_Program->ProgressivePass = _ gCreate ConstantBuffer<int>();
+		//dxrPTPipeline->_Program->ProgressivePass = _ gCreate ConstantBuffer<int>();
 		dxrPTPipeline->_Program->Photons = _ gCreate RWStructuredBuffer<Photon>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 		dxrPTPipeline->_Program->RadiusFactors = _ gCreate RWStructuredBuffer<float>(PHOTON_DIMENSION * PHOTON_DIMENSION);
 #pragma endregion

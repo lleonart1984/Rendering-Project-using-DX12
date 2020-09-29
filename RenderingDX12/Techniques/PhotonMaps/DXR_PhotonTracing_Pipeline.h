@@ -46,7 +46,7 @@ struct DXR_PT_Pipeline : public RTPipelineManager {
 
 		gObj<Buffer> CameraCB;
 		gObj<Buffer> LightingCB;
-		int ProgressivePass;
+		int2 ProgressivePass;
 
 		// Photon map binding objects
 		gObj<Buffer> Photons; // Photon map in a lineal buffer
