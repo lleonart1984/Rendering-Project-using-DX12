@@ -64,7 +64,11 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDF_RT.cso"));
+				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDF2_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDF_RT.cso"));
+
+				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDFAndDL_RT.cso"));
+				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDFAndDL_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -75,7 +79,8 @@ public:
 
 		struct DXR_RT_Program : public RTProgram<DXR_PT_Pipeline> {
 			void Setup() {
-				_ gSet Payload(4 * 3 * 4 + 4 + 4 + 16); // 4 float3 + int + 2 uint
+				//_ gSet Payload(4 * 3 * 4 + 4 + 4 + 16); // 4 float3 + int + 2 uint
+				_ gSet Payload(4 * 5); // 4 float3 + int + 2 uint
 				_ gSet StackSize(1); // No recursion needed!
 				_ gLoad Shader(Context()->PTMainRays);
 				_ gLoad Shader(Context()->EnvironmentMap);
@@ -229,8 +234,8 @@ public:
 
 		manager gCopy ValueData(voxelizer->GridInfo, GridInfo{
 			gridSize,
-			sceneLoader->Scene->getMinimum(),
-			sceneLoader->Scene->getMinimum() + float3(maxDim, maxDim, maxDim)
+			sceneLoader->Scene->getMinimum() - float3(0.01, 0.01, 0.01),
+			sceneLoader->Scene->getMinimum() + float3(maxDim, maxDim, maxDim) + float3(0.01, 0.01, 0.01)
 			});
 	}
 

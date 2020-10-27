@@ -63,16 +63,27 @@ struct IHasHomogeneousVolume {
 
 struct IHasScatteringEvents {
 
+	// Lucy
 	float size = 512;
-	float3 scattering = float3(1.2, 1.5, 1.0);
-	float3 absorption = float3(0.02, 0.002, 1) * 0.01f;
-	//float3 absorption = float3(0.2, 0.002, 0.02);
+	float3 scattering = float3(1.0, 1.2, 1.5);
+	float3 absorption = float3(0.0002, 0.001, .5) * 0.05f;
+	float3 gFactor = float3(1, 1, 1) * 0.6;// 0.75;// 0.875;
+
+	// Budha
+	//float size = 512;
+	//float3 scattering = float3(1.0, 1.0, 1.0);
+	//float3 absorption = float3(0.2, 0.02, .2) * 0.01f;
+	//float3 gFactor = float3(1, 1, 1) * 0.6;// 0.75;// 0.875;
+
+	// Sphere
+	//float size = 512;
+	//float3 scattering = float3(0.8, 1.0, 1.2);
+	//float3 absorption = float3(0.2, 0.02, .2) * 0.001f;
+	//float3 gFactor = float3(0.5, 1, 0.7) * 0.9;// 0.75;// 0.875;
 
 	float3 extinction() {
 		return size * (scattering + absorption);
 	}
-
-	float3 gFactor = float3(1, 1, 1) * 0.8;// 0.75;// 0.875;
 	
 	float pathtracing = 0.5;
 	

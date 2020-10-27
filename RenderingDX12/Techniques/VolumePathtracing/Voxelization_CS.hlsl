@@ -13,7 +13,7 @@ cbuffer GridInfo : register(b0) {
 	float3 Max;
 }
 
-int3 FromPositionToCell(float3 P, float4x4 world) {
+float3 FromPositionToCell(float3 P, float4x4 world) {
 	return (mul(float4(P, 1), world).xyz - Min) * Size / (Max - Min);
 }
 
@@ -49,12 +49,12 @@ void main( uint3 DTid : SV_DispatchThreadID )
 
 	float4x4 world = Transforms[OB[DTid.x * 3]];
 
-	int3 c1 = FromPositionToCell(vertices[DTid.x * 3 + 0].P, world);
-	int3 c2 = FromPositionToCell(vertices[DTid.x * 3 + 1].P, world);
-	int3 c3 = FromPositionToCell(vertices[DTid.x * 3 + 2].P, world);
+	float3 c1 = FromPositionToCell(vertices[DTid.x * 3 + 0].P, world);
+	float3 c2 = FromPositionToCell(vertices[DTid.x * 3 + 1].P, world);
+	float3 c3 = FromPositionToCell(vertices[DTid.x * 3 + 2].P, world);
 
-	int3 maxCell = max(c1, max(c2, c3));
-	int3 minCell = min(c1, min(c2, c3));
+	int3 maxCell = max(c1, max(c2, c3));// +0.00001;
+	int3 minCell = min(c1, min(c2, c3));// -0.00001;
 
 	for (int bz = minCell.z / 4; bz <= maxCell.z / 4; bz++)
 		for (int by = minCell.y / 4; by <= maxCell.y / 4; by++)

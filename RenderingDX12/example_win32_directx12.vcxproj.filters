@@ -103,6 +103,10 @@
     <FxCompile Include="Techniques\VolumePathtracing\VolPurePathtracing_RT.hlsl" />
     <FxCompile Include="Techniques\VolumeRendering\SphereSubsurfaceScattering_CS.hlsl" />
     <FxCompile Include="Techniques\VolumePathtracing\AVolSTWithDF_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\AVolSTWithDF2_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\AVolSTWithDFAndDL_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\NVolSTWithDFAndDL_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\NVolSTWithDF_RT.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -224,6 +228,10 @@
     <ClInclude Include="Techniques\VolumeRendering\VAESphereScatteringBuffered.h" />
     <ClInclude Include="Techniques\VolumeRendering\IWAEScattering.h" />
     <ClInclude Include="Techniques\VolumePathtracing\AVolSTWithDFTechnique.h" />
+    <ClInclude Include="Techniques\VolumeRendering\CVAEScattering.h" />
+    <ClInclude Include="Techniques\VolumeRendering\HGPhase.h" />
+    <ClInclude Include="Techniques\VolumeRendering\LorenzMiePhase.h" />
+    <ClInclude Include="Techniques\VolumeRendering\NewCVAEScattering.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

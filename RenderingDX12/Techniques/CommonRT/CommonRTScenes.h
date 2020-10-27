@@ -141,3 +141,23 @@ void GetHitInfo(in BuiltInTriangleIntersectionAttributes attr, out Vertex surfel
 
 	AugmentHitInfoWithTextureMapping(surfel, material, ddx, ddy);
 }
+
+void GetHitInfo(float3 barycentrics, uint triangleIndex, int materialIndex, out Vertex surfel, out Material material, float ddx, float ddy)
+{
+	Vertex v1 = vertices[triangleIndex * 3 + 0];
+	Vertex v2 = vertices[triangleIndex * 3 + 1];
+	Vertex v3 = vertices[triangleIndex * 3 + 2];
+	Vertex s = {
+		v1.P * barycentrics.x + v2.P * barycentrics.y + v3.P * barycentrics.z,
+		v1.N * barycentrics.x + v2.N * barycentrics.y + v3.N * barycentrics.z,
+		v1.C * barycentrics.x + v2.C * barycentrics.y + v3.C * barycentrics.z,
+		v1.T * barycentrics.x + v2.T * barycentrics.y + v3.T * barycentrics.z,
+		v1.B * barycentrics.x + v2.B * barycentrics.y + v3.B * barycentrics.z
+	};
+
+	surfel = s;// Transform(s, float4x3(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0));
+
+	material = materials[materialIndex];
+
+	AugmentHitInfoWithTextureMapping(surfel, material, ddx, ddy);
+}

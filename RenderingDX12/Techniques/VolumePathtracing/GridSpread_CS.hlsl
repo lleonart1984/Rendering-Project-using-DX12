@@ -39,13 +39,13 @@ int morton(int3 pos) {
 uint GetValueAt(int3 cell) {
 	//int index = Size * (cell.y + cell.z * Size) + cell.x;
 	int index = morton(cell);
-	return (GridSrc[index >> 3] >> (index & 0x7) * 4) & 0xF;
+	return (GridSrc[index >> 3] >> ((index & 0x7) * 4)) & 0xF;
 }
 
 void SetValueAt(int3 cell, uint value) {
 	//int index = Size * (cell.y + cell.z * Size) + cell.x;
 	int index = morton(cell);
-	InterlockedOr(GridDst[index >> 3], value << (index & 0x7) * 4);
+	InterlockedOr(GridDst[index >> 3], (uint)(value << ((index & 0x7) * 4)));
 }
 
 [numthreads(CS_1D_GROUPSIZE, 1, 1)]
@@ -64,7 +64,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		for (int by = -1; by <= 1; by++)
 			for (int bx = -1; bx <= 1; bx++)
 			{
-				int3 adjCell = clamp(int3(bx, by, bz) * Radius + currentCell, 0, Size - 1);
+				int3 adjCell = clamp(int3(bx, by, bz) * (Radius) + currentCell, 0, Size - 1);
 				uint levelAtAdjCell = GetValueAt(adjCell);
 				allEmpty &= levelAtAdjCell == Level;
 			}

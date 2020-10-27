@@ -31,14 +31,11 @@ struct Ray {
 	float3 Direction;
 };
 
-struct RayPayload
+struct RayPayload // Only used for raycasting
 {
-	float3 Importance;
-	float3 AccRadiance;
-	Ray ScatteredRay;
-	int InMedium;
-	int bounces;
-	uint4 seed;
+	int TriangleIndex;
+	int MaterialIndex;
+	float3 Barycentric;
 };
 
 
@@ -126,23 +123,14 @@ void TransformWavelengthMaterial(inout Material material, float3 color) {
 // Will accumulate emissive and direct lighting modulated by the carrying importance
 // Will update importance with scattered ratio divided by pdf
 // Will output scattered ray to continue with
-void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPayload payload)
+void SurfelScattering(inout float3 x, inout float3 w, inout float3 importance, Vertex surfel, Material material)
 {
-	TransformWavelengthMaterial(material, payload.Importance);
+	float3 V = -w;
 
-	// Adding emissive and direct lighting
 	float NdotV;
 	bool invertNormal;
 	float3 fN;
 	float4 R, T;
-	// Update Accumulated Radiance to the viewer
-	//payload.AccRadiance += payload.Importance *
-	//	(material.Emissive
-	//		// Next Event estimation
-	//		+ ComputeDirectLighting(V, surfel, material, LightPosition, LightIntensity,
-	//			// Co-lateral outputs
-	//			NdotV, invertNormal, fN, R, T));
-
 	ComputeImpulses(V, surfel, material,
 		NdotV,
 		invertNormal,
@@ -156,10 +144,10 @@ void SurfelScattering(float3 V, Vertex surfel, Material material, inout RayPaylo
 	RandomScatterRay(V, fN, R, T, material, ratio, direction, pdf);
 
 	// Update gathered Importance to the viewer
-	payload.Importance *= max(0, ratio);// / (1 - russianRoulette);
+	importance *= max(0, ratio);// / (1 - russianRoulette);
 	// Update scattered ray
-	payload.ScatteredRay.Direction = direction;
-	payload.ScatteredRay.Position = surfel.P + sign(dot(direction, fN)) * 0.0001 * fN;
+	w = direction;
+	x = surfel.P + sign(dot(direction, fN)) * 0.0001 * fN;
 }
 
 #include "VolumeScattering.h"
@@ -227,12 +215,28 @@ void GenerateVariables(float G, float Phi, float3 win, float3 Lin, float density
 	}
 }
 
-//#include "../VolumeRendering/SphereScatteringWithDL.h"
-#include "../VolumeRendering/IWAEScattering.h"
+//#include "../VolumeRendering/VAESphereScattering.h"
+//#include "../VolumeRendering/IWAEScattering.h"
+//#include "../VolumeRendering/CVAEScattering.h"
+#include "../VolumeRendering/NewCVAEScattering.h"
+
+bool Intersect(float3 P, float3 D, out int tIndex, out int mIndex, out float3 barycenter) {
+	RayPayload payload = (RayPayload)0;
+	RayDesc ray;
+	ray.Origin = P;
+	ray.Direction = D;
+	ray.TMin = 0;
+	ray.TMax = 100.0;
+	TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, ray, payload);
+	tIndex = payload.TriangleIndex;
+	mIndex = payload.MaterialIndex;
+	barycenter = payload.Barycentric;
+	return tIndex >= 0;
+}
 
 float sampleNormal(float mu, float logVar) {
 	//return mu + gauss() * exp(logVar * 0.5);
-	return mu + gauss() * exp(clamp(logVar, -20, 40) * 0.5);
+	return mu + gauss() * exp(clamp(logVar, -40, 76) * 0.5);
 }
 
 bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density, out float3 x, out float3 w)
@@ -240,7 +244,7 @@ bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density
 	x = float3(0, 0, 0);
 	w = win;
 
-	float3 temp = abs(win.x) >= 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+	float3 temp = abs(win.x) >= 0.9999 ? float3(0, 0, 1) : float3(1, 0, 0);
 	float3 winY = normalize(cross(temp, win));
 	float3 winX = cross(win, winY);
 	float rAlpha = random() * 2 * pi;
@@ -261,29 +265,31 @@ bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density
 	lenInput[3] = lenLatent.y;
 	lenModel(lenInput, lenOutput);
 
-	float logN = max(log(1), sampleNormal(lenOutput[0], lenOutput[1]));
-	float n = exp(logN);
+	float logN = max(0, sampleNormal(lenOutput[0], lenOutput[1]));
+	float n = ceil(exp(logN));
+	logN = log(n);
 
 	if (random() >= pow(Phi, n))
 		return false;
-	float4 pathLatent14 = randomStdNormal4();
-	float pathLatent5 = randomStdNormal();
+
+	float3 pathLatent13 = randomStdNormal3();
+	//float pathLatent5 = randomStdNormal();
 	// Generate path
-	float pathInput[8];
+	float pathInput[6];
 	float pathOutput[6];
 	pathInput[0] = codedDensity;
 	pathInput[1] = G;
 	pathInput[2] = logN;
-	pathInput[3] = pathLatent14.x;
-	pathInput[4] = pathLatent14.y;
-	pathInput[5] = pathLatent14.z;
-	pathInput[6] = pathLatent14.w;
-	pathInput[7] = pathLatent5.x;
+	pathInput[3] = pathLatent13.x;
+	pathInput[4] = pathLatent13.y;
+	pathInput[5] = pathLatent13.z;
+	//pathInput[6] = pathLatent14.w;
+	//pathInput[7] = pathLatent5.x;
 	pathModel(pathInput, pathOutput);
 	float3 sampling = randomStdNormal3();
 	float3 pathMu = float3(pathOutput[0], pathOutput[1], pathOutput[2]);
 	float3 pathLogVar = float3(pathOutput[3], pathOutput[4], pathOutput[5]);
-	float3 pathOut = clamp(pathMu + exp(clamp(pathLogVar, -20, 40) * 0.5) * sampling, -0.9999, 0.9999);
+	float3 pathOut = clamp(pathMu + exp(clamp(pathLogVar, -40, 76) * 0.5) * sampling, -0.9999, 0.9999);
 	float costheta = pathOut.x;
 	float wt = pathOut.y;
 	float wb = pathOut.z;
@@ -298,51 +304,206 @@ bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density
 	return true;// random() >= 1 - pow(Phi, n);
 }
 
+bool GenerateFullVariablesWithNewModel(float G, float Phi, float3 win, float density, out float3 x, out float3 w, out float factor, out float3 X, out float3 W)
+{
+	x = float3(0, 0, 0);
+	w = win;
+	X = x;
+	W = win;
+	factor = 1;
+
+	float3 temp = abs(win.x) >= 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+	float3 winY = normalize(cross(temp, win));
+	float3 winX = cross(win, winY);
+	float rAlpha = random() * 2 * pi;
+	float3x3 R = (mul(float3x3(
+		cos(rAlpha), -sin(rAlpha), 0,
+		sin(rAlpha), cos(rAlpha), 0,
+		0, 0, 1), float3x3(winX, winY, win)));
+
+	float codedDensity = density;// pow(density / 400.0, 0.125);
+
+	float2 lenLatent = randomStdNormal2();
+
+	// Generate length
+	float lenInput[4];
+	float lenOutput[2];
+	lenInput[0] = codedDensity;
+	lenInput[1] = G;
+	lenInput[2] = lenLatent.x;
+	lenInput[3] = lenLatent.y;
+	lenModel(lenInput, lenOutput);
+
+	float logN = density < 0.001 ? 0 : max(0, sampleNormal(lenOutput[0], lenOutput[1]));
+	float n = ceil(exp(logN));
+	logN = log(n);
+
+	//float logN = log(GenerateN(G, Phi, density));
+	//float n = exp(logN);
+
+	if (random() >= pow(Phi, n))
+		return false;
+
+	float3 pathLatent13 = randomStdNormal3();
+	//float pathLatent5 = randomStdNormal();
+	// Generate path
+	float pathInput[6];
+	float pathOutput[6];
+	pathInput[0] = codedDensity;
+	pathInput[1] = G;
+	pathInput[2] = logN;
+	pathInput[3] = pathLatent13.x;
+	pathInput[4] = pathLatent13.y;
+	pathInput[5] = pathLatent13.z;
+	//pathInput[6] = pathLatent14.w;
+	//pathInput[7] = pathLatent5.x;
+	pathModel(pathInput, pathOutput);
+	float3 sampling = randomStdNormal3();
+	float3 pathMu = float3(pathOutput[0], pathOutput[1], pathOutput[2]);
+	float3 pathLogVar = float3(pathOutput[3], pathOutput[4], pathOutput[5]);
+	float3 pathOut = pathMu + exp(clamp(pathLogVar, -40, 76) * 0.5) * sampling;
+	float costheta = clamp(pathOut.x, -1, 1);
+	float wt = pathOut.y;
+	float wb = pathOut.z;
+	x = float3(0, sqrt(1 - costheta * costheta), costheta);
+	float3 N = x;
+	float3 B = float3(1, 0, 0);
+	float3 T = cross(x, B);
+	w = normalize(N * sqrt(max(0, 1 - wt * wt - wb * wb)) + T * wt + B * wb);
+	x = mul(x, (R));
+	w = mul(w, (R)); // move to radial space
+
+	// Generate Scattering
+
+	float scatInput[13];
+	float scatOutput[12];
+	scatInput[0] = codedDensity;
+	scatInput[1] = G;
+	scatInput[2] = Phi;
+	scatInput[3] = logN;
+	scatInput[4] = costheta;
+	scatInput[5] = wt;
+	scatInput[6] = wb;
+	scatInput[7] = gauss();
+	scatInput[8] = gauss();
+	scatInput[9] = gauss();
+	scatInput[10] = gauss();
+	scatInput[11] = gauss();
+	scatInput[12] = gauss();
+	/*scatInput[12] = gauss();
+	scatInput[13] = gauss();
+	scatInput[14] = gauss();
+	scatInput[15] = gauss();*/
+	/*scatInput[16] = gauss();
+	scatInput[17] = gauss();
+	scatInput[18] = gauss();
+	scatInput[19] = gauss();*/
+	scatModel(scatInput, scatOutput);
+
+	/*float accum = 0;
+	for (int i = 1; i <= n; i++)
+		accum += pow(Phi, i);*/
+
+	float accum = Phi >= 0.9999 ? n : Phi * (1 - pow(Phi, n)) / (1 - Phi);
+
+	float probFirstScattering = Phi / accum;
+
+	//if (false)
+	//if (random() < 1 - probFirstScattering)
+	{
+		X = float3(
+			sampleNormal(scatOutput[0], scatOutput[6]),
+			sampleNormal(scatOutput[1], scatOutput[7]),
+			sampleNormal(scatOutput[2], scatOutput[8]));
+		X /= max(1, length(X));
+		W = normalize(float3(
+			sampleNormal(scatOutput[3], scatOutput[9]),
+			sampleNormal(scatOutput[4], scatOutput[10]),
+			sampleNormal(scatOutput[5], scatOutput[11])));
+		//W /= max(0.000001, length(W));
+		X = mul(X, (R));
+		W = mul(W, (R)); // move to radial space
+	} // second scatter comes from nn
+
+	factor = accum / pow(Phi, n);
+
+	return true;// random() >= 1 - pow(Phi, n);
+}
+
+
 // Represents a single bounce of path tracing
 // Will accumulate emissive and direct lighting modulated by the carrying importance
 // Will update importance with scattered ratio divided by pdf
 // Will output scattered ray to continue with
-void VolumeScattering(float Extinction, float G, float Phi, float3 V, float3 P, inout RayPayload payload)
+void VolumeScattering(inout float3 x, inout float3 w, inout float3 importance, float Extinction, float G, float Phi, inout float3 accum)
 {
 	bool pathTrace = DispatchRaysIndex().x / (float)DispatchRaysDimensions().x < PathtracingPercentage;
 
-	if (pathTrace)
+	if (random() < 1 - Phi)
 	{
-		if (random() < 1 - Phi)
-		{
-			payload.Importance = 0; // absorption
-		}
-
-		float3 newDir = GeneratePhase(G, -V);
-		// Update scattered ray
-		payload.ScatteredRay.Direction = newDir;
-		payload.ScatteredRay.Position = P;
+		importance = 0; // absorption
+		//return;
 	}
-	else {
 
-		float r = MaximalRadius(P);
+	int tIndex;
+	int mIndex;
+	float3 coords;
+	if (!Intersect(x, LightDirection, tIndex, mIndex, coords)) // 
+	{
+		importance = float3(1, 0, 1) * 0;
+		//return;
+		//return; // bad geometry... 
+	}
 
-		//if (Extinction * r < 1) {
-		//	if (random() < 1 - Phi)
-		//	{
-		//		payload.Importance = 0; // absorption
-		//	}
+	Vertex surfel;
+	Material material;
+	GetHitInfo(coords, tIndex, mIndex, surfel, material, 0, 0);
+	float d = length(surfel.P - x); // distance to surface in direction to light
 
-		//	float3 newDir = GeneratePhase(G, -V);
-		//	// Update scattered ray
-		//	payload.ScatteredRay.Direction = newDir;
-		//	payload.ScatteredRay.Position = P;
-		//}
-		//else
+	accum += importance * LightIntensity / (pi)*exp(-d * Extinction) * EvalPhase(G, w, LightDirection);
+
+	// Update scattered ray
+	w = GeneratePhase(G, w);
+
+	[branch]
+	if (!pathTrace) // Try to skip multiple scattering
+	{
+		float r = MaximalRadius(x);
+
+		float density = Extinction * r;
+
+		r = density < 1 ? 0 : r;
+		density = density < 1 ? 0 : density;
+
+		if (density > 0 && -log(1 - random()) / density < 1) // multiple scatter really occur
 		{
+			float3 _x, _w, _X, _W;
+			float factor;
 
-			float3 x, w, X, W;
+			//if (!GenerateVariablesWithNewModel(G, Phi, w, Extinction * r, _x, _w))
+			//	importance = 0;
 
-			if (!GenerateVariablesWithNewModel(G, Phi, -V, Extinction * r, x, w))
-				payload.Importance = 0;
+			if (!GenerateFullVariablesWithNewModel(G, Phi, w, density, _x, _w, factor, _X, _W))
+				importance = 0;
 
-			payload.ScatteredRay.Direction = w;
-			payload.ScatteredRay.Position = P + x * r;
+			float3 sX = x + _X * r;
+			if (!Intersect(sX, LightDirection, tIndex, mIndex, coords)) // 
+			{
+				importance = float3(1, 0, 0) * 0;
+				//return; // bad geometry... 
+			}
+
+			GetHitInfo(coords, tIndex, mIndex, surfel, material, 0, 0);
+			d = length(surfel.P - sX); // distance to surface in direction to light
+
+			accum += factor * importance * LightIntensity / (pi)*exp(-d * Extinction) * EvalPhase(G, _W, LightDirection);
+
+			w = _w;
+			x += _x * r;
+		}
+		else
+		{
+			x += w * r; // advance to exit the sphere in straight line without scattering
 		}
 	}
 }
@@ -377,101 +538,75 @@ float3 SampleSkybox(float3 L) {
 	col = lerp(col, BG_COLORS[2], smoothstep(BG_DISTS[1], BG_DISTS[2], L.y));
 	col = lerp(col, BG_COLORS[3], smoothstep(BG_DISTS[2], BG_DISTS[3], L.y));
 	col = lerp(col, BG_COLORS[4], smoothstep(BG_DISTS[3], BG_DISTS[4], L.y));
-	return col + // *LightIntensity;// +
-		pow(max(0, dot(L, LightDirection)), N) * phongNorm * LightIntensity;
+	return 0;// col;// + // *LightIntensity;// +
+		//pow(max(0, dot(L, LightDirection)), N) * phongNorm * LightIntensity;
 }
+
+float3 SampleLight(float3 L)
+{
+	int N = 100;
+	float phongNorm = (N + 2) / (4 * pi);
+	return pow(max(0, dot(L, LightDirection)), N) * phongNorm * LightIntensity;
+}
+
+
 
 float3 ComputePath(float3 O, float3 D, out int volBounces)
 {
-	RayPayload payload = (RayPayload)0;
 	int cmp = PassCount % 3;// random() * 3;
-	payload.Importance[cmp] = 3; // dividing 1 by 1/3.
-	payload.ScatteredRay.Position = O;
-	payload.ScatteredRay.Direction = D;
-	payload.InMedium = 0; // start outside the volume
+	float3 importance = 0;
+	importance[cmp] = 3;
+	float3 x = O;
+	float3 w = D;
 
-	payload.seed = getRNG();
+	bool inMedium = false;
 
 	volBounces = 0;
+	int bounces = 0;
+	float3 accum = 0;
 
-	while (any(payload.Importance > 0))
+	while (importance[cmp] > 0)
 	{
 		volBounces++;
 
-		RayDesc newRay;
-		newRay.Origin = payload.ScatteredRay.Position;
-		newRay.Direction = payload.ScatteredRay.Direction;
-		newRay.TMin = 0;
-		newRay.TMax = 100.0;
+		int tIndex;
+		int mIndex;
+		float3 coords;
+		if (!Intersect(x, w, tIndex, mIndex, coords)) // 
+			return accum + importance * SampleLight(w) * 0.5 * (bounces == 1);// +importance * (SampleSkybox(w) + SampleLight(w) * (bounces > 0));
 
-		TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, payload);
+		Vertex surfel;
+		Material material;
+		GetHitInfo(coords, tIndex, mIndex, surfel, material, 0, 0);
+		float d = length(surfel.P - x);
+		float t = -log(max(0.000000000001, 1 - random())) / Extinction[cmp];
+
+		if (t > d || !inMedium) // surface scattering
+		{
+			bounces++;
+
+			if (bounces > PATH_TRACING_MAX_BOUNCES)
+				importance = 0;
+
+			SurfelScattering(x, w, importance, surfel, material);
+			if (any(material.Specular) && material.Roulette.w > 0) // some fresnel
+				inMedium = dot(surfel.N, w) < 0;
+		}
+		else // volume scattering
+		{
+			x += t * w;
+			VolumeScattering(x, w, importance, Extinction[cmp], G_Value[cmp], Phi[cmp], accum);
+		}
 	}
 
-	return payload.AccRadiance;
+	return 0;
 }
-//float3 ComputePath(bool hit, float3 P, float3 V, Vertex surfel, Material material, int bounces)
-//{
-//	RayPayload payload = (RayPayload)0;
-//	payload.Importance = 1;
-//
-//	float d = length(surfel.P - P);
-//
-//	float t = -log(max(0.0000001, 1 - random())) / Extinction;
-//
-//	// initial scatter (primary rays)
-//	if (hit && t > d)
-//		SurfelScatteringWithoutAccumulation(V, surfel, material, payload);
-//	else
-//		VolumeScattering(V, P - t * V, payload);
-//
-//	payload.seed = getCurrentSeed();
-//
-//	while (any(payload.Importance > 0.001))
-//	{
-//		RayDesc newRay;
-//		newRay.Origin = payload.ScatteredRay.Position;
-//		newRay.Direction = payload.ScatteredRay.Direction;
-//		newRay.TMin = 0.001;
-//		newRay.TMax = 10.0;
-//
-//		TraceRay(Scene, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, newRay, payload);
-//	}
-//	return payload.AccRadiance;
-//}
-
 
 [shader("miss")]
 void EnvironmentMap(inout RayPayload payload)
 {
-	// Start seed here...
-	//setCurrentSeed(payload.seed);
-
-	//if (payload.bounces < 0) // miss geometry
-	//	payload.AccRadiance = 1 / 0;
-	//else {
-	//if (payload.bounces != 0)
-	//if (!payload.InMedium)
-		payload.AccRadiance += payload.Importance * SampleSkybox(payload.ScatteredRay.Direction);
-	//else
-	//	payload.AccRadiance += float3(1, 0, 1) * 100000;
-
-	//}
-	payload.Importance = 0;
-
-	//int cmp = (int)dot(payload.Importance > 0, float3(0, 1, 2));
-
-	//float t = -log(max(0.0000001, 1 - random())) / Extinction[cmp];
-
-	//float3 P = payload.ScatteredRay.Position + t * payload.ScatteredRay.Direction;
-
-	//if (length(P) > VOL_DIST) // go outside envolving volume
-	//	payload.Importance = 0;
-	//else // hit media particle
-	//	VolumeScattering(Extinction[cmp], G_Value[cmp], Phi[cmp], -payload.ScatteredRay.Direction, P, payload);
-
-	//payload.seed = getCurrentSeed();
+	payload.TriangleIndex = -1;
 }
-
 
 [shader("raygeneration")]
 void PTMainRays()
@@ -518,39 +653,7 @@ void PTMainRays()
 [shader("closesthit")]
 void PTScattering(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-	Vertex surfel;
-	Material material;
-	GetHitInfo(attr, surfel, material, 0, 0);
-
-	// Start seed here...
-	setRNG(payload.seed);
-
-	int cmp = (int)dot(payload.Importance > 0, float3(0, 1, 2));
-
-	float d = length(surfel.P - payload.ScatteredRay.Position);
-
-	float t = -log(max(0.000000000001, 1 - random())) / Extinction[cmp];
-
-	if (t > d || !payload.InMedium) // hit opaque surface or travel outside volume
-	{
-		if (payload.bounces > PATH_TRACING_MAX_BOUNCES)
-			//if (random() < 0.5)
-			payload.Importance = 0;
-		//else
-		//	payload.Importance *= 2;
-
-		if (any(payload.Importance)) {
-			payload.bounces++;
-			// This is not a recursive closest hit but it will accumulate in payload
-			// all the result of the scattering to this surface
-			SurfelScattering(-WorldRayDirection(), surfel, material, payload);
-
-			if (any(material.Specular) && material.Roulette.w > 0) // some fresnel
-				payload.InMedium = dot(surfel.N, payload.ScatteredRay.Direction) < 0;
-		}
-	}
-	else // hit media particle
-		VolumeScattering(Extinction[cmp], G_Value[cmp], Phi[cmp], -WorldRayDirection(), payload.ScatteredRay.Position + t * payload.ScatteredRay.Direction, payload);
-
-	payload.seed = getRNG();
+	payload.Barycentric = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
+	payload.TriangleIndex = objectInfo.TriangleOffset + PrimitiveIndex();
+	payload.MaterialIndex = objectInfo.MaterialIndex;
 }

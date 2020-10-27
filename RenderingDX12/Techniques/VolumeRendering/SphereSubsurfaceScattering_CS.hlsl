@@ -136,7 +136,7 @@ float3 SampleSkybox(float3 L) {
 	//#ifdef USE_DIRECT_LIGHT
 	//	return 0;
 	//#else
-	return pow(max(0, dot(L, LightDirection)), N) * phongNorm * LightIntensity;
+		return pow(max(0, dot(L, LightDirection)), N) * phongNorm * LightIntensity;
 	//#endif
 
 	return 0;//col + 
@@ -209,8 +209,8 @@ float3 PathtraceNoDirectLight(float G, float Phi, float Sigma, float3 P, float3 
 		{
 			if (random() < 0.5) {
 				float3 N = normalize(P);
-				float F = ComputeFresnel(dot(-N, -D), 1.76);
-				float3 T = refract(D, -N, 1.76);
+				float F = ComputeFresnel(dot(-N, -D), 1.2);
+				float3 T = refract(D, -N, 1.2);
 				F = any(T) ? F : 1;
 				if (random() < 1 - F) {
 					//D = T;
@@ -257,8 +257,8 @@ float3 Pathtrace(float G, float Phi, float Sigma, float3 P, float3 D, out int bo
 		if (t >= d)
 		{
 			float3 N = normalize(P);
-			float F = ComputeFresnel(dot(-N, -D), 1.76);
-			float3 T = refract(D, -N, 1.76);
+			float F = ComputeFresnel(dot(-N, -D), 1.2);
+			float3 T = refract(D, -N, 1.2);
 			F = any(T) ? F : 1;
 			if (random() < 1 - F) {
 				D = T;
@@ -388,11 +388,12 @@ int GenerateN(float G, float Phi, float density) {
 }
 
 
-#include "../VolumeRendering/IWAEScattering.h"
+//#include "../VolumeRendering/IWAEScattering.h"
+#include "../VolumeRendering/CVAEScattering.h"
 
 float sampleNormal(float mu, float logVar) {
 	//return mu + gauss() * exp(logVar * 0.5);
-	return mu + gauss()*exp(clamp(logVar, -7, 70) * 0.5);
+	return mu + gauss()*exp(clamp(logVar, -20, 70) * 0.5);
 }
 
 bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density, out float3 x, out float3 w)
@@ -409,7 +410,7 @@ bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density
 		sin(rAlpha), cos(rAlpha), 0,
 		0, 0, 1), float3x3(winX, winY, win)));
 
-	float codedDensity = pow(density/400.0, 0.125);
+	float codedDensity = density;// pow(density / 400.0, 0.125);
 
 	float2 lenLatent = randomStdNormal2();
 	// Generate length
@@ -447,7 +448,7 @@ bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density
 	float3 sampling = randomStdNormal3();
 	float3 pathMu = float3(pathOutput[0], pathOutput[1], pathOutput[2]);
 	float3 pathLogVar = float3(pathOutput[3], pathOutput[4], pathOutput[5]);
-	float3 pathOut = clamp(pathMu + exp(pathLogVar * 0.5) * sampling, -0.9999, 0.9999);
+	float3 pathOut = clamp(pathMu + exp(clamp(pathLogVar, -20, 70) * 0.5) * sampling, -0.9999, 0.9999);
 	float costheta = pathOut.x;
 	float wt = pathOut.y;
 	float wb = pathOut.z;
@@ -479,7 +480,7 @@ bool GenerateFullVariablesWithNewModel(float G, float Phi, float3 win, float den
 		sin(rAlpha), cos(rAlpha), 0,
 		0, 0, 1), float3x3(winX, winY, win)));
 
-	float codedDensity = pow(density / 400.0, 0.125);
+	float codedDensity = density;// pow(density / 400.0, 0.125);
 
 	float2 lenLatent = randomStdNormal2();
 
@@ -491,9 +492,12 @@ bool GenerateFullVariablesWithNewModel(float G, float Phi, float3 win, float den
 	lenInput[2] = lenLatent.x;
 	lenInput[3] = lenLatent.y;
 	lenModel(lenInput, lenOutput);
+	
+	float logN = max(0, sampleNormal(lenOutput[0], lenOutput[1]));
+	float n = floor(exp(logN));
 
-	float logN = max(log(1), sampleNormal(lenOutput[0], lenOutput[1]));
-	float n = exp(logN);
+	//float logN = log(GenerateN(G, Phi, density));
+	//float n = exp(logN);
 
 	if (random() >= pow(Phi, n))
 		return false;
@@ -515,7 +519,7 @@ bool GenerateFullVariablesWithNewModel(float G, float Phi, float3 win, float den
 	float3 sampling = randomStdNormal3();
 	float3 pathMu = float3(pathOutput[0], pathOutput[1], pathOutput[2]);
 	float3 pathLogVar = float3(pathOutput[3], pathOutput[4], pathOutput[5]);
-	float3 pathOut = clamp(pathMu + exp(pathLogVar * 0.5) * sampling, -0.9999, 0.9999);
+	float3 pathOut = clamp(pathMu + exp(clamp(pathLogVar,-20,70) * 0.5) * sampling, -0.9999, 0.9999);
 	float costheta = pathOut.x;
 	float wt = pathOut.y;
 	float wb = pathOut.z;
@@ -529,11 +533,11 @@ bool GenerateFullVariablesWithNewModel(float G, float Phi, float3 win, float den
 
 	// Generate Scattering
 
-	float scatInput[16];
+	float scatInput[12];
 	float scatOutput[12];
 	scatInput[0] = codedDensity;
 	scatInput[1] = G;
-	scatInput[2] = pow(1.00000 - Phi, 0.1);
+	scatInput[2] = Phi;
 	scatInput[3] = logN;
 	scatInput[4] = costheta;
 	scatInput[5] = wt;
@@ -543,10 +547,10 @@ bool GenerateFullVariablesWithNewModel(float G, float Phi, float3 win, float den
 	scatInput[9] = gauss();
 	scatInput[10] = gauss();
 	scatInput[11] = gauss();
-	scatInput[12] = gauss();
+	/*scatInput[12] = gauss();
 	scatInput[13] = gauss();
 	scatInput[14] = gauss();
-	scatInput[15] = gauss();
+	scatInput[15] = gauss();*/
 	/*scatInput[16] = gauss();
 	scatInput[17] = gauss();
 	scatInput[18] = gauss();
@@ -599,8 +603,8 @@ float3 SpherePathtracing(float G, float Phi, float Sigma, float3 x, float3 w, ou
 		if (t >= d)
 		{
 			float3 N = normalize(x);
-			float F = ComputeFresnel(dot(-N, -w), 1.76);
-			float3 T = refract(w, -N, 1.76);
+			float F = ComputeFresnel(dot(-N, -w), 1.2);
+			float3 T = refract(w, -N, 1.2);
 			F = any(T) ? F : 1;
 			if (random() < 1 - F)
 			{
@@ -666,8 +670,8 @@ float3 SpherePathtracingWithDirectLight(float G, float Phi, float Sigma, float3 
 		if (t >= d)
 		{
 			float3 N = normalize(x);
-			float F = ComputeFresnel(dot(-N, -w), 1.76);
-			float3 T = refract(w, -N, 1.76);
+			float F = ComputeFresnel(dot(-N, -w), 1.2);
+			float3 T = refract(w, -N, 1.2);
 			F = any(T) ? F : 1;
 			if (random() < 1 - F)
 			{
@@ -827,8 +831,8 @@ float3 IsotropicSpherePathtracing2(float G, float Phi, float Sigma, float3 x, fl
 		if (t >= d)
 		{
 			float3 N = normalize(x);
-			float F = ComputeFresnel(dot(-N, -w), 1.76);
-			float3 T = refract(w, -N, 1.76);
+			float F = ComputeFresnel(dot(-N, -w), 1.2);
+			float3 T = refract(w, -N, 1.2);
 			if (any(T)) {
 				w = T;
 				return I * SampleSkybox(w) * (1 - F);
@@ -864,8 +868,8 @@ float3 IsotropicSpherePathtracing(float G, float Phi, float Sigma, float3 x, flo
 		if (t >= d)
 		{
 			float3 N = normalize(x);
-			float F = ComputeFresnel(dot(-N, -w), 1.76);
-			float3 T = refract(w, -N, 1.76);
+			float F = ComputeFresnel(dot(-N, -w), 1.2);
+			float3 T = refract(w, -N, 1.2);
 			F = any(T) ? F : 1;
 			if (random() < 1 - F) {
 				w = T;
@@ -952,8 +956,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	{
 		O += D * inT; // move to sphere surface
 		float3 N = normalize(O);
-		float F = ComputeFresnel(dot(N, -D), 1 / 1.76);
-		float3 T = refract(D, N, 1 / 1.76); // refraction index
+		float F = ComputeFresnel(dot(N, -D), 1 / 1.2);
+		float3 T = refract(D, N, 1 / 1.2); // refraction index
 		float3 R = reflect(D, N);
 
 		if (random() < F)

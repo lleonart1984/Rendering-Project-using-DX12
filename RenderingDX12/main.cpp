@@ -201,14 +201,18 @@ int main(int, char**)
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("CA4G_Samples_Window"), NULL };
     RegisterClassEx(&wc);
 	
+
+	//int windowWidth = 1920; // Full HD
 	//int windowWidth = 1280;
-	int windowWidth = 600*7/5;
+	int windowWidth = 600*7/5; // Lucys
 	//int windowWidth = 1024;
-	//int windowWidth = 512;
+	//int windowWidth = 600 * 7 / 5;
 	//int windowHeight = 300;
-	//int windowHeight = 512;
+	//int windowHeight = 600 * 7 / 5;
 	//int windowHeight = 768;
-	int windowHeight = 800*7/5;
+	//int windowHeight = 1080;
+
+	int windowHeight = 800*7/5; // Lucys
 	HWND hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, windowWidth+1024-1008, windowHeight+768-729, NULL, NULL, wc.hInstance, NULL);
 	//HWND hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, 1280+1024-1008, 800+768-729, NULL, NULL, wc.hInstance, NULL);
 
@@ -302,34 +306,56 @@ int main(int, char**)
 			break;
 		case BUDDHA_OBJ:
 			filePath = desktop_directory();
-			strcat(filePath, "\\Models\\pitagoras\\model2.obj");
+			//strcat(filePath, "\\Models\\pitagoras\\model2.obj");
 			//strcat(filePath, "\\Models\\dragon.obj");
 			//strcat(filePath, "\\Models\\Jade_buddha.obj");
-			//strcat(filePath, "\\Models\\lucy2.obj");
+			strcat(filePath, "\\Models\\lucy2.obj");
 			//strcat(filePath, "\\Models\\Bunny.obj");
 			//strcat(filePath, "\\Models\\afrodita\\model.obj");
 			//strcat(filePath, "\\Models\\cupid\\cupid.obj");
 			//strcat(filePath, "\\Models\\david\\david.obj");
 			//strcat(filePath, "\\Models\\weddingRing\\ring.obj");
+			//strcat(filePath, "\\Models\\csg\\csg.obj");
 			
 			scene = new Scene(filePath);
-			
+
+			//// Lucy's settings
+			camera->Position = float3(.43f, .133f, -1.3f);
+			camera->Target = float3(.43f, 0.133f, 0);
+
+			//// Budha's settings
+			//camera->Position = float3(-0.0, 0.46, .16);
+			//camera->Target = float3(-0.0,0.46,0);
+
+			//// CSG settings
+			//camera->Position = float3(-0.0, 1.8, 2.5);
+			//camera->Target = float3(-0.0, 0.5, 0);
+
+			//// Bunny's settings
+			//camera->Position = float3(-0.1f, .46f, 1.9f);
+			//camera->Target = float3(-0.1f, 0.46f, 0);
+
+
 			//camera->Up = float3(0, 0, 1);
 			//camera->Position = float3(0.1f, 0.65f, 0.80f);
-			camera->Position = float3(-.0f, .405f, -1.5f);
+			//camera->Position = float3(-.0f, .405f, -1.5f);
 			//camera->Position = float3(-.20f, .1205f, -1.25f);
 			//camera->Position = float3(-.4f, .60f, 1.8f);
 			
-			camera->Target = float3(0, 0.405f, 0);
+			//camera->Target = float3(0, 0.405f, 0);
 			//camera->Target = float3(0.5, 0.1205f, 0);
 			//camera->Target = float3(-0.2f, 0.4, 0.0f);
 			
-			lightSource->Position = float3(0.1, 0.4, 0.2);
+			//// Backs lighting
+			lightSource->Position = float3(0.0, 0.2, -4);
+			lightSource->Direction = normalize(float3(0, 1, 1));
+
+			//lightSource->Position = float3(0.1, 0.4, 0.2);
 			//lightSource->Direction = normalize(float3(0, 0.5f, -1));
-			lightSource->Direction = normalize(float3(1, 1, 1));
-			lightSource->Intensity = float3(6, 6, 6);
+			//lightSource->Direction = normalize(float3(1, 1, 1));
+			lightSource->Intensity = float3(10, 10, 10);
 			//MixMirrorMaterial(&scene->Materials()[0], 1);
-			MixGlassMaterial(&scene->Materials()[0], 1, 1.7);
+			MixGlassMaterial(&scene->Materials()[0], 1, 1.5);
 			//MixGlassMaterial(&scene->Materials()[1], 1, 1.7);
 			//MixEmissiveMaterial(&scene->Materials()[0], float3(1, 1, 0));
 			break;
@@ -380,8 +406,8 @@ int main(int, char**)
 			//strcat(volumePath, "\\clouds\\cloud-1090.xyz");
 			volume = new Volume(volumePath);
 			lightSource->Position = float3(0.4, 0.5, 0.3);
-			lightSource->Direction = normalize(float3(1, 1, 1));
-			lightSource->Intensity = float3(4);
+			lightSource->Direction = normalize(float3(1, 1, -1));
+			lightSource->Intensity = float3(6);
 			camera->Position = float3(0, 0, -1);
 			camera->Target = float3(0, 0, 0);
 
