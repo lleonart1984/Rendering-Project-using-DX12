@@ -252,8 +252,8 @@ bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density
 	lenModel(lenInput, lenOutput);
 
 	float logN = max(0, sampleNormal(lenOutput[0], lenOutput[1]));
-	float n = round(exp(logN));
-	//logN = log(n);
+	float n = floor(exp(logN));
+	logN = log(n);
 
 	if (random() >= pow(Phi, n))
 		return false;
@@ -298,11 +298,7 @@ void VolumeScattering(inout float3 x, inout float3 w, inout float3 importance, f
 {
 	bool pathTrace = DispatchRaysIndex().x / (float)DispatchRaysDimensions().x < PathtracingPercentage;
 
-	if (random() < 1 - Phi)
-	{
-		importance = 0; // absorption
-		//return;
-	}
+	importance *= (random() >= 1 - Phi);
 
 	// Update scattered ray
 	w = GeneratePhase(G, w);
@@ -314,23 +310,17 @@ void VolumeScattering(inout float3 x, inout float3 w, inout float3 importance, f
 
 		float density = Extinction * r;
 
-		r = density < 1 ? 0 : r;
-		density = density < 1 ? 0 : density;
+		//r = density < 5 ? 0 : r;
+		//density = density < 5 ? 0 : density;
 
-		if (density > 0 && -log(1 - random()) / density < 1) // multiple scatter really occur
-		{
-			float3 _x, _w;
+		float3 _x, _w;
 
-			if (!GenerateVariablesWithNewModel(G, Phi, w, Extinction * r, _x, _w))
-				importance = 0;
+		bool passMulti = GenerateVariablesWithNewModel(G, Phi, w, Extinction * r, _x, _w);
 
-			w = _w;
-			x += _x * r;
-		}
-		else
-		{
-			x += w * r; // advance to exit the sphere in straight line without scattering
-		}
+		bool multiScattering = random() > exp(-density);
+		x += (multiScattering ? _x : w) * r;
+		w = multiScattering ? _w : w;
+		importance *= multiScattering ? passMulti : 1;
 	}
 }
 
@@ -409,6 +399,7 @@ float3 ComputePath(float3 O, float3 D, out int volBounces)
 		int tIndex;
 		int mIndex;
 		float3 coords;
+		[branch]
 		if (!Intersect(x, w, tIndex, mIndex, coords)) // 
 			return importance * (SampleSkybox(w) + SampleLight(w) * (bounces > 0));
 
@@ -418,12 +409,12 @@ float3 ComputePath(float3 O, float3 D, out int volBounces)
 		float d = length(surfel.P - x);
 		float t = -log(max(0.000000000001, 1 - random())) / Extinction[cmp];
 
+		[branch]
 		if (t > d || !inMedium) // surface scattering
 		{
 			bounces++;
 
-			if (bounces > PATH_TRACING_MAX_BOUNCES)
-				importance = 0;
+			importance *= (bounces <= PATH_TRACING_MAX_BOUNCES);
 
 			SurfelScattering(x, w, importance, surfel, material);
 			if (any(material.Specular) && material.Roulette.w > 0) // some fresnel

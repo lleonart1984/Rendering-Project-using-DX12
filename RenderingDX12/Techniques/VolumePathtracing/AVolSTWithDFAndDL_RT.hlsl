@@ -498,7 +498,8 @@ void VolumeScattering(inout float3 x, inout float3 w, inout float3 importance, f
 			int tIndex;
 			int mIndex;
 			float3 coords;
-			if (!Intersect(x + _X * r, LightDirection, tIndex, mIndex, coords)) // 
+			float3 xS = x + _X * r;
+			if (!Intersect(xS, LightDirection, tIndex, mIndex, coords)) // 
 			{
 				importance = float3(1, 0, 0) * 0;
 				//return; // bad geometry... 
@@ -507,7 +508,7 @@ void VolumeScattering(inout float3 x, inout float3 w, inout float3 importance, f
 			Vertex surfel;
 			Material material;
 			GetHitInfo(coords, tIndex, mIndex, surfel, material, 0, 0);
-			float d = length(surfel.P - x); // distance to surface in direction to light
+			float d = length(surfel.P - xS); // distance to surface in direction to light
 
 			accum += factor * importance * LightIntensity / ( pi) * exp(-d * Extinction) * EvalPhase(G, _W, LightDirection);
 
