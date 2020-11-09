@@ -202,17 +202,17 @@ int main(int, char**)
     RegisterClassEx(&wc);
 	
 
-	//int windowWidth = 1920; // Full HD
+	int windowWidth = 1920; // Full HD
 	//int windowWidth = 1280;
-	int windowWidth = 600*7/5; // Lucys
+	//int windowWidth = 600*7/5; // Lucys
 	//int windowWidth = 1024;
 	//int windowWidth = 600 * 7 / 5;
 	//int windowHeight = 300;
 	//int windowHeight = 600 * 7 / 5;
 	//int windowHeight = 768;
-	//int windowHeight = 1080;
+	int windowHeight = 1080;
 
-	int windowHeight = 800*7/5; // Lucys
+	//int windowHeight = 800*7/5; // Lucys
 	HWND hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, windowWidth+1024-1008, windowHeight+768-729, NULL, NULL, wc.hInstance, NULL);
 	//HWND hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, 1280+1024-1008, 800+768-729, NULL, NULL, wc.hInstance, NULL);
 
@@ -399,16 +399,17 @@ int main(int, char**)
 		switch (USE_VOLUME) {
 		case 0:
 			volumePath = desktop_directory();
-			strcat(volumePath, "\\clouds\\cloud-1196.xyz");
+			//strcat(volumePath, "\\clouds\\cloud-1196.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-1191.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-1940.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-190.xyz");
 			//strcat(volumePath, "\\clouds\\cloud-1090.xyz");
+			strcat(volumePath, "\\clouds\\cloud-1196.xyz");
 			volume = new Volume(volumePath);
 			lightSource->Position = float3(0.4, 0.5, 0.3);
 			lightSource->Direction = normalize(float3(1, 1, -1));
 			lightSource->Intensity = float3(6);
-			camera->Position = float3(0, 0, -1);
+			camera->Position = float3(0, 0, 1);
 			camera->Target = float3(0, 0, 0);
 
 			break;

@@ -21,9 +21,9 @@ float invertcdf(float xi) {
 
 	int index = xi * 50;
 	float alpha = (xi * 50) % 1;
-	return invPDF[index];
+	//return invPDF[index];
 
-	//return lerp(invPDF[index], invPDF[index + 1], alpha);
+	return lerp(invPDF[index], invPDF[index + 1], alpha);
 }
 static const float lmPDF[50] =
 {
@@ -31,7 +31,7 @@ static const float lmPDF[50] =
 };
 float calcpdf(float cosTheta) {
 	float xi = cosTheta * 0.5 + 0.5;
-	int index = xi * 49 + 0.5;
+	int index = xi * 49;
 	float alpha = (xi * 49) % 1;
 	return lerp(lmPDF[index], lmPDF[index + 1], alpha);
 	//return lmPDF[int(49.999 * (cosTheta * 0.5 + 0.5))];

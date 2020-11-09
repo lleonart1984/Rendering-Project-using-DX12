@@ -77,14 +77,14 @@
 //gObj<PhotonMapVolumeTechnique> technique;
 //gObj<PhotonMapVolumeTechnique2> technique;
 //gObj<AdaptiveTrackingVolumeTechnique> technique;
-//gObj<GridTrackingVolumeTechnique> technique;
+gObj<GridTrackingVolumeTechnique> technique;
 
 //gObj<SphereScatteringTestTechnique> technique;
 
 //gObj<VolPathtracerTechnique> technique;
 //gObj<VolSTPathtracerTechnique> technique;
 //gObj<VolSTPathtracerWithDFTechnique> technique;
-gObj<AVolSTWithDFTechnique> technique;
+//gObj<AVolSTWithDFTechnique> technique;
 //gObj<VolPurePTTechnique> technique;
 
 //#define TEST_WSAPIT
