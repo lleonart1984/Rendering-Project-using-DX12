@@ -13082,6 +13082,28 @@ namespace CA4G {
 		}
 
 		// Binds a shader resource view
+		void SRV(int slot, gObj<Texture3D>& const resource, int space = 0) {
+			D3D12_ROOT_PARAMETER p = { };
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			p.DescriptorTable.NumDescriptorRanges = 1;
+			D3D12_DESCRIPTOR_RANGE range = { };
+			range.BaseShaderRegister = slot;
+			range.NumDescriptors = 1;
+			range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+			range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+			range.RegisterSpace = space;
+
+			ranges.add(range);
+			p.DescriptorTable.pDescriptorRanges = &ranges.last();
+
+			SlotBinding b{ };
+			b.Root_Parameter = p;
+			b.DescriptorData.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+			b.DescriptorData.ptrToResourceViewArray = (void*)&resource;
+			__CurrentBindings->csuBindings.add(b);
+		}
+
+		// Binds a shader resource view
 		void SRV_Array(int startSlot, gObj<Texture2D>*& const resources, int &count, int space = 0) {
 			D3D12_ROOT_PARAMETER p = { };
 			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;

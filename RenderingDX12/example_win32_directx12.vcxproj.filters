@@ -107,6 +107,7 @@
     <FxCompile Include="Techniques\VolumePathtracing\AVolSTWithDFAndDL_RT.hlsl" />
     <FxCompile Include="Techniques\VolumePathtracing\NVolSTWithDFAndDL_RT.hlsl" />
     <FxCompile Include="Techniques\VolumePathtracing\NVolSTWithDF_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\GridToText3D_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />

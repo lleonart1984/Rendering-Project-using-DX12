@@ -55,6 +55,24 @@ public:
 		}
 	};
 
+	struct GridToTexture : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\GridToText3D_CS.cso"));
+		}
+
+		gObj<Buffer> GridSrc;
+		gObj<Buffer> DistanceField;
+		gObj<Buffer> GridInfo;
+
+		void Globals() {
+			UAV(0, DistanceField, ShaderType_Any);
+			SRV(0, GridSrc, ShaderType_Any);
+			CBV(0, GridInfo, ShaderType_Any);
+		}
+	};
+
+
+
 	// DXR pipeline for pathtracing stage
 	struct DXR_PT_Pipeline : public RTPipelineManager {
 		gObj<RayGenerationHandle> PTMainRays;
@@ -65,10 +83,10 @@ public:
 		class DXR_RT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
 				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDF2_RT.cso"));
-				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDF_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDF_RT.cso"));
 
 				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDFAndDL_RT.cso"));
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDFAndDL_RT.cso"));
+				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDFAndDL_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -91,7 +109,7 @@ public:
 			gObj<Buffer> Vertices;
 			gObj<Buffer> Materials;
 
-			gObj<Buffer> Grid;
+			gObj<Texture3D> Grid;
 
 			gObj<Texture2D>* Textures;
 			int TextureCount;
@@ -136,6 +154,8 @@ public:
 				CBV(3, ProjToWorld);
 				CBV(4, GridInfo);
 				CBV(5, Debug);
+
+				Static_SMP(2, Sampler::PointWithoutMipMaps());
 			}
 
 			void HitGroup_Locals() {
@@ -157,6 +177,7 @@ public:
 	
 	gObj<Voxelizer> voxelizer;
 	gObj<Spreading> spreading;
+	gObj<GridToTexture> gridToTexture;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
 
 	void Startup() {
@@ -170,6 +191,7 @@ public:
 
 		_ gLoad Pipeline(voxelizer);
 		_ gLoad Pipeline(spreading);
+		_ gLoad Pipeline(gridToTexture);
 		_ gLoad Pipeline(dxrPTPipeline);
 		
 		// Load assets to render the deferred lighting image
@@ -178,7 +200,7 @@ public:
 		perform(CreateSceneOnGPU);
 	}
 
-	int gridSize = 1024;
+	int gridSize = 512;
 	struct GridInfo {
 		int Size;
 		float3 Min;
@@ -228,6 +250,8 @@ public:
 		voxelizer->GridInfo = _ gCreate ConstantBuffer<GridInfo>();
 		dxrPTPipeline->_Program->GridInfo = voxelizer->GridInfo;
 		spreading->GridInfo = voxelizer->GridInfo;
+		gridToTexture->GridInfo = voxelizer->GridInfo;
+		gridToTexture->DistanceField = _ gCreate DrawableTexture3D<char>(gridSize, gridSize, gridSize);
 
 		float3 dim = sceneLoader->Scene->getMaximum() - sceneLoader->Scene->getMinimum();
 		float maxDim = max(dim.x, max(dim.y, dim.z));
@@ -303,7 +327,12 @@ public:
 				radius *= 2;
 		}
 
-		dxrPTPipeline->_Program->Grid = Grid;
+		gridToTexture->GridSrc = Grid;
+		compute gSet Pipeline(gridToTexture);
+		compute gDispatch Threads(gridSize * gridSize * gridSize / CS_1D_GROUPSIZE);
+		
+		//dxrPTPipeline->_Program->Grid = Grid;
+		dxrPTPipeline->_Program->Grid = gridToTexture->DistanceField;
 	}
 
 	float4x4 view, proj;

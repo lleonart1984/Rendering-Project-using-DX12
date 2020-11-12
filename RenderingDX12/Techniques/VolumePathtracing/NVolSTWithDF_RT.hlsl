@@ -8,7 +8,8 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define VERTICES_REG				t1
 #define MATERIALS_REG				t2
 #define BACKGROUND_IMG_REG			t3
-StructuredBuffer<uint> Grid : register(t4);
+//StructuredBuffer<uint> Grid : register(t4);
+Texture3D<uint> Grid : register(t4);
 #define TEXTURES_REG				t5
 
 #define TEXTURES_SAMPLER_REG		s0
@@ -60,6 +61,8 @@ cbuffer DebugInfo : register(b5) {
 	int CountSteps;
 }
 
+sampler PointSampler : register(s2);
+
 #define VOL_DIST 4
 
 int split3(int value) {
@@ -83,10 +86,15 @@ int morton(int3 pos) {
 	return split3(pos.x) | (split3(pos.y) << 1) | (split3(pos.z) << 2);
 }
 
-uint GetValueAt(int3 cell) {
-	//int index = Size * (cell.y + cell.z * Size) + cell.x;
-	int index = morton(cell);
-	return (Grid[index >> 3] >> ((index & 0x7) * 4)) & 0xF;
+//uint GetValueAt(int3 cell) {
+//	//int index = Size * (cell.y + cell.z * Size) + cell.x;
+//	int index = morton(cell);
+//	return (Grid[index >> 3] >> ((index & 0x7) * 4)) & 0xF;
+//}
+
+uint GetValueFAt(int3 cell) {
+	//return Grid.SampleGrad(PointSampler, cell / (float)Size, 0, 0);
+	return Grid[cell];// .SampleGrad(PointSampler, cell / (float)Size, 0, 0);
 }
 
 float MaximalRadius(float3 P) {
@@ -95,13 +103,14 @@ float MaximalRadius(float3 P) {
 	{
 		float3 cellSize = (MaximumGrid - MinimumGrid) / Size;
 		int3 cell = (P - MinimumGrid) / cellSize;
-		uint emptySizePower = GetValueAt(cell);
+		uint emptySizePower = GetValueFAt(cell);
 
 		if (emptySizePower <= 0) // no empty cell
 			return 0;
 
 		//float halfboxSize = pow(2, emptySizePower - 1) * 1.4142 - 0.5;// *0.5;
 		float halfboxSize = pow(2, emptySizePower - 1) - 0.5;// *0.5;
+		//float halfboxSize = emptySizePower * 0.5 - 0.5;// *0.5;
 		float3 minBox = (cell + 0.5 - halfboxSize) * cellSize + MinimumGrid;
 		float3 maxBox = (cell + 0.5 + halfboxSize) * cellSize + MinimumGrid;
 
