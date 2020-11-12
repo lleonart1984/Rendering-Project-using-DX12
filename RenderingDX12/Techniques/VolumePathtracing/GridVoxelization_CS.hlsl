@@ -20,6 +20,12 @@ float3 FromPositionToCell(float3 P, float4x4 world) {
 	return (mul(float4(P, 1), world).xyz - Min) * Size / (Max - Min);
 }
 
+void ClampPositive(inout float3 a, inout float3 b, float3 P, float3 N) {
+	float3 d = b - a;
+	float alpha = clamp(dot(a - P, N) / dot(d, N), 0, 1);
+	a += d * max(0, alpha);
+}
+
 [numthreads(CS_1D_GROUPSIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
