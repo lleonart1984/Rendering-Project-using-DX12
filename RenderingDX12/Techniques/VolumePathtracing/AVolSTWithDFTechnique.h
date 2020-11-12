@@ -251,7 +251,7 @@ public:
 		dxrPTPipeline->_Program->GridInfo = voxelizer->GridInfo;
 		spreading->GridInfo = voxelizer->GridInfo;
 		gridToTexture->GridInfo = voxelizer->GridInfo;
-		gridToTexture->DistanceField = _ gCreate DrawableTexture3D<char>(gridSize, gridSize, gridSize);
+		gridToTexture->DistanceField = _ gCreate DrawableTexture3D<float>(gridSize, gridSize, gridSize);
 
 		float3 dim = sceneLoader->Scene->getMaximum() - sceneLoader->Scene->getMinimum();
 		float maxDim = max(dim.x, max(dim.y, dim.z));

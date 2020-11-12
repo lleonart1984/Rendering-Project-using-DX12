@@ -3,7 +3,7 @@
 
 StructuredBuffer<uint>		GridSrc : register(t0);
 
-RWTexture3D<uint> DistanceField : register(u0);
+RWTexture3D<float> DistanceField : register(u0);
 
 cbuffer GridInfo : register(b0) {
 	int Size;

@@ -9,7 +9,7 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define MATERIALS_REG				t2
 #define BACKGROUND_IMG_REG			t3
 //StructuredBuffer<uint> Grid : register(t4);
-Texture3D<uint> Grid : register(t4);
+Texture3D<float> Grid : register(t4);
 #define TEXTURES_REG				t5
 
 #define TEXTURES_SAMPLER_REG		s0
@@ -92,9 +92,9 @@ int morton(int3 pos) {
 //	return (Grid[index >> 3] >> ((index & 0x7) * 4)) & 0xF;
 //}
 
-uint GetValueFAt(int3 cell) {
-	//return Grid.SampleGrad(PointSampler, cell / (float)Size, 0, 0);
-	return Grid[cell];// .SampleGrad(PointSampler, cell / (float)Size, 0, 0);
+float GetValueFAt(int3 cell) {
+	return Grid.SampleLevel(PointSampler, cell / (float)Size, 0);
+	//return Grid[cell];// .SampleGrad(PointSampler, cell / (float)Size, 0, 0);
 }
 
 float MaximalRadius(float3 P) {
