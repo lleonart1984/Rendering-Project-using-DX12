@@ -162,11 +162,11 @@ void ClipPositive(float3 P, float3 N, inout float3 e0, inout float3 e1) {
 }
 
 /// Distance from Side (Corner C, Up U, Right R, Normal N) to Triangle
-float Distance(float3 C, float3 U, float3 R, float3 N, float3 t[3]) {
+float Distance(float3 C, float3 U, float3 R, float3 N, float3 r, float3 t[3]) {
 	float3 p00 = C;
-	float3 p01 = C + R;
-	float3 p10 = C + U;
-	float3 p11 = C + U + R;
+	float3 p01 = C + dot(R,r);
+	float3 p10 = C + dot(U,r);
+	float3 p11 = C + dot(U,r) + dot(R,r);
 
 	float dist = 1000000;
 
@@ -257,8 +257,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
 						currentTriangle = Next[currentTriangle];
 					}
 				}
-				if (type == 1) {
-
+				if (type == 1)
+				{
+					float3 N = b;
+					float3 cellSize = 1 / (Max - Min);
+					float3 C = (currentCell + b)*cellSize;
 				}
 			}
 	
