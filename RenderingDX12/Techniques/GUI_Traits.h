@@ -93,6 +93,8 @@ struct IHasScatteringEvents {
 	
 	bool CountSteps = false;
 
+	float DebugTreshold = 0.01;
+
 	virtual void Boo() {}
 };
 

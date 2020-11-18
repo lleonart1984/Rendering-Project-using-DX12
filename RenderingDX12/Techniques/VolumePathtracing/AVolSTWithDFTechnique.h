@@ -64,11 +64,11 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
-				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDF2_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDF2_RT.cso"));
 				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDF_RT.cso"));
 
 				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDFAndDL_RT.cso"));
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDFAndDL_RT.cso"));
+				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDFAndDL_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -101,7 +101,8 @@ public:
 			gObj<Buffer> ParticipatingMedia;
 			gObj<Buffer> ProjToWorld;
 			gObj<Buffer> GridInfo;
-			int Debug;
+
+			float2 Debug;
 
 			gObj<Texture2D> DirectLighting;
 			gObj<Texture2D> Output;
@@ -338,7 +339,7 @@ public:
 					this->pathtracing
 				});
 		}
-		dxrPTPipeline->_Program->Debug = this->CountSteps ? 1 : 0;
+		dxrPTPipeline->_Program->Debug = float2( this->CountSteps ? 1 : 0, this->DebugTreshold);
 		rtProgram->Frame = int2(FrameIndex, this->CountSteps ? 1 : 0);
 
 		// Set DXR Pipeline

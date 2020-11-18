@@ -57,7 +57,8 @@ cbuffer GridInfo : register(b4) {
 }
 
 cbuffer DebugInfo : register(b5) {
-	int CountSteps;
+	float CountSteps;
+	float DebugThreshold;
 }
 
 #define VOL_DIST 4
@@ -293,7 +294,7 @@ bool GenerateVariablesWithNewModel(float G, float Phi, float3 win, float density
 // Will accumulate emissive and direct lighting modulated by the carrying importance
 // Will update importance with scattered ratio divided by pdf
 // Will output scattered ray to continue with
-void VolumeScattering(inout float3 x, inout float3 w, inout float3 importance, float Extinction, float G, float Phi)
+void VolumeScattering(inout float3 x, inout float3 w, inout float3 importance, float Extinction, float G, float Phi, inout int counter)
 {
 	bool pathTrace = DispatchRaysIndex().x / (float)DispatchRaysDimensions().x < PathtracingPercentage;
 
@@ -308,6 +309,9 @@ void VolumeScattering(inout float3 x, inout float3 w, inout float3 importance, f
 	else {
 
 		float r = MaximalRadius(x);
+
+		if (r > DebugThreshold)
+			counter++;
 
 		if (Extinction * r < 1) {
 			if (random() < 1 - Phi)
@@ -401,7 +405,7 @@ float3 ComputePath(float3 O, float3 D, out int volBounces)
 
 	while (importance[cmp] > 0)
 	{
-		volBounces++;
+		//volBounces++;
 
 		int tIndex;
 		int mIndex;
@@ -429,7 +433,7 @@ float3 ComputePath(float3 O, float3 D, out int volBounces)
 		else // volume scattering
 		{
 			x += t * w;
-			VolumeScattering(x, w, importance, Extinction[cmp], G_Value[cmp], Phi[cmp]);
+			VolumeScattering(x, w, importance, Extinction[cmp], G_Value[cmp], Phi[cmp], volBounces);
 		}
 	}
 
