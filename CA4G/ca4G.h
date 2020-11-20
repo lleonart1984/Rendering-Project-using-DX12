@@ -13384,6 +13384,7 @@ namespace CA4G {
 
 		gObj<Buffer> __NullBuffer = nullptr;
 		gObj<Texture2D> __NullTexture2D = nullptr;
+		gObj<Texture3D> __NullTexture3D = nullptr;
 
 
 		DeviceManager(DX_Device device, int buffers, bool useFrameBuffer, bool isWarpDevice);

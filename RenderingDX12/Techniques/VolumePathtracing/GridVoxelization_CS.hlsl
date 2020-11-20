@@ -48,8 +48,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	int3 minCell = min(c1, min(c2, c3));// -0.00001;
 
 	float2x4 evals = float2x4(
-		dot(minCell + float3(0, 0, 0) - P, V), dot(minCell + float3(1, 0, 0) - P, V), dot(minCell + float3(0, 1, 0) - P, V), dot(minCell + float3(1, 1, 0) - P, V),
-		dot(minCell + float3(0, 0, 1) - P, V), dot(minCell + float3(1, 0, 1) - P, V), dot(minCell + float3(0, 1, 1) - P, V), dot(minCell + float3(1, 1, 1) - P, V)
+		dot(minCell + float3(0, 0, 0) - P, N), dot(minCell + float3(1, 0, 0) - P, N), dot(minCell + float3(0, 1, 0) - P, N), dot(minCell + float3(1, 1, 0) - P, N),
+		dot(minCell + float3(0, 0, 1) - P, N), dot(minCell + float3(1, 0, 1) - P, N), dot(minCell + float3(0, 1, 1) - P, N), dot(minCell + float3(1, 1, 1) - P, N)
 		);
 
 	for (int cz = minCell.z; cz <= maxCell.z; cz++)

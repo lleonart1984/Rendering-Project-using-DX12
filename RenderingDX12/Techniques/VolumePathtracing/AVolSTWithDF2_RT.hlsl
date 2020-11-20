@@ -8,7 +8,7 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 #define VERTICES_REG				t1
 #define MATERIALS_REG				t2
 #define BACKGROUND_IMG_REG			t3
-StructuredBuffer<uint> Grid : register(t4);
+Texture3D<float> Grid				: register(t4);
 #define TEXTURES_REG				t5
 
 #define TEXTURES_SAMPLER_REG		s0
@@ -62,57 +62,21 @@ cbuffer DebugInfo : register(b5) {
 
 #define VOL_DIST 4
 
-int split3(int value) {
-
-	int ans = value & 0x3FF; // allow 10 bits only.
-
-	ans = (ans | ans << 16) & 0xff0000ff;
-	// poniendo 8 ceros entre cada grupo de 4 bits.
-	// shift left 8 bits y despues hacer OR entre ans y 0001000000001111000000001111000000001111000000001111000000000000
-	ans = (ans | ans << 8) & 0x0f00f00f;
-	// poniendo 4 ceros entre cada grupo de 2 bits.
-	// shift left 4 bits y despues hacer OR entre ans y 0001000011000011000011000011000011000011000011000011000011000011
-	ans = (ans | ans << 4) & 0xc30c30c3;
-	// poniendo 2 ceros entre cada bit.
-	// shift left 2 bits y despues hacer OR entre ans y 0001001001001001001001001001001001001001001001001001001001001001
-	ans = (ans | ans << 2) & 0x49249249;
-	return ans;
-}
-
-int morton(int3 pos) {
-	return split3(pos.x) | (split3(pos.y) << 1) | (split3(pos.z) << 2);
-}
-
-uint GetValueAt(int3 cell) {
-	//int index = Size * (cell.y + cell.z * Size) + cell.x;
-	int index = morton(cell);
-	return (Grid[index >> 3] >> ((index & 0x7) * 4)) & 0xF;
-}
-
 float MaximalRadius(float3 P) {
+	float3 cellSize = (MaximumGrid - MinimumGrid) / Size;
+	int3 cell = (P - MinimumGrid) / cellSize;
+	float radius = Grid[cell];
 
-	//if (all(P > MinimumGrid) && all(P < MaximumGrid))
-	{
-		float3 cellSize = (MaximumGrid - MinimumGrid) / Size;
-		int3 cell = (P - MinimumGrid) / cellSize;
-		uint emptySizePower = GetValueAt(cell);
+	if (radius < 0) // no empty cell
+		return 0;
 
-		if (emptySizePower <= 0) // no empty cell
-			return 0;
+	float3 minBox = (cell + 0.5 - radius) * cellSize + MinimumGrid;
+	float3 maxBox = (cell + 0.5 + radius) * cellSize + MinimumGrid;
 
-		//float halfboxSize = pow(2, emptySizePower - 1) * 1.4142 - 0.5;// *0.5;
-		float halfboxSize = pow(2, emptySizePower - 1) - 0.5;// *0.5;
-		float3 minBox = (cell + 0.5 - halfboxSize) * cellSize + MinimumGrid;
-		float3 maxBox = (cell + 0.5 + halfboxSize) * cellSize + MinimumGrid;
-
-		float3 toMin = (P - minBox);
-		float3 toMax = (maxBox - P);
-		float3 m = min(toMin, toMax);
-		return min(m.x, min(m.y, m.z));
-	}
-	return 1000;
-	float3 proj = P <= MinimumGrid ? MinimumGrid : (P >= MaximumGrid ? MaximumGrid : P);
-	return max(0, min(length(P - proj), VOL_DIST - length(P))); // distance to box and to the exterior of vol
+	float3 toMin = (P - minBox);
+	float3 toMax = (maxBox - P);
+	float3 m = min(toMin, toMax);
+	return min(m.x, min(m.y, m.z));
 }
 
 void TransformWavelengthMaterial(inout Material material, float3 color) {

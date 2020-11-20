@@ -203,16 +203,16 @@ int main(int, char**)
 	
 
 	//int windowWidth = 1920; // Full HD
-	//int windowWidth = 1280;
-	int windowWidth = 600*7/5; // Lucys
+	int windowWidth = 1280;
+	//int windowWidth = 600*7/5; // Lucys
 	//int windowWidth = 1024;
 	//int windowWidth = 600 * 7 / 5;
 	//int windowHeight = 300;
 	//int windowHeight = 600 * 7 / 5;
-	//int windowHeight = 768;
+	int windowHeight = 768;
 	//int windowHeight = 1080;
 
-	int windowHeight = 800*7/5; // Lucys
+	//int windowHeight = 800*7/5; // Lucys
 	HWND hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, windowWidth+1024-1008, windowHeight+768-729, NULL, NULL, wc.hInstance, NULL);
 	//HWND hWnd = CreateWindow(_T("CA4G_Samples_Window"), _T("CA4G Samples"), WS_OVERLAPPEDWINDOW, 100, 100, 1280+1024-1008, 800+768-729, NULL, NULL, wc.hInstance, NULL);
 
@@ -308,14 +308,14 @@ int main(int, char**)
 			filePath = desktop_directory();
 			//strcat(filePath, "\\Models\\pitagoras\\model2.obj");
 			//strcat(filePath, "\\Models\\dragon.obj");
-			//strcat(filePath, "\\Models\\Jade_buddha.obj");
+			strcat(filePath, "\\Models\\Jade_buddha.obj");
 			//strcat(filePath, "\\Models\\lucy2.obj");
 			//strcat(filePath, "\\Models\\Bunny.obj");
 			//strcat(filePath, "\\Models\\afrodita\\model.obj");
 			//strcat(filePath, "\\Models\\cupid\\cupid.obj");
 			//strcat(filePath, "\\Models\\david\\david.obj");
 			//strcat(filePath, "\\Models\\weddingRing\\ring.obj");
-			strcat(filePath, "\\Models\\csg\\csg.obj");
+			//strcat(filePath, "\\Models\\csg\\csg.obj");
 			
 			scene = new Scene(filePath);
 
@@ -324,12 +324,12 @@ int main(int, char**)
 			//camera->Target = float3(.43f, 0.133f, 0);
 
 			//// Budha's settings
-			//camera->Position = float3(-0.0, 0.46, .16);
-			//camera->Target = float3(-0.0,0.46,0);
+			camera->Position = float3(-0.0, 0.46, .16);
+			camera->Target = float3(-0.0,0.46,0);
 
 			//// CSG settings
-			camera->Position = float3(-0.0, 1.8, 2.5);
-			camera->Target = float3(-0.0, 0.5, 0);
+			//camera->Position = float3(-0.0, 1.8, 2.5);
+			//camera->Target = float3(-0.0, 0.5, 0);
 
 			//// Bunny's settings
 			//camera->Position = float3(-0.1f, .46f, 1.9f);

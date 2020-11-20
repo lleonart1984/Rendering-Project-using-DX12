@@ -34,6 +34,8 @@ namespace CA4G {
 			__NullBuffer = nullptr;
 		if (!__NullTexture2D.isNull())
 			__NullTexture2D = nullptr;
+		if (!__NullTexture3D.isNull())
+			__NullTexture3D = nullptr;
 
 		delete creating;
 		delete loading;

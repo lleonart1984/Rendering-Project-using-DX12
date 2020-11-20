@@ -18,7 +18,10 @@ public:
 		gObj<Buffer> OB;
 		gObj<Buffer> Transforms;
 
-		gObj<Buffer> Grid;
+		gObj<Buffer> Triangles;
+		gObj<Texture3D> Head;
+		gObj<Buffer> NextBuffer;
+		gObj<Buffer> Malloc;
 
 		gObj<Buffer> GridInfo;
 
@@ -27,7 +30,40 @@ public:
 			SRV(1, OB, ShaderType_Any);
 			SRV(2, Transforms, ShaderType_Any);
 
-			UAV(0, Grid, ShaderType_Any);
+			UAV(0, Triangles, ShaderType_Any);
+			UAV(1, Head, ShaderType_Any);
+			UAV(2, NextBuffer, ShaderType_Any);
+			UAV(3, Malloc, ShaderType_Any);
+
+			CBV(0, GridInfo, ShaderType_Any);
+		}
+	};
+
+	struct InitialDistances : public ComputePipelineBindings {
+		void Setup() {
+			_ gSet ComputeShader(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\GridInitialDistances_CS.cso"));
+		}
+
+		gObj<Buffer> Vertices;
+		gObj<Buffer> OB;
+		gObj<Buffer> Transforms;
+		gObj<Buffer> Triangles;
+		gObj<Texture3D> Head;
+		gObj<Buffer> NextBuffer;
+
+		gObj<Texture3D> DistanceField;
+
+		gObj<Buffer> GridInfo;
+
+		void Globals() {
+			SRV(0, Vertices, ShaderType_Any);
+			SRV(1, OB, ShaderType_Any);
+			SRV(2, Transforms, ShaderType_Any);
+			SRV(3, Triangles, ShaderType_Any);
+			SRV(4, Head, ShaderType_Any);
+			SRV(5, NextBuffer, ShaderType_Any);
+
+			UAV(0, DistanceField, ShaderType_Any);
 
 			CBV(0, GridInfo, ShaderType_Any);
 		}
@@ -41,7 +77,7 @@ public:
 		gObj<Buffer> GridSrc;
 		gObj<Buffer> GridDst;
 		gObj<Buffer> GridInfo;
-		int2 LevelInfo;
+		int LevelInfo;
 
 		void Globals() {
 			UAV(0, GridDst, ShaderType_Any);
@@ -50,7 +86,6 @@ public:
 		}
 
 		void Locals() {
-
 			CBV(1, LevelInfo, ShaderType_Any);
 		}
 	};
@@ -64,11 +99,11 @@ public:
 
 		class DXR_RT_IL : public DXIL_Library<DXR_PT_Pipeline> {
 			void Setup() {
-				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDF2_RT.cso"));
+				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDF2_RT.cso"));
 				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDF_RT.cso"));
 
 				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\AVolSTWithDFAndDL_RT.cso"));
-				_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDFAndDL_RT.cso"));
+				//_ gLoad DXIL(ShaderLoader::FromFile(".\\Techniques\\VolumePathtracing\\NVolSTWithDFAndDL_RT.cso"));
 
 				_ gLoad Shader(Context()->PTMainRays, L"PTMainRays");
 				_ gLoad Shader(Context()->EnvironmentMap, L"EnvironmentMap");
@@ -156,6 +191,7 @@ public:
 	gObj<RetainedSceneLoader> sceneLoader; 
 	
 	gObj<Voxelizer> voxelizer;
+	gObj<InitialDistances> initializing;
 	gObj<Spreading> spreading;
 	gObj<DXR_PT_Pipeline> dxrPTPipeline;
 
@@ -169,6 +205,7 @@ public:
 		wait_for(signal(flush_all_to_gpu));
 
 		_ gLoad Pipeline(voxelizer);
+		_ gLoad Pipeline(initializing);
 		_ gLoad Pipeline(spreading);
 		_ gLoad Pipeline(dxrPTPipeline);
 		
@@ -178,15 +215,15 @@ public:
 		perform(CreateSceneOnGPU);
 	}
 
-	int gridSize = 1024;
+	int gridSize = 512;
 	struct GridInfo {
 		int Size;
 		float3 Min;
 		float3 Max;
 	};
 
-	gObj<Buffer> Grid;
-	gObj<Buffer> GridTmp;
+	gObj<Texture3D> Grid;
+	gObj<Texture3D> GridTmp;
 
 	struct ScatteringParameters {
 		float3 Sigma; float rm0;
@@ -222,10 +259,21 @@ public:
 		voxelizer->Transforms = sceneLoader->TransformBuffer;
 		voxelizer->OB = sceneLoader->ObjectBuffer;
 
-		Grid = _ gCreate RWStructuredBuffer<unsigned int>(gridSize * gridSize * gridSize / 8);
-		GridTmp = _ gCreate RWStructuredBuffer<unsigned int>(gridSize * gridSize * gridSize / 8);
+		voxelizer->Triangles = _ gCreate RWStructuredBuffer<int>(10000000);
+		voxelizer->NextBuffer = _ gCreate RWStructuredBuffer<int>(10000000);
+		voxelizer->Malloc = _ gCreate RWStructuredBuffer<int>(1);
+		voxelizer->Head = _ gCreate DrawableTexture3D<int>(gridSize, gridSize, gridSize);
+		
+		Grid = _ gCreate DrawableTexture3D<float>(gridSize, gridSize, gridSize);
+		GridTmp = _ gCreate DrawableTexture3D<float>(gridSize, gridSize, gridSize);
 
 		voxelizer->GridInfo = _ gCreate ConstantBuffer<GridInfo>();
+		
+		initializing->GridInfo = voxelizer->GridInfo;
+		initializing->Triangles = voxelizer->Triangles;
+		initializing->NextBuffer = voxelizer->NextBuffer;
+		initializing->Head = voxelizer->Head;
+
 		dxrPTPipeline->_Program->GridInfo = voxelizer->GridInfo;
 		spreading->GridInfo = voxelizer->GridInfo;
 
@@ -279,28 +327,25 @@ public:
 	void BuildGrid(gObj<DXRManager> manager) {
 		auto compute = manager.Dynamic_Cast<ComputeManager>();
 
-		voxelizer->Grid = Grid;
-
-		compute gClear UAV(voxelizer->Grid, uint4(0));
+		compute gClear UAV(voxelizer->Head, uint4(-1));
 		compute gSet Pipeline(voxelizer);
 		compute gDispatch Threads((int)ceil(sceneLoader->VertexBuffer->ElementCount / 3.0 / CS_1D_GROUPSIZE));
 
-		int radius = 1;
-		//for (int level = 0; level < 2; level++)
+		initializing->DistanceField = Grid;
+		compute gSet Pipeline(initializing);
+		compute gDispatch Threads(gridSize * gridSize * gridSize / CS_1D_GROUPSIZE);
+
 		for (int level = 0; level < ceil(log(gridSize) / log(2)); level++)
 		{
-			compute gClear UAV(GridTmp, uint4(0));
 			spreading->GridDst = GridTmp;
 			spreading->GridSrc = Grid;
 			compute gSet Pipeline(spreading);
 
-			spreading->LevelInfo = int2(level, radius);
+			spreading->LevelInfo = level;
 			compute gDispatch Threads(gridSize * gridSize * gridSize / CS_1D_GROUPSIZE);
 
 			Grid = spreading->GridDst;
 			GridTmp = spreading->GridSrc;
-			if (level > 0)
-				radius *= 2;
 		}
 
 		dxrPTPipeline->_Program->Grid = Grid;

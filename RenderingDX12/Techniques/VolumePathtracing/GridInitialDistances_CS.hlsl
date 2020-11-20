@@ -16,16 +16,6 @@ cbuffer GridInfo : register(b0) {
 	float3 Max;
 }
 
-float Distance(int triangleIndex, float3 N, float3 P) {
-	float4x4 world = Transforms[OB[triangleIndex * 3]];
-
-	float3 c1 = mul(vertices[triangleIndex * 3 + 0].P, world);
-	float3 c2 = mul(vertices[triangleIndex * 3 + 1].P, world);
-	float3 c3 = mul(vertices[triangleIndex * 3 + 2].P, world);
-
-	return min(dot(c1 - P, N), min(dot(c2 - P, N), dot(c3 - P, N)));
-}
-
 /// Point to Point
 float Distance(float3 p1, float3 p2) {
 	return length(p1 - p2);
@@ -162,11 +152,11 @@ void ClipPositive(float3 P, float3 N, inout float3 e0, inout float3 e1) {
 }
 
 /// Distance from Side (Corner C, Up U, Right R, Normal N) to Triangle
-float Distance(float3 C, float3 U, float3 R, float3 N, float3 r, float3 t[3]) {
+float Distance(float3 C, float3 U, float3 R, float3 N, float3 t[3]) {
 	float3 p00 = C;
-	float3 p01 = C + dot(R,r);
-	float3 p10 = C + dot(U,r);
-	float3 p11 = C + dot(U,r) + dot(R,r);
+	float3 p01 = C + R;
+	float3 p10 = C + U;
+	float3 p11 = C + U + R;
 
 	float dist = 1000000;
 
@@ -189,12 +179,13 @@ float Distance(float3 C, float3 U, float3 R, float3 N, float3 r, float3 t[3]) {
 	return dist;
 }
 
+/// Gets the triangle in Grid space (0,0,0)-(Size, Size, Size)
 void GetTriangle(int triangleIndex, inout float3 t[3]) {
 	float4x4 world = Transforms[OB[triangleIndex * 3]];
 
-	t[0] = mul(vertices[triangleIndex * 3 + 0].P, world);
-	t[1] = mul(vertices[triangleIndex * 3 + 1].P, world);
-	t[2] = mul(vertices[triangleIndex * 3 + 2].P, world);
+	t[0] = (mul(vertices[triangleIndex * 3 + 0].P, world) - Min) * Size / (Max - Min);
+	t[2] = (mul(vertices[triangleIndex * 3 + 2].P, world) - Min) * Size / (Max - Min);
+	t[1] = (mul(vertices[triangleIndex * 3 + 1].P, world) - Min) * Size / (Max - Min);
 }
 
 [numthreads(CS_1D_GROUPSIZE, 1, 1)]
@@ -203,16 +194,20 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	int3 currentCell = int3(DTid.x % Size, DTid.x / Size % Size, DTid.x / (Size * Size));
 
 	if (Head[currentCell] != -1) // not empty cell
-		return; // leave distance equals 0
+	{
+		DistanceField[currentCell] = -1;
+		return;
+	}
 
 	float3 corners[2][2][2];
 	for (int cz = 0; cz < 2; cz++)
 		for (int cy = 0; cy < 2; cy++)
 			for (int cx = 0; cx < 2; cx++) 
-				corners[cx][cy][cz] = Min + (Max - Min) * (currentCell + int3(cx, cy, cz)) / Size;
+				corners[cx][cy][cz] = currentCell + float3(cx, cy, cz);
 
 
-	float dist = 100000;
+	float dist = 0.99999;
+
 	for (int bz = -1; bz <= 1; bz++)
 		for (int by = -1; by <= 1; by++)
 			for (int bx = -1; bx <= 1; bx++)
@@ -260,10 +255,22 @@ void main(uint3 DTid : SV_DispatchThreadID)
 				if (type == 1)
 				{
 					float3 N = b;
-					float3 cellSize = 1 / (Max - Min);
-					float3 C = (currentCell + b)*cellSize;
+					float3 C = currentCell + ((b + 1) / 2); // intentionally int division
+					float3 B = abs(bz) == 1 ? float3(1, 0, 0) : float3(0, 0, 1);
+					float3 T = abs(cross(B, N)); // TODO: improve this!
+
+					int currentTriangle = Head[adjCell];
+					while (currentTriangle != -1) {
+
+						float3 t[3];
+						GetTriangle(currentTriangle, t);
+
+						dist = min(dist, Distance(C, B, T, N, t));
+
+						currentTriangle = Next[currentTriangle];
+					}
 				}
 			}
 	
-	DistanceField[currentCell] = dist;
+	DistanceField[currentCell] = dist; // Value between 0..0.99999 indicating the safe distance in a cell regarding the adjacents.
 }
