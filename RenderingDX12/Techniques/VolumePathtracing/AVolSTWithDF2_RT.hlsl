@@ -319,9 +319,9 @@ void VolumeScattering(inout float3 x, inout float3 w, inout float3 importance, f
 				importance = 0; // absorption
 			}
 
-			w = GeneratePhase(G, w);
-		}
-		else
+		//	w = GeneratePhase(G, w);
+		//}
+		//else
 		{
 
 			float3 _x, _w, _X, _W;
