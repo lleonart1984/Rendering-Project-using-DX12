@@ -307,9 +307,9 @@ int main(int, char**)
 			break;
 		case BUDDHA_OBJ:
 			filePath = desktop_directory();
-			//strcat(filePath, "\\Models\\pitagoras\\model2.obj");
+			strcat(filePath, "\\Models\\pitagoras\\model2.obj");
 			//strcat(filePath, "\\Models\\dragon.obj");
-			strcat(filePath, "\\Models\\Jade_buddha.obj");
+			//strcat(filePath, "\\Models\\Jade_buddha.obj");
 			//strcat(filePath, "\\Models\\lucy2.obj");
 			//strcat(filePath, "\\Models\\Bunny.obj");
 			//strcat(filePath, "\\Models\\afrodita\\model.obj");
@@ -325,8 +325,8 @@ int main(int, char**)
 			//camera->Target = float3(.43f, 0.133f, 0);
 
 			//// Budha's settings
-			camera->Position = float3(-0.0, 0.46, .16);
-			camera->Target = float3(-0.0,0.46,0);
+			//camera->Position = float3(-0.0, 0.46, .16);
+			//camera->Target = float3(-0.0,0.46,0);
 
 			//// CSG settings
 			//camera->Position = float3(-0.0, 1.8, 2.5);
@@ -339,11 +339,11 @@ int main(int, char**)
 
 			//camera->Up = float3(0, 0, 1);
 			//camera->Position = float3(0.1f, 0.65f, 0.80f);
-			//camera->Position = float3(-.0f, .405f, -1.5f);
+			camera->Position = float3(-.0f, .405f, -1.5f);
 			//camera->Position = float3(-.20f, .1205f, -1.25f);
 			//camera->Position = float3(-.4f, .60f, 1.8f);
 			
-			//camera->Target = float3(0, 0.405f, 0);
+			camera->Target = float3(0, 0.405f, 0);
 			//camera->Target = float3(0.5, 0.1205f, 0);
 			//camera->Target = float3(-0.2f, 0.4, 0.0f);
 			

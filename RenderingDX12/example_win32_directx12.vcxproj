@@ -256,6 +256,7 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
     <ClInclude Include="Techniques\Tutorials\Tutorial8.h" />
     <ClInclude Include="Techniques\Tutorials\Tutorial9.h" />
     <ClInclude Include="Techniques\VolumePathtracing\AVolSTWithDFTechnique.h" />
+    <ClInclude Include="Techniques\VolumePathtracing\AVolSTWithEDFTechnique.h" />
     <ClInclude Include="Techniques\VolumePathtracing\VolDirectLightingTechnique.h" />
     <ClInclude Include="Techniques\VolumePathtracing\VolPathtracerTechnique.h" />
     <ClInclude Include="Techniques\VolumePathtracing\VolPurePTTechnique.h" />
@@ -1182,7 +1183,35 @@ PostbuildCopy.bat "$(OutputPath)"</Command>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
       </EntryPointName>
     </FxCompile>
+    <FxCompile Include="Techniques\VolumePathtracing\AVolSTWithEDF_RT.hlsl">
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+    </FxCompile>
     <FxCompile Include="Techniques\VolumePathtracing\BUVoxelization_CS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Techniques\VolumePathtracing\EGrid_InitialDistances_CS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Techniques\VolumePathtracing\EGrid_Spread_CS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Techniques\VolumePathtracing\EGrid_Voxelization_CS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>

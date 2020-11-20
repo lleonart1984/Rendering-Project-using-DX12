@@ -107,6 +107,10 @@
     <FxCompile Include="Techniques\VolumePathtracing\AVolSTWithDFAndDL_RT.hlsl" />
     <FxCompile Include="Techniques\VolumePathtracing\NVolSTWithDFAndDL_RT.hlsl" />
     <FxCompile Include="Techniques\VolumePathtracing\NVolSTWithDF_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\AVolSTWithEDF_RT.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\EGrid_InitialDistances_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\EGrid_Spread_CS.hlsl" />
+    <FxCompile Include="Techniques\VolumePathtracing\EGrid_Voxelization_CS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Imgui\imgui.cpp" />
@@ -232,6 +236,7 @@
     <ClInclude Include="Techniques\VolumeRendering\HGPhase.h" />
     <ClInclude Include="Techniques\VolumeRendering\LorenzMiePhase.h" />
     <ClInclude Include="Techniques\VolumeRendering\NewCVAEScattering.h" />
+    <ClInclude Include="Techniques\VolumePathtracing\AVolSTWithEDFTechnique.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

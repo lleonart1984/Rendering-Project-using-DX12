@@ -67,5 +67,6 @@ using namespace CA4G;
 #include "Techniques/VolumePathtracing/VolSTPathtracerWithDFTechnique.h"
 #include "Techniques/VolumePathtracing/VolPurePTTechnique.h"
 #include "Techniques/VolumePathtracing/AVolSTWithDFTechnique.h"
+#include "Techniques/VolumePathtracing/AVolSTWithEDFTechnique.h"
 
 #include "main.h"
